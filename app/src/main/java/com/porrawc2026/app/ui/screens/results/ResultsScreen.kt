@@ -21,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
 import com.porrawc2026.app.util.ShareUtil
+import com.porrawc2026.app.domain.model.StandingsCalculator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,6 +154,12 @@ fun ResultsScreen(
                 )
             }
 
+            // Prediction stats
+            item {
+                val stats = StandingsCalculator.calculatePredictionStats(matches)
+                PredictionStatsCard(stats)
+            }
+
             // Group stage results
             item {
                 SectionHeader("FASE DE GRUPOS", "+$groupPoints pts")
@@ -281,5 +288,70 @@ private fun ResultRow(match: MatchEntity) {
         if (match.pointsEarned > 0) {
             Text(" +${match.pointsEarned}", style = MaterialTheme.typography.labelSmall, color = AccentGreen, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+@Composable
+private fun PredictionStatsCard(stats: StandingsCalculator.PredictionStats) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = CardDark),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "ESTADÍSTICAS DE ACIERTO",
+                style = MaterialTheme.typography.labelMedium,
+                color = TextMuted,
+                letterSpacing = 2.sp
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                StatItem("Resultados", "${stats.matchesWithResults}/${stats.totalMatches}", WCGold)
+                StatItem("Resultado", "${stats.resultHits}", AccentGreen)
+                StatItem("Exacto", "${stats.exactScoreHits}", AccentBlue)
+                StatItem("Precision", "${"%.0f".format(stats.accuracyPercent)}%", AccentOrange)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val progress = if (stats.matchesWithResults > 0)
+                stats.resultHits.toFloat() / stats.matchesWithResults else 0f
+            LinearProgressIndicator(
+                progress = progress,
+                modifier = Modifier.fillMaxWidth(),
+                color = AccentGreen,
+                trackColor = InputBg
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "${stats.resultHits} aciertos de resultado en ${stats.matchesWithResults} partidos jugados",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatItem(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted
+        )
     }
 }

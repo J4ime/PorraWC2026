@@ -209,7 +209,7 @@ private fun PointsBreakdownCard(
             PointsRow("Eliminatorias", knockoutPoints, AccentGreen)
             PointsRow("50 Preguntas", questionPoints, AccentBlue)
             PointsRow("Goleadores", playerPoints, AccentOrange)
-            Divider(color = SurfaceMedium, modifier = Modifier.padding(vertical = 4.dp))
+            HorizontalDivider(color = SurfaceMedium, modifier = Modifier.padding(vertical = 4.dp))
             PointsRow("TOTAL", groupPoints + knockoutPoints + questionPoints + playerPoints, WCGold, bold = true)
         }
     }
@@ -322,7 +322,7 @@ private fun PredictionStatsCard(stats: StandingsCalculator.PredictionStats) {
             val progress = if (stats.matchesWithResults > 0)
                 stats.resultHits.toFloat() / stats.matchesWithResults else 0f
             LinearProgressIndicator(
-                progress = progress,
+                progress = { progress },
                 modifier = Modifier.fillMaxWidth(),
                 color = AccentGreen,
                 trackColor = InputBg

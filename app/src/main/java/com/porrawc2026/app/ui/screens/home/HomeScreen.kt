@@ -299,7 +299,7 @@ private fun ValidationDialog(
                 // Progress
                 val progress = if (result.totalChecks > 0) result.passedChecks.toFloat() / result.totalChecks else 0f
                 LinearProgressIndicator(
-                    progress = progress,
+                    progress = { progress },
                     modifier = Modifier.fillMaxWidth(),
                     color = if (result.isValid) AccentGreen else AccentOrange,
                     trackColor = InputBg,

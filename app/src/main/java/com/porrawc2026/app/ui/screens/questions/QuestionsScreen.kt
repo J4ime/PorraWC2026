@@ -66,8 +66,9 @@ fun QuestionsScreen(
         ) {
             item {
                 val answered = questions.count { it.predictedAnswer != null }
+                val progress = if (questions.isNotEmpty()) answered.toFloat() / questions.size else 0f
                 LinearProgressIndicator(
-                    progress = { if (questions.isNotEmpty()) answered.toFloat() / questions.size else 0f },
+                    progress = progress,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),

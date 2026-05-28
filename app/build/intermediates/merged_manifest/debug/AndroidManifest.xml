@@ -26,7 +26,6 @@
         android:icon="@mipmap/ic_launcher"
         android:label="Porra WC 2026"
         android:supportsRtl="true"
-        android:testOnly="true"
         android:theme="@style/Theme.PorraWC2026" >
         <activity
             android:name="com.porrawc2026.app.MainActivity"

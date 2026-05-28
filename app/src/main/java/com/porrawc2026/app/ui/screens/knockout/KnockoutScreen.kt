@@ -12,14 +12,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
-import com.porrawc2026.app.data.local.entity.MatchEntity
+import com.porrawc2026.app.ui.components.TournamentBracket
 import com.porrawc2026.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,17 +26,8 @@ fun KnockoutScreen(
     onBackClick: () -> Unit,
     viewModel: KnockoutViewModel = hiltViewModel()
 ) {
-    val matches by viewModel.matches.collectAsState()
     val predictions by viewModel.predictions.collectAsState()
-
-    val rounds = listOf(
-        "Dieciseisavos" to "DIECISEISAVOS - 20 pts",
-        "Octavos" to "OCTAVOS - 40 pts",
-        "Cuartos" to "CUARTOS - 80 pts",
-        "Semifinales" to "SEMIFINALES - 160 pts",
-        "3er puesto" to "3er PUESTO - 250 pts",
-        "Final" to "FINAL - 500 pts"
-    )
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -62,59 +51,82 @@ fun KnockoutScreen(
             colors = TopAppBarDefaults.topAppBarColors(containerColor = WCDarkBlue)
         )
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = WCDarkBlue,
+            contentColor = WCGold
         ) {
-            rounds.forEach { (round, title) ->
-                val roundMatches = matches.filter { it.knockoutRound == round }
-                val roundPredictions = predictions.filter { it.round == round }
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("BRACKET", style = MaterialTheme.typography.labelMedium) }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("PREDECIR", style = MaterialTheme.typography.labelMedium) }
+            )
+        }
 
-                if (roundMatches.isNotEmpty() || roundPredictions.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = WCGold,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
-                        )
-                    }
+        when (selectedTab) {
+            0 -> TournamentBracket(
+                predictions = predictions,
+                modifier = Modifier.fillMaxSize()
+            )
+            1 -> KnockoutPredictionList(
+                predictions = predictions,
+                onPickWinner = { prediction, winner ->
+                    viewModel.savePrediction(prediction.copy(winner = winner))
+                }
+            )
+        }
+    }
+}
 
-                    items(roundPredictions) { prediction ->
-                        KnockoutPredictionCard(
-                            prediction = prediction,
-                            roundPoints = when (round) {
-                                "Dieciseisavos" -> 20
-                                "Octavos" -> 40
-                                "Cuartos" -> 80
-                                "Semifinales" -> 160
-                                "3er puesto" -> 250
-                                "Final" -> 500
-                                else -> 0
-                            },
-                            onPickWinner = { winner ->
-                                viewModel.savePrediction(prediction.copy(winner = winner))
-                            }
-                        )
-                    }
+@Composable
+private fun KnockoutPredictionList(
+    predictions: List<KnockoutPredictionEntity>,
+    onPickWinner: (KnockoutPredictionEntity, Int) -> Unit
+) {
+    val rounds = listOf(
+        "Dieciseisavos" to 20,
+        "Octavos" to 40,
+        "Cuartos" to 80,
+        "Semifinales" to 160,
+        "3er puesto" to 250,
+        "Final" to 500
+    )
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        rounds.forEach { (round, pts) ->
+            val roundPredictions = predictions.filter { it.round == round }
+            if (roundPredictions.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "${round.uppercase()} — $pts pts",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = WCGold,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                    )
+                }
+
+                items(roundPredictions) { prediction ->
+                    KnockoutPredictionCard(
+                        prediction = prediction,
+                        roundPoints = pts,
+                        onPickWinner = { winner -> onPickWinner(prediction, winner) }
+                    )
                 }
             }
-
-            item {
-                Text(
-                    text = "1 = Gana equipo izquierda · 2 = Gana equipo derecha",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            item { Spacer(modifier = Modifier.height(24.dp)) }
         }
+
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 
@@ -142,12 +154,14 @@ private fun KnockoutPredictionCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = TextMuted
                 )
-                Text(
-                    "+$roundPoints pts",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AccentGreen,
-                    fontWeight = FontWeight.Bold
-                )
+                if (prediction.pointsEarned > 0) {
+                    Text(
+                        "+${prediction.pointsEarned} pts",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AccentGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -157,15 +171,13 @@ private fun KnockoutPredictionCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                // Home team
                 Card(
                     onClick = { onPickWinner(1) },
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelectedHome) AccentGreen.copy(alpha = 0.2f) else SurfaceMedium
                     ),
-                    shape = RoundedCornerShape(10.dp),
-                    border = if (isSelectedHome) CardDefaults.outlinedCardBorder() else null
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
@@ -189,26 +201,21 @@ private fun KnockoutPredictionCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
-
                 Text(
                     "VS",
                     style = MaterialTheme.typography.titleMedium,
                     color = WCGold,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp)
                 )
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Away team
                 Card(
                     onClick = { onPickWinner(2) },
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelectedAway) AccentGreen.copy(alpha = 0.2f) else SurfaceMedium
                     ),
-                    shape = RoundedCornerShape(10.dp),
-                    border = if (isSelectedAway) CardDefaults.outlinedCardBorder() else null
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(12.dp),

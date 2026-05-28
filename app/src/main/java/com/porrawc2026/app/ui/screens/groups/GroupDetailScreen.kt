@@ -21,6 +21,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.TeamEntity
 import com.porrawc2026.app.ui.theme.*
+import com.porrawc2026.app.domain.model.StandingsCalculator
+import com.porrawc2026.app.domain.model.StandingEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +35,13 @@ fun GroupDetailScreen(
         .collectAsState(initial = emptyList())
     val matches by viewModel.getGroupMatches(groupLetter)
         .collectAsState(initial = emptyList())
+
+    val standings = remember(teams, matches) {
+        StandingsCalculator.calculateGroupStandings(
+            matches = matches,
+            groupTeams = teams.map { it.name }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -74,8 +83,8 @@ fun GroupDetailScreen(
                 StandingHeader()
             }
 
-            items(teams) { team ->
-                StandingRow(team = team, position = team.rank)
+            items(standings.size) { index ->
+                StandingRow(entry = standings[index], position = index + 1)
             }
 
             item {
@@ -130,7 +139,7 @@ private fun StandingHeader() {
 }
 
 @Composable
-private fun StandingRow(team: TeamEntity, position: Int) {
+private fun StandingRow(entry: StandingEntry, position: Int) {
     val bgColor = if (position <= 2) AccentGreen.copy(alpha = 0.1f) else SurfaceMedium
     Row(
         modifier = Modifier
@@ -140,18 +149,14 @@ private fun StandingRow(team: TeamEntity, position: Int) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("$position", Modifier.width(24.dp), color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
-        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Text(team.flagEmoji, fontSize = 16.sp)
-            Spacer(Modifier.width(6.dp))
-            Text(team.name, color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
-        }
-        Text("0", Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
-        Text("0", Modifier.width(24.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
-        Text("0", Modifier.width(24.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
-        Text("0", Modifier.width(24.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
-        Text("0", Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
-        Text("0", Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
-        Text("0", Modifier.width(32.dp), color = WCGold, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(entry.teamName, Modifier.weight(1f), color = TextPrimary, style = MaterialTheme.typography.bodyMedium)
+        Text("${entry.played}", Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        Text("${entry.won}", Modifier.width(24.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        Text("${entry.drawn}", Modifier.width(24.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        Text("${entry.lost}", Modifier.width(24.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        Text("${entry.goalsFor}", Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        Text("${entry.goalsAgainst}", Modifier.width(28.dp), color = TextSecondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+        Text("${entry.points}", Modifier.width(32.dp), color = WCGold, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 

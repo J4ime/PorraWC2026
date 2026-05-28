@@ -48,11 +48,9 @@ class ResultsViewModel @Inject constructor(
         viewModelScope.launch {
             _isRefreshing.value = true
             try {
-                val response = apiService.getLiveMatches()
-                response.matches.forEach { liveMatch ->
-                    // Update match results in database
-                    val matches = allMatches.value
-                    // Compare and calculate points
+                val response = apiService.getWorldCupMatches()
+                response.matches.forEach { liveMatch: com.porrawc2026.app.data.remote.FootballMatch ->
+                    // Compare and calculate points when live
                 }
                 refreshPoints()
             } catch (e: Exception) {

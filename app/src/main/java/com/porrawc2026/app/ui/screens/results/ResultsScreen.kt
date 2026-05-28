@@ -180,7 +180,7 @@ private fun PointsBreakdownCard(
             PointsRow("Eliminatorias", knockoutPoints, AccentGreen)
             PointsRow("50 Preguntas", questionPoints, AccentBlue)
             PointsRow("Goleadores", playerPoints, AccentOrange)
-            HorizontalDivider(color = SurfaceMedium, modifier = Modifier.padding(vertical = 4.dp))
+            Divider(color = SurfaceMedium, modifier = Modifier.padding(vertical = 4.dp))
             PointsRow("TOTAL", groupPoints + knockoutPoints + questionPoints + playerPoints, WCGold, bold = true)
         }
     }

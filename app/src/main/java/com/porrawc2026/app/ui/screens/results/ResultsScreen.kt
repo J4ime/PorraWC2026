@@ -1,5 +1,6 @@
 package com.porrawc2026.app.ui.screens.results
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -18,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
+import com.porrawc2026.app.util.ShareUtil
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,6 +28,7 @@ fun ResultsScreen(
     onBackClick: () -> Unit,
     viewModel: ResultsViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val totalPoints by viewModel.totalPoints.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val matches by viewModel.allMatches.collectAsState()
@@ -63,6 +67,24 @@ fun ResultsScreen(
                 }
             },
             actions = {
+                IconButton(
+                    onClick = {
+                        val shareText = ShareUtil.buildShareText(
+                            totalPoints = totalPoints,
+                            groupPoints = groupPoints,
+                            knockoutPoints = kokoPoints,
+                            questionPoints = qPoints,
+                            playerPoints = pPoints,
+                            matchesCount = matches.count { !it.isKnockout && it.predictedHomeGoals != null && it.predictedAwayGoals != null },
+                            questionsAnswered = questions.count { it.predictedAnswer != null },
+                            playersNamed = playerPredictions.count { !it.predictedName.isNullOrBlank() },
+                            knockoutPredicted = knockoutPredictions.count { it.winner != null && it.winner in 1..2 }
+                        )
+                        ShareUtil.shareResults(context, "Porra WC 2026", shareText)
+                    }
+                ) {
+                    Icon(Icons.Filled.Share, contentDescription = "Compartir", tint = WCGold)
+                }
                 IconButton(
                     onClick = { viewModel.refreshLiveScores() },
                     enabled = !isRefreshing

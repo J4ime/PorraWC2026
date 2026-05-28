@@ -23,11 +23,8 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper
-
       - name: Run unit tests
-        run: ./gradlew test --no-daemon
+        run: gradle test
 
       - uses: dorny/test-reporter@v1
         if: success() || failure()
@@ -51,11 +48,8 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper
-
       - name: Run regression test suite
-        run: ./gradlew test --tests "com.porrawc2026.app.RegressionTestSuite" --no-daemon
+        run: gradle test --tests "com.porrawc2026.app.RegressionTestSuite"
 
       - uses: dorny/test-reporter@v1
         if: success() || failure()
@@ -79,11 +73,8 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper
-
       - name: Run lint
-        run: ./gradlew lint --no-daemon
+        run: gradle lint
 
       - uses: actions/upload-artifact@v4
         if: success() || failure()
@@ -107,11 +98,8 @@ jobs:
         with:
           gradle-version: '8.5'
 
-      - name: Generate Gradle wrapper
-        run: gradle wrapper
-
       - name: Assemble debug
-        run: ./gradlew assembleDebug --no-daemon
+        run: gradle assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:

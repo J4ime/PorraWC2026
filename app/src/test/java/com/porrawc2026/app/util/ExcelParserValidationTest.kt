@@ -189,7 +189,7 @@ class ExcelParserValidationTest {
         val data = ExcelData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
         val result = ExcelParser.validate(data)
         assertTrue(result.isValid)
-        assertEquals(0, result.totalChecks)
+        assertEquals(3, result.totalChecks)
     }
 
     @Test

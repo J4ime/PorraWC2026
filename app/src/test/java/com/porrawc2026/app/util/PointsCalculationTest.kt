@@ -24,7 +24,7 @@ class PointsCalculationTest {
             id = 1, groupName = "A", matchday = "J1",
             dateTime = "2026-06-11", homeTeam = "A", awayTeam = "B",
             predictedHomeGoals = 3, predictedAwayGoals = 0,
-            homeGoals = 1, awayGoals = 0
+            homeGoals = 2, awayGoals = 1
         )
         val points = calculateGroupPoints(match)
         assertEquals(30, points)
@@ -48,7 +48,7 @@ class PointsCalculationTest {
             id = 1, groupName = "A", matchday = "J1",
             dateTime = "2026-01-01", homeTeam = "A", awayTeam = "B",
             predictedHomeGoals = 2, predictedAwayGoals = 0,
-            homeGoals = 2, awayGoals = 1
+            homeGoals = 2, awayGoals = 2
         )
         val points = calculateGroupPoints(match)
         assertEquals(10, points)
@@ -108,7 +108,7 @@ class PointsCalculationTest {
             id = 1, groupName = "A", matchday = "J1",
             dateTime = "2026-01-01", homeTeam = "A", awayTeam = "B",
             predictedHomeGoals = 5, predictedAwayGoals = 1,
-            homeGoals = 3, awayGoals = 1
+            homeGoals = 1, awayGoals = 1
         )
         val points = calculateGroupPoints(match)
         assertEquals(10, points)

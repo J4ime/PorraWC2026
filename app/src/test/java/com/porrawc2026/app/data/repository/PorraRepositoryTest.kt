@@ -119,7 +119,7 @@ class PorraRepositoryTest {
 
     @Test
     fun `updateMatchPrediction delegates to dao`() = runTest {
-        val match = MatchEntity(1, "A", "J1", "2026-01-01", "México", "Sudáfrica", predHome = 2, predAway = 1)
+        val match = MatchEntity(1, "A", "J1", "2026-01-01", "México", "Sudáfrica", predictedHomeGoals = 2, predictedAwayGoals = 1)
         coEvery { matchDao.updateMatch(any()) } returns Unit
 
         repository.updateMatchPrediction(match)

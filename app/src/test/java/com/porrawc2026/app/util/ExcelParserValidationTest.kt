@@ -38,8 +38,8 @@ class ExcelParserValidationTest {
     @Test
     fun `validate detects missing group predictions`() {
         val matches = listOf(
-            MatchEntity(1, "Grupo A", "J1", "2026-06-11", "México", "Sudáfrica", predHome = 2, predAway = 1),
-            MatchEntity(2, "Grupo A", "J1", "2026-06-11", "Corea del Sur", "República Checa", predHome = null, predAway = null),
+            MatchEntity(1, "Grupo A", "J1", "2026-06-11", "México", "Sudáfrica", predictedHomeGoals = 2, predictedAwayGoals = 1),
+            MatchEntity(2, "Grupo A", "J1", "2026-06-11", "Corea del Sur", "República Checa", predictedHomeGoals = null, predictedAwayGoals = null),
         )
         val questions = (1..50).map {
             QuestionEntity(it, "Pregunta $it", predictedAnswer = true)
@@ -63,7 +63,7 @@ class ExcelParserValidationTest {
     @Test
     fun `validate all group matches predicted passes`() {
         val matches = (1..72).map {
-            MatchEntity(it, "Grupo X", "J1", "2026-06-11", "EquipoA", "EquipoB", predHome = 1, predAway = 0)
+            MatchEntity(it, "Grupo X", "J1", "2026-06-11", "EquipoA", "EquipoB", predictedHomeGoals = 1, predictedAwayGoals = 0)
         }
         val questions = (1..50).map {
             QuestionEntity(it, "Pregunta $it", predictedAnswer = true)
@@ -87,7 +87,7 @@ class ExcelParserValidationTest {
     @Test
     fun `validate detects unanswered questions`() {
         val matches = (1..72).map {
-            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predHome = 1, predAway = 0)
+            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predictedHomeGoals = 1, predictedAwayGoals = 0)
         }
         val questions = (1..50).map { i ->
             QuestionEntity(i, "Pregunta $i", predictedAnswer = if (i <= 40) true else null)
@@ -111,7 +111,7 @@ class ExcelParserValidationTest {
     @Test
     fun `validate all questions answered passes`() {
         val matches = (1..72).map {
-            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predHome = 1, predAway = 0)
+            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predictedHomeGoals = 1, predictedAwayGoals = 0)
         }
         val questions = (1..50).map {
             QuestionEntity(it, "Pregunta $it", predictedAnswer = it % 2 == 0)
@@ -135,7 +135,7 @@ class ExcelParserValidationTest {
     @Test
     fun `validate detects missing player names`() {
         val matches = (1..72).map {
-            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predHome = 1, predAway = 0)
+            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predictedHomeGoals = 1, predictedAwayGoals = 0)
         }
         val questions = (1..50).map {
             QuestionEntity(it, "Q$it", predictedAnswer = true)
@@ -161,7 +161,7 @@ class ExcelParserValidationTest {
     @Test
     fun `validate detects missing knockout winner`() {
         val matches = (1..72).map {
-            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predHome = 1, predAway = 0)
+            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predictedHomeGoals = 1, predictedAwayGoals = 0)
         }
         val questions = (1..50).map {
             QuestionEntity(it, "Q$it", predictedAnswer = true)
@@ -195,7 +195,7 @@ class ExcelParserValidationTest {
     @Test
     fun `validation shows total checks matches expected count`() {
         val matches = (1..72).map {
-            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predHome = 1, predAway = 0)
+            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predictedHomeGoals = 1, predictedAwayGoals = 0)
         }
         val questions = (1..50).map { QuestionEntity(it, "Q$it", predictedAnswer = true) }
         val players = (1..3).map { PlayerPredictionEntity(it, "P$it", predictedName = "N$it") }
@@ -210,7 +210,7 @@ class ExcelParserValidationTest {
     @Test
     fun `validation detects completely empty predictions`() {
         val matches = (1..72).map {
-            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predHome = null, predAway = null)
+            MatchEntity(it, "G", "J1", "2026-01-01", "A", "B", predictedHomeGoals = null, predictedAwayGoals = null)
         }
         val questions = (1..50).map { QuestionEntity(it, "Q$it", predictedAnswer = null) }
         val players = (1..3).map { PlayerPredictionEntity(it, "P$it", predictedName = null) }

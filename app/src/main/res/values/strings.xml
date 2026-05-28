@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Porra WC 2026</string>
+    <string name="home">Inicio</string>
+    <string name="groups">Grupos</string>
+    <string name="knockout">Eliminatorias</string>
+    <string name="questions">Preguntas</string>
+    <string name="players">Jugadores</string>
+    <string name="results">Resultados</string>
+    <string name="import_excel">Cargar Excel</string>
+    <string name="total_points">Puntos totales</string>
+    <string name="group_stage">Fase de grupos</string>
+    <string name="round_of_32">Dieciseisavos</string>
+    <string name="round_of_16">Octavos</string>
+    <string name="quarter_finals">Cuartos</string>
+    <string name="semi_finals">Semifinales</string>
+    <string name="third_place">3er puesto</string>
+    <string name="final_match">Final</string>
+    <string name="champion">Campeón</string>
+    <string name="predictions">Predicciones</string>
+    <string name="live_scores">Resultados en directo</string>
+    <string name="refresh">Actualizar</string>
+    <string name="save">Guardar</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancelar</string>
+</resources>

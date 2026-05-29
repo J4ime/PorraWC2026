@@ -2,6 +2,7 @@ package com.porrawc2026.app.util
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.porrawc2026.app.data.local.entity.*
 import org.apache.poi.ss.usermodel.*
 import java.io.InputStream
@@ -62,6 +63,8 @@ object ExcelParser {
         val playerPredictions = parsePlayers(sheet)
         val knockoutPredictions = parseKnockout(sheet)
         val standings = parseStandings(teams)
+
+        Log.d("ExcelParser", "Parsed: teams=${teams.size}, matches=${matches.size} (group=${matches.count { !it.isKnockout }}, ko=${matches.count { it.isKnockout }}), questions=${questions.size} (answered=${questions.count { it.predictedAnswer != null }}), players=${playerPredictions.size} (named=${playerPredictions.count { !it.predictedName.isNullOrBlank() }}), knockoutPred=${knockoutPredictions.size} (picked=${knockoutPredictions.count { it.winner != null }})")
 
         workbook.close()
         inputStream.close()
@@ -262,9 +265,16 @@ object ExcelParser {
 
     private fun parseQuestions(sheet: Sheet): List<QuestionEntity> {
         val questions = mutableListOf<QuestionEntity>()
+        var skipped = 0
         for (rowIdx in 158..207) {
             val row = sheet.getRow(rowIdx) ?: continue
-            val id = (getCellValue(row, COL_QUESTION_ID) as? Double)?.toInt() ?: continue
+            val idVal = getCellValue(row, COL_QUESTION_ID)
+            val id = when (idVal) {
+                is Double -> idVal.toInt()
+                is String -> idVal.toIntOrNull()
+                else -> null
+            }
+            if (id == null) { skipped++; continue }
             val text = getCellValue(row, COL_QUESTION_TEXT)?.toString() ?: continue
 
             val answerRaw = getCellValue(row, COL_QUESTION_ANSWER)
@@ -286,6 +296,7 @@ object ExcelParser {
                 )
             )
         }
+        Log.d("ExcelParser", "parseQuestions: found ${questions.size}, skipped=$skipped, answered=${questions.count { it.predictedAnswer != null }}")
         return questions
     }
 
@@ -314,6 +325,7 @@ object ExcelParser {
 
     private fun parseKnockout(sheet: Sheet): List<KnockoutPredictionEntity> {
         val predictions = mutableListOf<KnockoutPredictionEntity>()
+        var skipped = 0
 
         val rounds = mapOf(
             99 to "Dieciseisavos",
@@ -330,13 +342,23 @@ object ExcelParser {
                 "Semifinales" -> 2
                 else -> 0
             }
+            var roundSkipped = 0
 
             for (offset in 1..matchCount) {
                 val rowIdx = startRow + offset
-                val row = sheet.getRow(rowIdx) ?: continue
-                val matchNumber = (getCellValue(row, COL_KNOCKOUT_MATCH_NUM) as? Double)?.toInt() ?: continue
-                val homeRef = getCellValue(row, COL_KNOCKOUT_HOME_REF)?.toString() ?: continue
-                val awayRef = getCellValue(row, COL_KNOCKOUT_AWAY_REF)?.toString() ?: continue
+                val row = sheet.getRow(rowIdx)
+                if (row == null) { roundSkipped++; continue }
+                val matchNumVal = getCellValue(row, COL_KNOCKOUT_MATCH_NUM)
+                val matchNumber = when (matchNumVal) {
+                    is Double -> matchNumVal.toInt()
+                    is String -> matchNumVal.toIntOrNull()
+                    else -> null
+                }
+                if (matchNumber == null) { roundSkipped++; continue }
+                val homeRef = getCellValue(row, COL_KNOCKOUT_HOME_REF)?.toString()
+                if (homeRef == null) { roundSkipped++; continue }
+                val awayRef = getCellValue(row, COL_KNOCKOUT_AWAY_REF)?.toString()
+                if (awayRef == null) { roundSkipped++; continue }
 
                 val winnerHome = getCellValue(row, COL_KNOCKOUT_WINNER_HOME)?.let {
                     when (it) {
@@ -364,6 +386,8 @@ object ExcelParser {
                     )
                 )
             }
+            skipped += roundSkipped
+            Log.d("ExcelParser", "parseKnockout $round: expected $matchCount, found ${matchCount - roundSkipped}, skipped $roundSkipped")
         }
 
         // 3rd place

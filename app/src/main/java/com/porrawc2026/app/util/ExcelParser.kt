@@ -288,6 +288,11 @@ object ExcelParser {
                 else -> null
             }
 
+            if (id <= 3) {
+                val cell = row.getCell(COL_QUESTION_ANSWER)
+                Log.d("ExcelParser", "Q$id: cell=$cell, type=${cell?.cellType}, answerRaw=$answerRaw ($answerRaw), answer=$answer")
+            }
+
             questions.add(
                 QuestionEntity(
                     id = id,
@@ -375,6 +380,12 @@ object ExcelParser {
                     }
                 }
                 val winner = winnerHome ?: winnerAway
+
+                if (matchNumber <= 75) {
+                    val cellAb = row.getCell(COL_KNOCKOUT_WINNER_HOME)
+                    val cellAe = row.getCell(COL_KNOCKOUT_WINNER_AWAY)
+                    Log.d("ExcelParser", "KO$matchNumber: AB=${cellAb?.cellType}=${getCellValue(row, COL_KNOCKOUT_WINNER_HOME)}, AE=${cellAe?.cellType}=${getCellValue(row, COL_KNOCKOUT_WINNER_AWAY)}, winner=$winner")
+                }
 
                 predictions.add(
                     KnockoutPredictionEntity(

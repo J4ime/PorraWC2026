@@ -88,13 +88,19 @@ fun HomeScreen(
                 if (isLoading) {
                     CircularProgressIndicator(color = WCDarkBlue, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 } else {
-                    Icon(Icons.Filled.FileUpload, contentDescription = null)
+                    Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Cargar Excel", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(if (hasData) "Actualizar Excel" else "Cargar Excel", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
+        if (!hasData) {
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+            return@LazyColumn
+        }
+
+        // Upcoming matches
         if (upcomingMatches.isNotEmpty()) {
             item {
                 Card(

@@ -10,8 +10,8 @@ import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.ValidationResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
@@ -54,11 +54,14 @@ class HomeViewModel @Inject constructor(
     private val _upcomingMatches = MutableStateFlow<List<MatchDisplay>>(emptyList())
     val upcomingMatches: StateFlow<List<MatchDisplay>> = _upcomingMatches.asStateFlow()
 
-    private val _sectionTitle = MutableStateFlow("PRÓXIMA JORNADA")
+    private val _sectionTitle = MutableStateFlow("")
     val sectionTitle: StateFlow<String> = _sectionTitle.asStateFlow()
 
     private val _errorMessage = MutableSharedFlow<String>()
     val errorMessage: SharedFlow<String> = _errorMessage.asSharedFlow()
+
+    private var cachedMatches: List<MatchEntity> = emptyList()
+    private var refreshJob: Job? = null
 
     init {
         refreshPoints()
@@ -77,8 +80,10 @@ class HomeViewModel @Inject constructor(
                     data.playerPredictions, data.knockoutPredictions, data.standings
                 )
                 _hasData.value = true
+                cachedMatches = data.matches
                 refreshPoints()
-                refreshUpcomingMatches(data.matches)
+                refreshUpcomingMatches()
+                startAutoRefresh()
             } catch (e: Exception) {
                 _errorMessage.emit("Error al cargar el Excel: ${e.message}")
             } finally {
@@ -95,7 +100,23 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun refreshUpcomingMatches(matches: List<MatchEntity>) {
+    private fun startAutoRefresh() {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch(Dispatchers.IO) {
+            var lastDay = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+            while (isActive) {
+                delay(60_000)
+                val now = Calendar.getInstance()
+                val currentDay = now.get(Calendar.DAY_OF_YEAR)
+                if (currentDay != lastDay) {
+                    lastDay = currentDay
+                    refreshUpcomingMatches()
+                }
+            }
+        }
+    }
+
+    private fun refreshUpcomingMatches() {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
         val timeFmt = SimpleDateFormat("HH:mm", Locale.US)
         val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "ES"))
@@ -103,7 +124,7 @@ class HomeViewModel @Inject constructor(
         val today = now.get(Calendar.DAY_OF_YEAR)
         val year = now.get(Calendar.YEAR)
 
-        val groupMatches = matches.filter { !it.isKnockout }
+        val groupMatches = cachedMatches.filter { !it.isKnockout }
         val allDisplay = groupMatches.map { match ->
             val time = if (match.dateTime.isNotBlank()) {
                 try { val d = sdf.parse(match.dateTime); if (d != null) timeFmt.format(d) else "" } catch (e: Exception) { "" }
@@ -131,36 +152,26 @@ class HomeViewModel @Inject constructor(
             )
         }.sortedBy { it.time }
 
-        val todayMatches = allDisplay.filter {
+        val todayMatches = allDisplay.filter { display ->
             try {
-                val dateStr = matches.firstOrNull { m -> m.id == it.id }?.dateTime ?: return@filter false
-                if (dateStr.isBlank()) return@filter false
-                val d = sdf.parse(dateStr) ?: return@filter false
+                val m = cachedMatches.firstOrNull { it.id == display.id } ?: return@filter false
+                if (m.dateTime.isBlank()) return@filter false
+                val d = sdf.parse(m.dateTime) ?: return@filter false
                 val c = Calendar.getInstance().apply { time = d }
                 c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today
             } catch (e: Exception) { false }
         }
 
-        if (todayMatches.isNotEmpty()) {
-            _sectionTitle.value = "HOY — ${todayMatches.first().dateLabel.uppercase()}"
-            _upcomingMatches.value = todayMatches.take(8)
+        _sectionTitle.value = if (todayMatches.isNotEmpty()) {
+            "HOY \u2014 ${todayMatches.first().dateLabel.uppercase()}"
         } else {
-            val futureMatches = allDisplay.filter {
-                try {
-                    val dateStr = matches.firstOrNull { m -> m.id == it.id }?.dateTime ?: return@filter false
-                    if (dateStr.isBlank()) return@filter false
-                    val d = sdf.parse(dateStr) ?: return@filter false
-                    d.after(Date())
-                } catch (e: Exception) { false }
-            }
-            if (futureMatches.isNotEmpty()) {
-                val firstDate = futureMatches.first().dateLabel
-                _sectionTitle.value = firstDate.uppercase().ifBlank { "PRÓXIMA JORNADA" }
-                _upcomingMatches.value = futureMatches.filter { it.dateLabel == firstDate }.take(8)
-            } else {
-                _sectionTitle.value = "PARTIDOS"
-                _upcomingMatches.value = allDisplay.take(8)
-            }
+            "HOY \u2014 ${dateFmt.format(now.time).replace(".", "").uppercase()} - SIN PARTIDOS"
         }
+        _upcomingMatches.value = todayMatches
+    }
+
+    override fun onCleared() {
+        refreshJob?.cancel()
+        super.onCleared()
     }
 }

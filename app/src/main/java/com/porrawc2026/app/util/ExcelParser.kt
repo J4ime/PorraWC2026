@@ -186,8 +186,10 @@ object ExcelParser {
                     else -> null
                 } ?: continue
 
-                val homeCell = cellText(row, COL_MATCH_HOME) ?: continue
-                val awayCell = cellText(row, COL_MATCH_AWAY) ?: continue
+                val homeCell = cellText(row, COL_MATCH_HOME) ?: getCellValue(row, COL_MATCH_HOME)?.toString()
+                    ?: continue
+                val awayCell = cellText(row, COL_MATCH_AWAY) ?: getCellValue(row, COL_MATCH_AWAY)?.toString()
+                    ?: continue
 
                 if (!loggedFirst) {
                     loggedFirst = true

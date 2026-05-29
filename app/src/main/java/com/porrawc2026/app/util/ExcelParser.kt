@@ -403,16 +403,15 @@ object ExcelParser {
         for (rank in 1..3) {
             val rowIdx = 152 + rank
             val row = sheet.getRow(rowIdx) ?: continue
-            val name = cellText(row, COL_PLAYER_NAME)?.trim()?.takeIf { it.isNotEmpty() && it != "0" && it != "0.0" }
+            val raw = cellText(row, COL_PLAYER_NAME)?.trim() ?: ""
+            val name = raw.takeIf { it.isNotEmpty() && !it.matches(Regex("^[\\d.]+$")) && it != "0" && it != "0.0" }
+
+            Log.d("ExcelParser", "Player $rank (r$rowIdx): raw='$raw' name='$name'")
 
             players.add(
                 PlayerPredictionEntity(
                     rank = rank,
-                    playerName = when (rank) {
-                        1 -> "1er Goleador"
-                        2 -> "2do Goleador"
-                        else -> "3er Goleador"
-                    },
+                    playerName = when (rank) { 1 -> "1er Goleador"; 2 -> "2do Goleador"; else -> "3er Goleador" },
                     predictedName = name
                 )
             )

@@ -139,7 +139,7 @@ fun HomeScreen(
                 SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, AccentBlue, hasData, onNavigateToQuestions)
             }
         }
-        item { Spacer(modifier = Modifier.height(16.dp)) }
+        item { Spacer(modifier = Modifier.height(48.dp)) }
     }
 }
 

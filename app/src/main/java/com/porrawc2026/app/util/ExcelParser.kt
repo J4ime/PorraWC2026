@@ -187,9 +187,9 @@ object ExcelParser {
                 } ?: continue
 
                 val homeCell = cellText(row, COL_MATCH_HOME) ?: getCellValue(row, COL_MATCH_HOME)?.toString()
-                    ?: continue
+                if (homeCell == null) { Log.d("ExcelParser", "Skip r$rowIdx: no home team"); continue }
                 val awayCell = cellText(row, COL_MATCH_AWAY) ?: getCellValue(row, COL_MATCH_AWAY)?.toString()
-                    ?: continue
+                if (awayCell == null) { Log.d("ExcelParser", "Skip r$rowIdx: no away team"); continue }
 
                 if (!loggedFirst) {
                     loggedFirst = true
@@ -260,6 +260,7 @@ object ExcelParser {
             }
         }
 
+        Log.d("ExcelParser", "parseMatches: found ${matches.size} (group=${matches.count { !it.isKnockout }}, ko=${matches.count { it.isKnockout }})")
         return matches
     }
 

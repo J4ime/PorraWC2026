@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import com.porrawc2026.app.data.local.entity.*
 import org.apache.poi.ss.usermodel.*
+import org.apache.poi.ss.util.CellRangeAddress
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.*
@@ -51,6 +52,7 @@ object ExcelParser {
     private const val COL_KNOCKOUT_AWAY_REF = 13
 
     private lateinit var formatter: DataFormatter
+    private var cachedSheet: Sheet? = null
 
     fun parse(context: Context, uri: Uri): ExcelData {
         val inputStream: InputStream = context.contentResolver.openInputStream(uri)
@@ -72,6 +74,7 @@ object ExcelParser {
 
         Log.d("ExcelParser", "Parsed: teams=${teams.size}, matches=${matches.size} (group=${matches.count { !it.isKnockout }}, ko=${matches.count { it.isKnockout }}), questions=${questions.size} (answered=${questions.count { it.predictedAnswer != null }}), players=${playerPredictions.size} (named=${playerPredictions.count { !it.predictedName.isNullOrBlank() }}), knockoutPred=${knockoutPredictions.size} (picked=${knockoutPredictions.count { it.winner != null }})")
 
+        cachedSheet = sheet
         workbook.close()
         inputStream.close()
 
@@ -81,73 +84,174 @@ object ExcelParser {
     fun validate(data: ExcelData): ValidationResult {
         val errors = mutableListOf<String>()
         val warnings = mutableListOf<String>()
-        var total = 0
-        var passed = 0
+
+        val sheet = cachedSheet
+        if (sheet != null) {
+            val agResult = validateAgColumn(sheet)
+            errors.addAll(agResult.errors)
+            warnings.addAll(agResult.warnings)
+
+            val missingMatches = data.matches.count { it.predictedHomeGoals == null || it.predictedAwayGoals == null }
+            val missingQuestions = data.questions.count { it.predictedAnswer == null }
+            val missingKnockout = data.knockoutPredictions.count { it.winner == null || it.winner !in 1..2 }
+            val missingPlayers = data.playerPredictions.count { it.predictedName.isNullOrBlank() }
+
+            return ValidationResult(
+                isValid = agResult.isValid,
+                totalChecks = agResult.totalRows,
+                passedChecks = agResult.greenCount,
+                failedChecks = agResult.redCount,
+                errors = errors,
+                warnings = warnings,
+                pendingMatches = missingMatches,
+                pendingQuestions = missingQuestions,
+                pendingKnockout = missingKnockout,
+                pendingPlayers = missingPlayers
+            )
+        }
 
         val groupMatches = data.matches.filter { !it.isKnockout }
-        total += groupMatches.size
-        var predictedMatches = 0
-        groupMatches.forEach { match ->
-            if (match.predictedHomeGoals != null && match.predictedAwayGoals != null) {
-                predictedMatches++
-            } else {
-                val label = if (match.groupName.isNotEmpty()) "(${match.groupName})" else ""
-                errors.add("Falta predicción: ${match.homeTeam} vs ${match.awayTeam} $label")
-            }
-        }
-        passed += predictedMatches
-
-        total += data.questions.size
+        val predictedMatches = groupMatches.count { it.predictedHomeGoals != null && it.predictedAwayGoals != null }
         val answeredQuestions = data.questions.count { it.predictedAnswer != null }
-        passed += answeredQuestions
-        data.questions.forEach { q ->
-            if (q.predictedAnswer == null) {
-                errors.add("Pregunta ${q.id} sin responder: ${q.text.take(80)}...")
-            }
-        }
-
-        total += data.playerPredictions.size
         val namedPlayers = data.playerPredictions.count { !it.predictedName.isNullOrBlank() }
-        passed += namedPlayers
-        if (namedPlayers < 3) {
-            errors.add("Faltan ${3 - namedPlayers} jugador(es) por nombrar")
-        }
+        val predictedKnockout = data.knockoutPredictions.count { it.winner != null && it.winner in 1..2 }
 
-        val knockoutOnly = data.knockoutPredictions
-        total += knockoutOnly.size
-        val predictedKnockout = knockoutOnly.count { it.winner != null && it.winner in 1..2 }
-        passed += predictedKnockout
-        knockoutOnly.forEach { k ->
-            if (k.winner == null || k.winner !in 1..2) {
-                errors.add("Sin ganador en ${k.round}: ${k.homeTeamRef} vs ${k.awayTeamRef}")
-            }
+        if (data.matches.isEmpty() && data.questions.isEmpty() && data.playerPredictions.isEmpty()) {
+            errors.add("EL EXCEL NO CONTIENE PREDICCIONES. ¿Has rellenado las casillas?")
         }
 
         val totalPredicted = predictedMatches + answeredQuestions + namedPlayers + predictedKnockout
-        val totalExpected = groupMatches.size + data.questions.size + 3 + knockoutOnly.size
-
-        if (totalPredicted == 0) {
-            errors.add(0, "EL EXCEL NO CONTIENE PREDICCIONES. ¿Has rellenado las casillas grises?")
-        }
-
-        val failed = total - passed
-        val missingMatches = groupMatches.count { it.predictedHomeGoals == null || it.predictedAwayGoals == null }
-        val missingQuestions = data.questions.count { it.predictedAnswer == null }
-        val missingKnockout = knockoutOnly.count { it.winner == null || it.winner !in 1..2 }
-        val missingPlayers = data.playerPredictions.count { it.predictedName.isNullOrBlank() }
+        val totalExpected = groupMatches.size + data.questions.size + 3 + data.knockoutPredictions.size
 
         return ValidationResult(
-            isValid = failed == 0,
+            isValid = data.matches.isNotEmpty() && predictedKnockout > 0,
             totalChecks = totalExpected,
             passedChecks = totalPredicted,
-            failedChecks = failed,
+            failedChecks = totalExpected - totalPredicted,
             errors = errors,
             warnings = warnings,
-            pendingMatches = missingMatches,
-            pendingQuestions = missingQuestions,
-            pendingKnockout = missingKnockout,
-            pendingPlayers = missingPlayers
+            pendingMatches = groupMatches.count { it.predictedHomeGoals == null || it.predictedAwayGoals == null },
+            pendingQuestions = data.questions.count { it.predictedAnswer == null },
+            pendingKnockout = data.knockoutPredictions.count { it.winner == null || it.winner !in 1..2 },
+            pendingPlayers = data.playerPredictions.count { it.predictedName.isNullOrBlank() }
         )
+    }
+
+    data class AgValidationResult(
+        val isValid: Boolean,
+        val totalRows: Int,
+        val greenCount: Int,
+        val redCount: Int,
+        val errors: List<String>,
+        val warnings: List<String>
+    )
+
+    private fun validateAgColumn(sheet: Sheet): AgValidationResult {
+        val errors = mutableListOf<String>()
+        val warnings = mutableListOf<String>()
+        var green = 0
+        var red = 0
+        var total = 0
+
+        val dataValidations = sheet.dataValidations
+        Log.d("ExcelParser", "AG validate: found ${dataValidations.size} data validations on sheet")
+
+        val agValidationRegions = dataValidations.mapNotNull { dv ->
+            val regions = dv.regions.cellRangeAddresses
+            val ag32 = regions.filter { addr ->
+                addr.firstColumn <= 32 && addr.lastColumn >= 32
+            }
+            if (ag32.isNotEmpty()) dv to ag32 else null
+        }
+
+        for (rowIdx in 4..208) {
+            val row = sheet.getRow(rowIdx) ?: continue
+            val agCell = row.getCell(32) ?: continue
+            total++
+
+            val cellValue = try { formatter.formatCellValue(agCell).trim() } catch (e: Exception) { "" }
+            val cellType = try { agCell.cellType } catch (e: Exception) { null }
+
+            val isValid = isAgCellValid(agCell, agValidationRegions)
+
+            if (isValid) {
+                green++
+            } else {
+                red++
+                val rowLabel = when (rowIdx) {
+                    in 4..9 -> "Grupo A, fila $rowIdx"
+                    in 10..17 -> "Grupo B, fila $rowIdx"
+                    in 18..25 -> "Grupo C, fila $rowIdx"
+                    in 26..33 -> "Grupo D, fila $rowIdx"
+                    in 34..41 -> "Grupo E, fila $rowIdx"
+                    in 42..49 -> "Grupo F, fila $rowIdx"
+                    in 50..57 -> "Grupo G, fila $rowIdx"
+                    in 58..65 -> "Grupo H, fila $rowIdx"
+                    in 66..73 -> "Grupo I, fila $rowIdx"
+                    in 74..81 -> "Grupo J, fila $rowIdx"
+                    in 82..89 -> "Grupo K, fila $rowIdx"
+                    in 90..97 -> "Grupo L, fila $rowIdx"
+                    in 98..147 -> "Eliminatorias, fila $rowIdx"
+                    in 148..157 -> "Goleadores, fila $rowIdx"
+                    in 158..208 -> "Preguntas, fila $rowIdx"
+                    else -> "Fila $rowIdx"
+                }
+                if (red <= 10) {
+                    errors.add("$rowLabel — valor: '$cellValue' (${cellType})")
+                }
+            }
+        }
+
+        if (total > 0 && red == 0) {
+            warnings.add("Columna AG validada: $green celdas OK")
+        }
+
+        Log.d("ExcelParser", "AG validate: total=$total green=$green red=$red")
+        return AgValidationResult(
+            isValid = red == 0 && total > 0,
+            totalRows = total,
+            greenCount = green,
+            redCount = red,
+            errors = errors,
+            warnings = warnings
+        )
+    }
+
+    private fun isAgCellValid(cell: Cell, validations: List<Pair<DataValidation, List<CellRangeAddress>>>): Boolean {
+        val cellValue = try { formatter.formatCellValue(cell).trim() } catch (e: Exception) { "" }
+
+        if (cellValue.isEmpty() || cellValue == "0" || cellValue == "0.0") return false
+
+        for ((dv, regions) in validations) {
+            val rowIdx = cell.rowIndex
+            val colIdx = cell.columnIndex
+            if (regions.any { it.isInRange(rowIdx, colIdx) }) {
+                val constraint = dv.validationConstraint
+                return when (constraint.validationType) {
+                    DataValidationConstraint.ValidationType.LIST -> {
+                        val allowed = constraint.explicitListValues
+                        allowed.any { it.equals(cellValue, ignoreCase = true) }
+                    }
+                    DataValidationConstraint.ValidationType.INTEGER,
+                    DataValidationConstraint.ValidationType.DECIMAL -> {
+                        val v = cellValue.replace(',', '.').toDoubleOrNull()
+                        if (v == null) {
+                            dv.emptyCellAllowed
+                        } else {
+                            val min = constraint.formula1.replace(",", ".").toDoubleOrNull() ?: Double.MIN_VALUE
+                            val max = constraint.formula2.replace(",", ".").toDoubleOrNull() ?: Double.MAX_VALUE
+                            v in min..max
+                        }
+                    }
+                    DataValidationConstraint.ValidationType.TEXT_LENGTH,
+                    DataValidationConstraint.ValidationType.FORMULA,
+                    DataValidationConstraint.ValidationType.ANY -> true
+                    else -> true
+                }
+            }
+        }
+
+        return cellValue.isNotBlank() && cellValue != "0" && cellValue != "0.0"
     }
 
     private fun parseTeams(workbook: Workbook): List<TeamEntity> {

@@ -23,8 +23,7 @@ data class MatchDisplay(
     val awayTeam: String,
     val groupLabel: String,
     val dateTime: String,
-    val time: String,
-    val tvChannel: String
+    val time: String
 )
 
 @HiltViewModel
@@ -94,25 +93,23 @@ class HomeViewModel @Inject constructor(
         val year = now.get(Calendar.YEAR)
 
         val groupMatches = matches.filter { !it.isKnockout }
-        val upcoming = groupMatches.mapNotNull { match ->
-            try {
-                val date = sdf.parse(match.dateTime) ?: return@mapNotNull null
-                val cal = Calendar.getInstance().apply { time = date }
-                MatchDisplay(
-                    id = match.id,
-                    homeTeam = match.homeTeam,
-                    awayTeam = match.awayTeam,
-                    groupLabel = match.groupName,
-                    dateTime = match.dateTime,
-                    time = timeFmt.format(date),
-                    tvChannel = getTvChannel(cal)
-                )
-            } catch (e: Exception) { null }
+        val upcoming = groupMatches.map { match ->
+            val time = if (match.dateTime.isNotBlank()) {
+                try { val d = sdf.parse(match.dateTime); if (d != null) timeFmt.format(d) else "" } catch (e: Exception) { "" }
+            } else ""
+            MatchDisplay(
+                id = match.id,
+                homeTeam = match.homeTeam,
+                awayTeam = match.awayTeam,
+                groupLabel = match.groupName,
+                dateTime = match.dateTime,
+                time = time
+            )
         }.sortedBy { it.dateTime }
 
-        // Find today's matches or next matchday
         val todayMatches = upcoming.filter {
             try {
+                if (it.dateTime.isBlank()) return@filter false
                 val d = sdf.parse(it.dateTime) ?: return@filter false
                 val c = Calendar.getInstance().apply { time = d }
                 c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today
@@ -122,9 +119,9 @@ class HomeViewModel @Inject constructor(
         _upcomingMatches.value = if (todayMatches.isNotEmpty()) {
             todayMatches.take(6)
         } else {
-            // Next matchday
             val futureMatches = upcoming.filter {
                 try {
+                    if (it.dateTime.isBlank()) return@filter false
                     val d = sdf.parse(it.dateTime) ?: return@filter false
                     d.after(Date())
                 } catch (e: Exception) { false }
@@ -135,16 +132,6 @@ class HomeViewModel @Inject constructor(
             } else {
                 upcoming.take(6)
             }
-        }
-    }
-
-    private fun getTvChannel(date: Calendar): String {
-        // World Cup 2026 Spain TV rights - RTVE has main rights
-        val hour = date.get(Calendar.HOUR_OF_DAY)
-        return when {
-            hour >= 20 -> "La 1 TVE"
-            hour >= 15 -> "Teledeporte"
-            else -> "RTVE Play / La 1"
         }
     }
 }

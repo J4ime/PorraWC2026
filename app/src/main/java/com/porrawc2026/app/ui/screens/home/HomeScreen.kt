@@ -187,14 +187,12 @@ private fun MatchRow(match: MatchDisplay) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.width(46.dp)) {
-            Text(match.time, style = MaterialTheme.typography.labelMedium, color = WCGold, fontWeight = FontWeight.Bold)
+            Text(match.time.ifBlank { "?" }, style = MaterialTheme.typography.labelMedium, color = WCGold, fontWeight = FontWeight.Bold)
             Text(match.groupLabel, style = MaterialTheme.typography.labelSmall, color = TextMuted)
         }
         Text(match.homeTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary, textAlign = TextAlign.End, maxLines = 1)
         Text(" vs ", style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(horizontal = 2.dp))
         Text(match.awayTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(match.tvChannel, style = MaterialTheme.typography.labelSmall, color = AccentBlue, modifier = Modifier.width(68.dp), textAlign = TextAlign.Center)
     }
 }
 
@@ -232,7 +230,7 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
                 }
                 if (!result.isValid) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Puedes completar los datos desde la app", style = MaterialTheme.typography.labelSmall, color = TextMuted,
+                    Text("Corrige los errores en el Excel y vuelve a cargarlo", style = MaterialTheme.typography.labelSmall, color = TextMuted,
                         modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 }
             }

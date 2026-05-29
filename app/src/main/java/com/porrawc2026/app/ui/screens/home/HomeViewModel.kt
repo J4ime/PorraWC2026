@@ -67,7 +67,7 @@ class HomeViewModel @Inject constructor(
     private var livePollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
 
-    init { refreshPoints(); loadPlayers() }
+    init { refreshPoints(); loadPlayers(); preloadSchedule() }
 
     fun importExcel(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -110,6 +110,23 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             repository.getPlayerPredictions().collect { _players.value = it.sortedBy { p -> p.rank } }
         }
+    }
+
+    private fun preloadSchedule() {
+        val scheduleDates = hardcodedMatchDates()
+        val placeholder = scheduleDates.map { (id, pair) ->
+            val (date, _) = pair
+            val groupIndex = (id - 1) / 6
+            val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
+            MatchEntity(
+                id = id, groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
+                matchday = "J${(id - 1) % 6 + 1}", dateTime = date,
+                homeTeam = "Equipo A", awayTeam = "Equipo B",
+                isKnockout = false
+            )
+        }
+        cachedMatches = placeholder
+        refreshUpcomingMatches()
     }
 
     private suspend fun recalcAllPoints() {

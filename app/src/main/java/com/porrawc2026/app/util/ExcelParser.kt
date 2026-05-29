@@ -402,7 +402,7 @@ object ExcelParser {
         val players = mutableListOf<PlayerPredictionEntity>()
 
         for (rank in 1..3) {
-            val rowIdx = 153 + rank  // rows 154-156
+            val rowIdx = 152 + rank  // AA154, AA155, AA156
             val row = sheet.getRow(rowIdx) ?: continue
             val name = cellText(row, COL_PLAYER_NAME)?.trim()?.takeIf { it.isNotEmpty() && !it.matches(Regex("^[\\d.]+$")) }
             val pts = cellInt(row, COL_PLAYER_POINTS) ?: when (rank) { 1 -> 50; 2 -> 30; else -> 10 }

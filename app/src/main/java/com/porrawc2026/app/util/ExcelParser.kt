@@ -272,7 +272,16 @@ object ExcelParser {
 
             if (rowIdx in sampleRows) {
                 val cell = row.getCell(COL_QUESTION_ANSWER)
-                Log.d("ExcelParser", "Q$id(row$rowIdx): cell=${cell?.cellType}, raw='$answerRaw', answer=$answer")
+                val raw = if (cell != null) {
+                    when (cell.cellType) {
+                        CellType.NUMERIC -> cell.numericCellValue.toString()
+                        CellType.STRING -> cell.stringCellValue
+                        CellType.BOOLEAN -> cell.booleanCellValue.toString()
+                        CellType.FORMULA -> "F:${cell.cachedFormulaResultType}=${cell.numericCellValue}"
+                        else -> formatter.formatCellValue(cell)
+                    }
+                } else "null"
+                Log.d("ExcelParser", "Q$id(r$rowIdx): type=${cell?.cellType}, raw='$raw', txt='$answerRaw', ans=$answer")
             }
 
             questions.add(
@@ -351,7 +360,11 @@ object ExcelParser {
                 val winner = winnerHome ?: winnerAway
 
                 if (matchNumber <= 76) {
-                    Log.d("ExcelParser", "KO$matchNumber(row$rowIdx): AB='$whRaw', AE='$waRaw', winner=$winner")
+                    val cAb = row.getCell(COL_KNOCKOUT_WINNER_HOME)
+                    val cAe = row.getCell(COL_KNOCKOUT_WINNER_AWAY)
+                    val rawAb = if (cAb != null) when (cAb.cellType) { CellType.NUMERIC -> cAb.numericCellValue.toString(); CellType.FORMULA -> "F:${cAb.cachedFormulaResultType}=${try { cAb.numericCellValue } catch(e:Exception) { cAb.stringCellValue }}"; else -> formatter.formatCellValue(cAb) } else "null"
+                    val rawAe = if (cAe != null) when (cAe.cellType) { CellType.NUMERIC -> cAe.numericCellValue.toString(); CellType.FORMULA -> "F:${cAe.cachedFormulaResultType}=${try { cAe.numericCellValue } catch(e:Exception) { cAe.stringCellValue }}"; else -> formatter.formatCellValue(cAe) } else "null"
+                    Log.d("ExcelParser", "KO$matchNumber(r$rowIdx): AB=$rawAb, AE=$rawAe, wh='$whRaw', wa='$waRaw', w=$winner")
                 }
 
                 predictions.add(
@@ -394,8 +407,33 @@ object ExcelParser {
 
     private fun cellText(row: Row, colIndex: Int): String? {
         val cell = row.getCell(colIndex) ?: return null
-        val text = formatter.formatCellValue(cell).trim()
-        return text.ifEmpty { null }
+        return when (cell.cellType) {
+            CellType.STRING -> cell.stringCellValue.trim().takeIf { it.isNotEmpty() }
+            CellType.NUMERIC -> {
+                if (DateUtil.isCellDateFormatted(cell)) null
+                else {
+                    val d = cell.numericCellValue
+                    if (d == d.toLong().toDouble()) d.toLong().toString() else d.toString()
+                }
+            }
+            CellType.BOOLEAN -> cell.booleanCellValue.toString()
+            CellType.FORMULA -> {
+                try {
+                    when (cell.cachedFormulaResultType) {
+                        CellType.STRING -> cell.stringCellValue.trim().takeIf { it.isNotEmpty() }
+                        CellType.NUMERIC -> {
+                            val d = cell.numericCellValue
+                            if (d == d.toLong().toDouble()) d.toLong().toString() else d.toString()
+                        }
+                        CellType.BOOLEAN -> cell.booleanCellValue.toString()
+                        else -> formatter.formatCellValue(cell).trim().takeIf { it.isNotEmpty() }
+                    }
+                } catch (e: Exception) {
+                    formatter.formatCellValue(cell).trim().takeIf { it.isNotEmpty() }
+                }
+            }
+            else -> formatter.formatCellValue(cell).trim().takeIf { it.isNotEmpty() }
+        }
     }
 
     private fun cellInt(row: Row, colIndex: Int): Int? {

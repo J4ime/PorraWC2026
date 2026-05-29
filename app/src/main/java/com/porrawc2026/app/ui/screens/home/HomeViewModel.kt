@@ -67,7 +67,7 @@ class HomeViewModel @Inject constructor(
     init { refreshPoints() }
 
     fun importExcel(uri: Uri) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             _validationResult.value = null
             try {
@@ -81,10 +81,12 @@ class HomeViewModel @Inject constructor(
                 _hasData.value = true
                 cachedMatches = data.matches
                 lastWrittenScores.clear()
+                Log.d("HomeVM", "Imported ${cachedMatches.size} matches, enriching schedule...")
                 enrichScheduleFromApi()
                 recalcAllPoints()
                 refreshPoints()
                 refreshUpcomingMatches()
+                Log.d("HomeVM", "After enrich: match1 tv='${cachedMatches.firstOrNull()?.tvChannel}' dt='${cachedMatches.firstOrNull()?.dateTime}'")
                 startAutoRefresh()
             } catch (e: Exception) {
                 _errorMessage.emit("Error al cargar el Excel: ${e.message}")
@@ -416,8 +418,18 @@ class HomeViewModel @Inject constructor(
 
     private fun enrichScheduleFallback() {
         val fallbackDates = hardcodedMatchDates()
-        val tvSchedule = TvScraper.fetchSchedule()
-        Log.d("HomeVM", "TV scraper: ${tvSchedule.size} matches from futbolenlatv.es")
+        var tvCount = 0
+        lateinit var tvSchedule: List<TvScraper.TvMatch>
+        try {
+            tvSchedule = TvScraper.fetchSchedule()
+            Log.d("HomeVM", "TV scraper returned ${tvSchedule.size} matches")
+            if (tvSchedule.isNotEmpty()) {
+                Log.d("HomeVM", "First TV match: ${tvSchedule.first().homeTeam} vs ${tvSchedule.first().awayTeam} → ${tvSchedule.first().tvChannel}")
+            }
+        } catch (e: Exception) {
+            Log.e("HomeVM", "TV scraper exception: ${e.message}")
+            tvSchedule = emptyList()
+        }
 
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
@@ -427,8 +439,10 @@ class HomeViewModel @Inject constructor(
             } else {
                 TvScraper.matchTv(match.homeTeam, match.awayTeam, tvSchedule)
             }
+            if (tv.isNotBlank() && tv != "DAZN") tvCount++
             match.copy(dateTime = date, tvChannel = tv)
         }
+        Log.d("HomeVM", "Enriched ${cachedMatches.size} matches, $tvCount with RTVE, dates from schedule")
     }
 
     override fun onCleared() {

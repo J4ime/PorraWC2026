@@ -32,6 +32,9 @@ data class MatchDisplay(
     val awayFlag: String,
     val homeGoals: Int?,
     val awayGoals: Int?,
+    val predictedHomeGoals: Int?,
+    val predictedAwayGoals: Int?,
+    val pointsEarned: Int,
     val groupLabel: String,
     val status: MatchStatus,
     val tvChannel: String
@@ -337,6 +340,9 @@ class HomeViewModel @Inject constructor(
             homeFlag = ExcelParser.getFlagEmoji(match.homeTeam),
             awayFlag = ExcelParser.getFlagEmoji(match.awayTeam),
             homeGoals = match.homeGoals, awayGoals = match.awayGoals,
+            predictedHomeGoals = match.predictedHomeGoals,
+            predictedAwayGoals = match.predictedAwayGoals,
+            pointsEarned = match.pointsEarned,
             groupLabel = match.groupName, status = status, tvChannel = match.tvChannel
         )
     }

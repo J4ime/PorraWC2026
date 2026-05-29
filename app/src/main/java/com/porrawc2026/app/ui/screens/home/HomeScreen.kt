@@ -18,15 +18,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
-import com.porrawc2026.app.ui.theme.*
+import com.porrawc2026.app.util.PlayerPhotoResolver
 import com.porrawc2026.app.util.ValidationResult
 
 @Composable
@@ -115,7 +118,7 @@ fun HomeScreen(
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SectionButton("Partidos", "Grupos \u00B7 Dieciseisavos \u00B7 Octavos \u00B7 Cuartos \u00B7 Semis \u00B7 Final", Icons.Filled.EmojiEvents, hasData, onNavigateToMatches)
+                    SectionButton("Partidos", "Resultados de la fase de grupos y eliminatorias", Icons.Filled.EmojiEvents, hasData, onNavigateToMatches)
                     SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, hasData, onNavigateToQuestions)
                 }
             }
@@ -126,9 +129,16 @@ fun HomeScreen(
 
 @Composable
 private fun PlayerRow(p: PlayerPredictionEntity) {
-    val medals = listOf("\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49")
     Row(Modifier.fillMaxWidth().background(Color(0xFF222222), RoundedCornerShape(8.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(medals[p.rank - 1], fontSize = 22.sp)
+        val photoUrl = PlayerPhotoResolver.resolve(p.predictedName)
+        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
+            if (photoUrl != null) {
+                AsyncImage(model = photoUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                val initials = p.predictedName?.split(" ")?.take(2)?.mapNotNull { it.firstOrNull()?.uppercase() }?.joinToString("") ?: "${p.rank}"
+                Text(initials, style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(p.predictedName ?: "-", style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.Medium)
@@ -141,29 +151,58 @@ private fun PlayerRow(p: PlayerPredictionEntity) {
 
 @Composable
 private fun MatchRow(match: MatchDisplay) {
+    val hasPred = match.predictedHomeGoals != null && match.predictedAwayGoals != null
+    val hasResult = match.homeGoals != null && match.awayGoals != null
+    val isLive = match.status == MatchStatus.LIVE
+
+    val ptsColor = when {
+        hasResult && match.pointsEarned > 0 -> Color(0xFF4CAF50)
+        hasResult -> Color(0xFFE53935)
+        isLive -> Color(0xFFFFC107)
+        else -> Color.Transparent
+    }
+
     Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(match.time.ifBlank { "?" }, Modifier.width(38.dp), style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
-        Text(match.homeTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, textAlign = TextAlign.End, maxLines = 1)
-        Text(match.homeFlag, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 3.dp))
-        val hasScore = match.homeGoals != null && match.awayGoals != null
-        Text(if (hasScore) "${match.homeGoals}" else "-", style = MaterialTheme.typography.bodySmall, color = if (hasScore) Color.White else Color(0xFF777777), fontWeight = FontWeight.Bold)
-        Text(" - ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
-        Text(if (hasScore) "${match.awayGoals}" else "-", style = MaterialTheme.typography.bodySmall, color = if (hasScore) Color.White else Color(0xFF777777), fontWeight = FontWeight.Bold)
-        Text(match.awayFlag, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 3.dp))
-        Text(match.awayTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1)
+        Text(match.time.ifBlank { "?" }, Modifier.width(34.dp), style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
+        Text(match.homeTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(match.homeFlag, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 2.dp))
+
+        if (hasResult) {
+            Text("${match.homeGoals}", style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(" - ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
+            Text("${match.awayGoals}", style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold)
+        } else if (hasPred) {
+            Text("${match.predictedHomeGoals}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF999999))
+            Text(" - ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
+            Text("${match.predictedAwayGoals}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF999999))
+        } else {
+            Text("-", style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777))
+            Text(" - ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
+            Text("-", style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777))
+        }
+
+        Text(match.awayFlag, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 2.dp))
+        Text(match.awayTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(4.dp))
         val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
         channels.forEach { ch ->
             val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF555555) else Color(0xFF333333)
             Text(ch.trim().take(4), fontSize = 8.sp, color = Color.White, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
         }
-        if (match.status == MatchStatus.LIVE) {
+
+        if (isLive) {
             val infiniteTransition = rememberInfiniteTransition("live_${match.id}")
             val alpha by infiniteTransition.animateFloat(1f, 0.3f, infiniteRepeatable(tween(600), RepeatMode.Reverse))
-            Text("LIVE", color = Color(0xFF888888).copy(alpha = alpha), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, modifier = Modifier.padding(start = 4.dp))
+            Text("LIVE", color = Color(0xFF888888).copy(alpha = alpha), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, modifier = Modifier.padding(start = 2.dp))
+        }
+
+        if (hasResult || (hasPred && isLive)) {
+            Text(if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0", Modifier.width(32.dp),
+                style = MaterialTheme.typography.labelSmall, color = ptsColor,
+                fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         }
     }
 }

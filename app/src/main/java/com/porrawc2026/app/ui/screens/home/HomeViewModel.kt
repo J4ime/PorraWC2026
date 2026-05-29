@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.MatchEntity
+import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.util.TvScraper
@@ -56,6 +57,8 @@ class HomeViewModel @Inject constructor(
     val upcomingMatches: StateFlow<List<MatchDisplay>> = _upcomingMatches.asStateFlow()
     private val _sectionTitle = MutableStateFlow("")
     val sectionTitle: StateFlow<String> = _sectionTitle.asStateFlow()
+    private val _players = MutableStateFlow<List<PlayerPredictionEntity>>(emptyList())
+    val players: StateFlow<List<PlayerPredictionEntity>> = _players.asStateFlow()
     private val _errorMessage = MutableSharedFlow<String>()
     val errorMessage: SharedFlow<String> = _errorMessage.asSharedFlow()
 
@@ -64,7 +67,7 @@ class HomeViewModel @Inject constructor(
     private var livePollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
 
-    init { refreshPoints() }
+    init { refreshPoints(); loadPlayers() }
 
     fun importExcel(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -87,6 +90,7 @@ class HomeViewModel @Inject constructor(
                 refreshPoints()
                 refreshUpcomingMatches()
                 Log.d("HomeVM", "After enrich: match1 tv='${cachedMatches.firstOrNull()?.tvChannel}' dt='${cachedMatches.firstOrNull()?.dateTime}'")
+                loadPlayers()
                 startAutoRefresh()
             } catch (e: Exception) {
                 _errorMessage.emit("Error al cargar el Excel: ${e.message}")
@@ -100,6 +104,12 @@ class HomeViewModel @Inject constructor(
 
     fun refreshPoints() {
         viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
+    }
+
+    private fun loadPlayers() {
+        viewModelScope.launch {
+            repository.getPlayerPredictions().collect { _players.value = it.sortedBy { p -> p.rank } }
+        }
     }
 
     private suspend fun recalcAllPoints() {

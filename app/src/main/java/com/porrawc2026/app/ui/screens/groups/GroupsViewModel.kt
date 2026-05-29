@@ -18,7 +18,7 @@ class GroupsViewModel @Inject constructor(
     val allTeams: StateFlow<List<TeamEntity>> = repository.getAllTeams()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val allMatches: StateFlow<List<MatchEntity>> = repository.getAllGroupMatches()
+    val allMatches: StateFlow<List<MatchEntity>> = repository.getAllMatches()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun getGroupTeams(group: String): Flow<List<TeamEntity>> = repository.getTeamsByGroup(group)

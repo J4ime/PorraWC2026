@@ -26,16 +26,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.ui.theme.*
 import com.porrawc2026.app.util.ValidationResult
 
 @Composable
 fun HomeScreen(
-    onNavigateToGroups: () -> Unit,
-    onNavigateToKnockout: () -> Unit,
+    onNavigateToMatches: () -> Unit,
     onNavigateToQuestions: () -> Unit,
-    onNavigateToPlayers: () -> Unit,
-    onNavigateToResults: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val totalPoints by viewModel.totalPoints.collectAsState()
@@ -43,29 +41,22 @@ fun HomeScreen(
     val validationResult by viewModel.validationResult.collectAsState()
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
-    val sectionTitle by viewModel.sectionTitle.collectAsState()
+    val players by viewModel.players.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let { viewModel.importExcel(it) }
-    }
+    ) { uri: Uri? -> uri?.let { viewModel.importExcel(it) } }
 
     validationResult?.let { result ->
         ValidationDialog(result = result, onDismiss = { viewModel.dismissValidation() })
     }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(colors = listOf(WCDarkBlue, WCNavy, SurfaceDark)))
+        modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(WCDarkBlue, WCNavy, SurfaceDark)))
     ) {
         item {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Brush.horizontalGradient(colors = listOf(WCBlue, WCDarkBlue, WCBlue)))
-                    .padding(24.dp),
+                modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(WCBlue, WCDarkBlue, WCBlue))).padding(24.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -82,8 +73,7 @@ fun HomeScreen(
             Button(
                 onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = WCGold, contentColor = WCDarkBlue),
-                shape = RoundedCornerShape(12.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = WCGold, contentColor = WCDarkBlue), shape = RoundedCornerShape(12.dp)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(color = WCDarkBlue, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
@@ -95,58 +85,46 @@ fun HomeScreen(
             }
         }
 
-        if (!hasData) {
-            item { Spacer(modifier = Modifier.height(16.dp)) }
-            return@LazyColumn
-        }
+        if (!hasData) { item { Spacer(Modifier.height(16.dp)) }; return@LazyColumn }
 
-        // Upcoming matches
         if (upcomingMatches.isNotEmpty()) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardDark),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
+                Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(14.dp)) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = WCGold,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
+                        Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "", style = MaterialTheme.typography.titleSmall,
+                            color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(6.dp))
                         upcomingMatches.take(8).forEach { match ->
                             MatchRow(match)
-                            if (match != upcomingMatches.take(8).last()) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                            }
+                            if (match != upcomingMatches.take(8).last()) Spacer(Modifier.height(4.dp))
                         }
                     }
                 }
             }
         }
 
-        // Points Card
+        // Players section
+        if (players.isNotEmpty()) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(14.dp)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text("GOLEADORES", style = MaterialTheme.typography.titleSmall, color = WCGold, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp))
+                        players.forEach { p -> PlayerRow(p) }
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(8.dp)) }
+        }
+
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardDark),
-                shape = RoundedCornerShape(16.dp)
-            ) {
+            Card(modifier = Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp)) {
                 Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("PUNTOS TOTALES", style = MaterialTheme.typography.labelMedium, color = TextMuted, letterSpacing = 2.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("$totalPoints", style = MaterialTheme.typography.displayLarge, color = WCGold, fontWeight = FontWeight.Black)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        PointsItem("Grupos", totalPoints, WCGold)
-                        PointsItem("Elim.", totalPoints, AccentGreen)
-                        PointsItem("Pregs.", totalPoints, AccentBlue)
-                        PointsItem("Jug.", totalPoints, AccentOrange)
-                    }
                 }
             }
         }
@@ -157,112 +135,61 @@ fun HomeScreen(
         }
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionButton("Fase de Grupos", "Predicciones de 72 partidos", Icons.Filled.Groups, WCGold, hasData, onNavigateToGroups)
-                SectionButton("Eliminatorias", "Dieciseisavos a la Final", Icons.Filled.EmojiEvents, WCGold, hasData, onNavigateToKnockout)
+                SectionButton("Partidos", "Grupos \u00B7 Dieciseisavos \u00B7 Octavos \u00B7 Cuartos \u00B7 Semis \u00B7 Final", Icons.Filled.EmojiEvents, WCGold, hasData, onNavigateToMatches)
                 SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, AccentBlue, hasData, onNavigateToQuestions)
-                SectionButton("Goleadores", "3 jugadores \u00B7 50/30/10 pts", Icons.Filled.Person, AccentOrange, hasData, onNavigateToPlayers)
-                SectionButton("Resultados", "Puntos, estad\u00EDsticas, compartir", Icons.Filled.Update, AccentGreen, hasData, onNavigateToResults)
             }
         }
-
         item { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }
 
 @Composable
+private fun PlayerRow(p: PlayerPredictionEntity) {
+    val colors = listOf(WCGold, AccentBlue, AccentOrange)
+    val medals = listOf("\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49")
+    Row(Modifier.fillMaxWidth().background(SurfaceMedium.copy(alpha = 0.3f), RoundedCornerShape(8.dp)).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(medals[p.rank - 1], fontSize = 22.sp)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(p.predictedName ?: "-", style = MaterialTheme.typography.bodyMedium, color = TextPrimary, fontWeight = FontWeight.Medium)
+            Text("${p.pointsPerGoal} pts/gol", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+        }
+        Text("${p.goalsScored} goles", Modifier.width(60.dp), style = MaterialTheme.typography.bodySmall, color = colors[p.rank - 1], textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+        Text("+${p.pointsEarned}", Modifier.width(50.dp), style = MaterialTheme.typography.bodySmall, color = AccentGreen, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
 private fun MatchRow(match: MatchDisplay) {
-    val hasScore = match.homeGoals != null && match.awayGoals != null
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                when (match.status) {
-                    MatchStatus.LIVE -> AccentRed.copy(alpha = 0.1f)
-                    MatchStatus.FINISHED -> SurfaceMedium.copy(alpha = 0.2f)
-                    MatchStatus.UPCOMING -> SurfaceMedium.copy(alpha = 0.3f)
-                },
-                RoundedCornerShape(8.dp)
-            )
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().background(
+            when (match.status) { MatchStatus.LIVE -> AccentRed.copy(alpha = 0.1f); MatchStatus.FINISHED -> SurfaceMedium.copy(alpha = 0.2f); else -> SurfaceMedium.copy(alpha = 0.3f) },
+            RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            match.time.ifBlank { "?" },
-            style = MaterialTheme.typography.labelMedium,
-            color = WCGold,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.width(38.dp)
-        )
-
-        Text(
-            match.homeTeam,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextPrimary,
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.End,
-            maxLines = 1
-        )
-
-        Text(
-            match.homeFlag,
-            fontSize = 16.sp,
-            modifier = Modifier.padding(horizontal = 3.dp)
-        )
-
-        Text(
-            if (hasScore) "${match.homeGoals}" else "-",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (hasScore) TextPrimary else TextMuted,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            " - ",
-            style = MaterialTheme.typography.labelSmall,
-            color = TextMuted
-        )
-
-        Text(
-            if (hasScore) "${match.awayGoals}" else "-",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (hasScore) TextPrimary else TextMuted,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            match.awayFlag,
-            fontSize = 16.sp,
-            modifier = Modifier.padding(horizontal = 3.dp)
-        )
-
-        Text(
-            match.awayTeam,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextPrimary,
-            modifier = Modifier.weight(1f),
-            maxLines = 1
-        )
-
-        Spacer(modifier = Modifier.width(4.dp))
-
+        Text(match.time.ifBlank { "?" }, Modifier.width(38.dp), style = MaterialTheme.typography.labelMedium, color = WCGold, fontWeight = FontWeight.Bold)
+        Text(match.homeTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary, textAlign = TextAlign.End, maxLines = 1)
+        Text(match.homeFlag, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 3.dp))
+        val hasScore = match.homeGoals != null && match.awayGoals != null
+        Text(if (hasScore) "${match.homeGoals}" else "-", style = MaterialTheme.typography.bodySmall, color = if (hasScore) TextPrimary else TextMuted, fontWeight = FontWeight.Bold)
+        Text(" - ", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+        Text(if (hasScore) "${match.awayGoals}" else "-", style = MaterialTheme.typography.bodySmall, color = if (hasScore) TextPrimary else TextMuted, fontWeight = FontWeight.Bold)
+        Text(match.awayFlag, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 3.dp))
+        Text(match.awayTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1)
+        Spacer(Modifier.width(4.dp))
         val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
         channels.forEach { ch ->
-            TvChannelBadge(ch.trim())
-            Spacer(modifier = Modifier.width(2.dp))
+            val bg = if (ch.contains("RTVE", ignoreCase = true)) AccentBlue else Color(0xFF0A0A0A)
+            Text(ch.trim().take(4), fontSize = 8.sp, color = TextPrimary, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
         }
-
         if (match.status == MatchStatus.LIVE) {
             val infiniteTransition = rememberInfiniteTransition("live_${match.id}")
-            val alpha by infiniteTransition.animateFloat(
-                initialValue = 1f, targetValue = 0.3f,
-                animationSpec = infiniteRepeatable(animation = tween(600), repeatMode = RepeatMode.Reverse)
-            )
+            val alpha by infiniteTransition.animateFloat(1f, 0.3f, infiniteRepeatable(tween(600), RepeatMode.Reverse))
             Text("LIVE", color = AccentRed.copy(alpha = alpha), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, modifier = Modifier.padding(start = 4.dp))
         }
     }
 }
-
-// ── Validation dialog ─────────────
 
 @Composable
 private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
@@ -278,8 +205,7 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.titleLarge, color = if (result.isValid) AccentGreen else AccentOrange, fontWeight = FontWeight.Bold)
                 if (!result.isValid) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("No es v\u00E1lido. Revisa el Excel y vuelve a cargarlo.",
-                        style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.Center)
+                    Text("No es v\u00E1lido. Revisa el Excel y vuelve a cargarlo.", style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.Center)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { dismissed = true; onDismiss() }, Modifier.fillMaxWidth(),
@@ -289,43 +215,6 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
             }
         }
     }
-}
-
-@Composable
-private fun PointsItem(label: String, points: Int, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(points.toString(), style = MaterialTheme.typography.titleLarge, color = color, fontWeight = FontWeight.Bold)
-        Text(label, style = MaterialTheme.typography.labelSmall, color = TextMuted)
-    }
-}
-
-@Composable
-private fun TvChannelBadge(channel: String) {
-    if (channel.isBlank() || channel.all { it.isDigit() || it == '.' }) return
-    val (bg, fg) = when (channel.uppercase()) {
-        "RTVE", "TVE", "LA 1", "LA1", "LA 2", "LA2", "TELEDEPORTE", "RTVE PLAY" -> Color(0xFF0B1D3A) to Color.White
-        "DAZN", "DAZN MUNDIAL", "DAZN APP GRATIS" -> Color(0xFF0A0A0A) to Color.White
-        "MOVISTAR", "M+", "MOVISTAR+", "#VAMOS" -> Color(0xFF019DF4) to Color.White
-        else -> SurfaceMedium to TextPrimary
-    }
-    val label = when (channel.uppercase()) {
-        "RTVE", "TVE", "LA 1", "LA1" -> "RTVE"
-        "LA 2", "LA2" -> "TVE2"
-        "TELEDEPORTE" -> "TDP"
-        "DAZN" -> "DAZN"
-        "MOVISTAR", "M+", "MOVISTAR+" -> "M+"
-        "#VAMOS" -> "VAMOS"
-        else -> channel.take(4).uppercase()
-    }
-    Text(
-        label,
-        style = MaterialTheme.typography.labelSmall,
-        color = fg,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
-            .background(bg, RoundedCornerShape(4.dp))
-            .padding(horizontal = 5.dp, vertical = 2.dp)
-    )
 }
 
 @Composable

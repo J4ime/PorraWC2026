@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -23,77 +22,44 @@ import com.porrawc2026.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GroupsScreen(
-    onGroupClick: (String) -> Unit,
+fun MatchesScreen(
     onBackClick: () -> Unit,
     viewModel: GroupsViewModel = hiltViewModel()
 ) {
     val allMatches by viewModel.allMatches.collectAsState()
-    var selectedTab by remember { mutableIntStateOf(0) }
+    val sortedMatches = allMatches.sortedBy { it.dateTime }
 
-    val groupMatches = allMatches.filter { !it.isKnockout }
-        .sortedBy { it.dateTime }
-
-    val groups = allMatches.filter { !it.isKnockout }
-        .groupBy { it.groupName }.keys.sorted()
-
-    Column(
-        modifier = Modifier.fillMaxSize().background(SurfaceDark)
-    ) {
+    Column(Modifier.fillMaxSize().background(SurfaceDark)) {
         TopAppBar(
-            title = { Text("FASE DE GRUPOS", style = MaterialTheme.typography.titleLarge, color = WCGold, fontWeight = FontWeight.Bold) },
-            navigationIcon = {
-                IconButton(onClick = onBackClick) {
-                    Icon(Icons.Filled.ArrowBack, null, tint = TextPrimary)
-                }
-            },
+            title = { Text("PARTIDOS", style = MaterialTheme.typography.titleLarge, color = WCGold, fontWeight = FontWeight.Bold) },
+            navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Filled.ArrowBack, null, tint = TextPrimary) } },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = WCDarkBlue)
         )
 
-        TabRow(selectedTabIndex = selectedTab, containerColor = WCDarkBlue, contentColor = WCGold) {
-            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("PARTIDOS", style = MaterialTheme.typography.labelMedium) })
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("GRUPOS", style = MaterialTheme.typography.labelMedium) })
-        }
-
-        when (selectedTab) {
-            0 -> ChronologicalMatchList(groupMatches)
-            1 -> GroupGrid(groups, viewModel, onGroupClick)
-        }
-    }
-}
-
-@Composable
-private fun ChronologicalMatchList(matches: List<MatchEntity>) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Hora", Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                Text("Partido · Predicción", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                Text("TV", Modifier.width(44.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
-                Text("Pts", Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
-            }
-        }
-
-        var currentDate = ""
-        for (match in matches) {
-            val dateLabel = match.dateTime.take(10)
-            if (currentDate != dateLabel) {
-                currentDate = dateLabel
-                val displayDate = formatDisplayDate(match.dateTime)
-                item {
-                    Text(displayDate, style = MaterialTheme.typography.labelMedium, color = WCGold, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("Hora", Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text("Partido", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text("Pred.", Modifier.width(46.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
+                    Text("Pts", Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
                 }
             }
-            item { ChronologicalMatchRow(match) }
+
+            var currentDate = ""
+            for (match in sortedMatches) {
+                val dateLabel = match.dateTime.take(10)
+                if (currentDate != dateLabel) {
+                    currentDate = dateLabel
+                    val displayDate = formatDisplayDate(match.dateTime)
+                    item { Text(displayDate, style = MaterialTheme.typography.labelMedium, color = WCGold, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)) }
+                }
+                item { MatchRow(match) }
+            }
+            item { Spacer(Modifier.height(16.dp)) }
         }
-        item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
@@ -108,75 +74,47 @@ private fun formatDisplayDate(dateTime: String): String {
 }
 
 @Composable
-private fun ChronologicalMatchRow(match: MatchEntity) {
+private fun MatchRow(match: MatchEntity) {
     val hasResult = match.homeGoals != null && match.awayGoals != null
     val hasPred = match.predictedHomeGoals != null && match.predictedAwayGoals != null
+    val isLive = !hasResult && hasPred
+
     val bgColor = when {
         hasResult && match.pointsEarned >= 30 -> AccentGreen.copy(alpha = 0.1f)
         hasResult && match.pointsEarned > 0 -> AccentBlue.copy(alpha = 0.1f)
         hasResult -> AccentRed.copy(alpha = 0.1f)
+        isLive -> AccentOrange.copy(alpha = 0.1f)
         else -> SurfaceMedium.copy(alpha = 0.3f)
     }
 
-    Row(
-        Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         val time = if (match.dateTime.length >= 16) match.dateTime.substring(11, 16) else match.dateTime
-        Text(time, Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold)
+        Text(time, Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold)
 
+        val label = if (match.isKnockout) match.knockoutRound ?: match.groupName else match.groupName
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-            Text(" ${if (hasPred) match.predictedHomeGoals?.toString() ?: "-" else "-"} - ${if (hasPred) match.predictedAwayGoals?.toString() ?: "-" else "-"} ", style = MaterialTheme.typography.bodySmall, color = if (hasPred) TextPrimary else TextMuted, maxLines = 1)
+            Text(" ${if (hasPred) "${match.predictedHomeGoals}-${match.predictedAwayGoals}" else "-"} ", style = MaterialTheme.typography.bodySmall, color = if (hasPred) TextPrimary else TextMuted, maxLines = 1)
             Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f))
         }
 
-        val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
-        Column(Modifier.width(44.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            channels.forEach { ch ->
-                val bg = if (ch.contains("RTVE", ignoreCase = true)) AccentBlue else Color(0xFF0A0A0A)
-                Text(ch.trim().take(4), fontSize = 8.sp, color = TextPrimary,
-                    modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
-            }
-        }
-
         Text(
-            if (match.pointsEarned > 0 || hasResult) "+${match.pointsEarned}" else "",
-            Modifier.width(40.dp),
-            style = MaterialTheme.typography.bodySmall, color = if (match.pointsEarned > 0) AccentGreen else TextMuted,
+            if (hasResult) "${match.homeGoals}-${match.awayGoals}" else if (hasPred) "${match.predictedHomeGoals}-${match.predictedAwayGoals}" else "-",
+            Modifier.width(46.dp),
+            style = MaterialTheme.typography.bodySmall, color = if (hasResult) AccentOrange else if (hasPred) TextPrimary else TextMuted, textAlign = TextAlign.Center, fontWeight = if (hasResult) FontWeight.Bold else FontWeight.Normal
+        )
+
+        val ptsColor = when {
+            hasResult && match.pointsEarned > 0 -> AccentGreen
+            isLive -> WCGold
+            else -> TextMuted
+        }
+        Text(
+            if (hasResult || isLive) "+${match.pointsEarned}" else "",
+            Modifier.width(42.dp),
+            style = MaterialTheme.typography.bodySmall, color = ptsColor,
             fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
         )
-    }
-}
-
-@Composable
-private fun GroupGrid(groups: List<String>, viewModel: GroupsViewModel, onGroupClick: (String) -> Unit) {
-    val teams by viewModel.allTeams.collectAsState()
-    val groupTeams = teams.groupBy { it.groupLetter }
-    LazyColumn(
-        modifier = Modifier.padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(groups) { group ->
-            GroupCard(group, groupTeams[group] ?: emptyList()) { onGroupClick(group) }
-        }
-    }
-}
-
-@Composable
-private fun GroupCard(groupLetter: String, teams: List<com.porrawc2026.app.data.local.entity.TeamEntity>, onClick: () -> Unit) {
-    Card(onClick = onClick, Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(12.dp)) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text("GRUPO $groupLetter", style = MaterialTheme.typography.titleMedium, color = WCGold, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            teams.forEach { team ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(team.flagEmoji, fontSize = 18.sp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(team.name, style = MaterialTheme.typography.bodyMedium, color = TextPrimary, modifier = Modifier.weight(1f))
-                }
-            }
-        }
     }
 }

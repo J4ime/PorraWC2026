@@ -418,11 +418,7 @@ class HomeViewModel @Inject constructor(
 
     private fun enrichScheduleFallback() {
         val fallbackDates = hardcodedMatchDates()
-        var tvSchedule = TvScraper.fetchSchedule()
-        if (tvSchedule.isEmpty()) {
-            Log.d("HomeVM", "Web scraper empty, using hardcoded TV map")
-        }
-        val hardcodedTv = TvScraper.getHardcodedTv()
+        TvScraper.clearCache()
 
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
@@ -430,13 +426,7 @@ class HomeViewModel @Inject constructor(
             val tv = if (match.tvChannel.isNotBlank() && match.tvChannel.all { !it.isDigit() }) {
                 match.tvChannel
             } else {
-                val fromWeb = TvScraper.matchTv(match.homeTeam, match.awayTeam, tvSchedule)
-                if (fromWeb != "DAZN") {
-                    fromWeb
-                } else {
-                    val key = TvScraper.normalizeTeam("#${match.homeTeam}#${match.awayTeam}")
-                    hardcodedTv[key] ?: "DAZN"
-                }
+                TvScraper.lookupTv(match.homeTeam, match.awayTeam)
             }
             match.copy(dateTime = date, tvChannel = tv)
         }

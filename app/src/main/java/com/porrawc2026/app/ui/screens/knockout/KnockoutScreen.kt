@@ -73,21 +73,13 @@ fun KnockoutScreen(
                 predictions = predictions,
                 modifier = Modifier.fillMaxSize()
             )
-            1 -> KnockoutPredictionList(
-                predictions = predictions,
-                onPickWinner = { prediction, winner ->
-                    viewModel.savePrediction(prediction.copy(winner = winner))
-                }
-            )
+            1 -> KnockoutPredictionList(predictions = predictions)
         }
     }
 }
 
 @Composable
-private fun KnockoutPredictionList(
-    predictions: List<KnockoutPredictionEntity>,
-    onPickWinner: (KnockoutPredictionEntity, Int) -> Unit
-) {
+private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) {
     val rounds = listOf(
         "Dieciseisavos" to 20,
         "Octavos" to 40,
@@ -117,11 +109,7 @@ private fun KnockoutPredictionList(
                 }
 
                 items(roundPredictions) { prediction ->
-                    KnockoutPredictionCard(
-                        prediction = prediction,
-                        roundPoints = pts,
-                        onPickWinner = { winner -> onPickWinner(prediction, winner) }
-                    )
+                    KnockoutPredictionCard(prediction = prediction)
                 }
             }
         }
@@ -131,11 +119,7 @@ private fun KnockoutPredictionList(
 }
 
 @Composable
-private fun KnockoutPredictionCard(
-    prediction: KnockoutPredictionEntity,
-    roundPoints: Int,
-    onPickWinner: (Int) -> Unit
-) {
+private fun KnockoutPredictionCard(prediction: KnockoutPredictionEntity) {
     val isSelectedHome = prediction.winner == 1
     val isSelectedAway = prediction.winner == 2
 
@@ -172,7 +156,6 @@ private fun KnockoutPredictionCard(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Card(
-                    onClick = { onPickWinner(1) },
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelectedHome) AccentGreen.copy(alpha = 0.2f) else SurfaceMedium
@@ -210,7 +193,6 @@ private fun KnockoutPredictionCard(
                 )
 
                 Card(
-                    onClick = { onPickWinner(2) },
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelectedAway) AccentGreen.copy(alpha = 0.2f) else SurfaceMedium

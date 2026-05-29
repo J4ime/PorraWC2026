@@ -85,17 +85,7 @@ fun QuestionsScreen(
             }
 
             itemsIndexed(questions) { index, question ->
-                QuestionCard(
-                    question = question,
-                    onAnswer = { answer ->
-                        viewModel.saveAnswer(
-                            question.copy(
-                                predictedAnswer = answer,
-                                pointsEarned = if (question.correctAnswer != null && answer == question.correctAnswer) 20 else 0
-                            )
-                        )
-                    }
-                )
+                QuestionCard(question = question)
             }
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -104,10 +94,7 @@ fun QuestionsScreen(
 }
 
 @Composable
-private fun QuestionCard(
-    question: QuestionEntity,
-    onAnswer: (Boolean) -> Unit
-) {
+private fun QuestionCard(question: QuestionEntity) {
     val isSelectedTrue = question.predictedAnswer == true
     val isSelectedFalse = question.predictedAnswer == false
 
@@ -147,11 +134,14 @@ private fun QuestionCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Button(
-                    onClick = { onAnswer(true) },
+                    onClick = { },
                     modifier = Modifier.weight(1f),
+                    enabled = false,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isSelectedTrue) AccentGreen else SurfaceMedium,
-                        contentColor = if (isSelectedTrue) TextPrimary else TextSecondary
+                        contentColor = if (isSelectedTrue) TextPrimary else TextSecondary,
+                        disabledContainerColor = if (isSelectedTrue) AccentGreen else SurfaceMedium,
+                        disabledContentColor = if (isSelectedTrue) TextPrimary else TextSecondary
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -159,11 +149,14 @@ private fun QuestionCard(
                     Text("VERDADERO", modifier = Modifier.padding(start = 4.dp))
                 }
                 Button(
-                    onClick = { onAnswer(false) },
+                    onClick = { },
                     modifier = Modifier.weight(1f),
+                    enabled = false,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isSelectedFalse) AccentRed else SurfaceMedium,
-                        contentColor = if (isSelectedFalse) TextPrimary else TextSecondary
+                        contentColor = if (isSelectedFalse) TextPrimary else TextSecondary,
+                        disabledContainerColor = if (isSelectedFalse) AccentRed else SurfaceMedium,
+                        disabledContentColor = if (isSelectedFalse) TextPrimary else TextSecondary
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {

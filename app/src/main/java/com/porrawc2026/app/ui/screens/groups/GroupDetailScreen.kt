@@ -1,25 +1,41 @@
 package com.porrawc2026.app.ui.screens.groups
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.MatchEntity
-import com.porrawc2026.app.data.local.entity.TeamEntity
 import com.porrawc2026.app.ui.theme.*
 import com.porrawc2026.app.domain.model.StandingsCalculator
 import com.porrawc2026.app.domain.model.StandingEntry
@@ -99,17 +115,7 @@ fun GroupDetailScreen(
             }
 
             items(matches) { match ->
-                MatchPredictionCard(
-                    match = match,
-                    onPredictionChange = { home, away ->
-                        viewModel.savePrediction(
-                            match.copy(
-                                predictedHomeGoals = home,
-                                predictedAwayGoals = away
-                            )
-                        )
-                    }
-                )
+                MatchPredictionCard(match = match)
             }
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -161,13 +167,7 @@ private fun StandingRow(entry: StandingEntry, position: Int) {
 }
 
 @Composable
-private fun MatchPredictionCard(
-    match: MatchEntity,
-    onPredictionChange: (Int?, Int?) -> Unit
-) {
-    var homeGoals by remember(match.id) { mutableStateOf(match.predictedHomeGoals?.toString() ?: "") }
-    var awayGoals by remember(match.id) { mutableStateOf(match.predictedAwayGoals?.toString() ?: "") }
-
+private fun MatchPredictionCard(match: MatchEntity) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = if (match.matchday == "J1") MatchBg else MatchBgAlternate),
@@ -206,60 +206,24 @@ private fun MatchPredictionCard(
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = homeGoals,
-                    onValueChange = { value ->
-                        if (value.length <= 2 && (value.isEmpty() || value.all { it.isDigit() })) {
-                            homeGoals = value
-                            onPredictionChange(
-                                value.toIntOrNull(),
-                                awayGoals.toIntOrNull()
-                            )
-                        }
-                    },
+                Text(
+                    text = match.predictedHomeGoals?.toString() ?: "-",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (match.predictedHomeGoals != null) TextPrimary else TextMuted,
                     modifier = Modifier.width(50.dp),
-                    textStyle = MaterialTheme.typography.titleMedium.copy(
-                        textAlign = TextAlign.Center,
-                        color = TextPrimary
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = InputBg,
-                        unfocusedContainerColor = InputBg,
-                        focusedBorderColor = WCGold,
-                        unfocusedBorderColor = InputBorder
-                    ),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    textAlign = TextAlign.Center
                 )
                 Text(
                     " - ",
                     style = MaterialTheme.typography.bodyLarge,
                     color = TextMuted
                 )
-                OutlinedTextField(
-                    value = awayGoals,
-                    onValueChange = { value ->
-                        if (value.length <= 2 && (value.isEmpty() || value.all { it.isDigit() })) {
-                            awayGoals = value
-                            onPredictionChange(
-                                homeGoals.toIntOrNull(),
-                                value.toIntOrNull()
-                            )
-                        }
-                    },
+                Text(
+                    text = match.predictedAwayGoals?.toString() ?: "-",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (match.predictedAwayGoals != null) TextPrimary else TextMuted,
                     modifier = Modifier.width(50.dp),
-                    textStyle = MaterialTheme.typography.titleMedium.copy(
-                        textAlign = TextAlign.Center,
-                        color = TextPrimary
-                    ),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = InputBg,
-                        unfocusedContainerColor = InputBg,
-                        focusedBorderColor = WCGold,
-                        unfocusedBorderColor = InputBorder
-                    ),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(

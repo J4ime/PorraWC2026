@@ -183,8 +183,9 @@ object ExcelParser {
                 val dateStr = when (dateCell) {
                     is Date -> dateFormat.format(dateCell)
                     is String -> dateCell
-                    else -> null
-                } ?: continue
+                    is Number -> dateCell.toString()
+                    else -> ""
+                }
 
                 val homeCell = cellText(row, COL_MATCH_HOME) ?: getCellValue(row, COL_MATCH_HOME)?.toString()
                 if (homeCell == null) { Log.d("ExcelParser", "Skip r$rowIdx: no home team"); continue }
@@ -193,11 +194,7 @@ object ExcelParser {
 
                 if (!loggedFirst) {
                     loggedFirst = true
-                    val h = row.getCell(COL_MATCH_HOME)
-                    val a = row.getCell(COL_MATCH_AWAY)
-                    val dh = row.getCell(COL_GOAL_HOME)
-                    val da = row.getCell(COL_GOAL_AWAY)
-                    Log.d("ExcelParser", "Match1(r$rowIdx): home=$homeCell (ct=${h?.cellType}, raw=${h?.stringCellValue}), away=$awayCell (ct=${a?.cellType}, raw=${a?.stringCellValue}), gH=${cellText(row, COL_GOAL_HOME)}, gA=${cellText(row, COL_GOAL_AWAY)}")
+                    Log.d("ExcelParser", "Match1(r$rowIdx): home=$homeCell, away=$awayCell, dateCell=$dateCell (${dateCell?.javaClass?.simpleName}), gH=${cellText(row, COL_GOAL_HOME)}, gA=${cellText(row, COL_GOAL_AWAY)}")
                 }
 
                 val predHome = cellInt(row, COL_GOAL_HOME)
@@ -240,8 +237,9 @@ object ExcelParser {
                 val dateStr = when (dateCell) {
                     is Date -> dateFormat.format(dateCell)
                     is String -> dateCell
-                    else -> null
-                } ?: continue
+                    is Number -> dateCell.toString()
+                    else -> ""
+                }
 
                 matchId++
                 matches.add(

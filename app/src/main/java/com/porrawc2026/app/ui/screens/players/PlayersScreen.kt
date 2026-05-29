@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -13,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,14 +63,7 @@ fun PlayersScreen(
             }
 
             items(predictions.sortedBy { it.rank }) { prediction ->
-                PlayerCard(
-                    prediction = prediction,
-                    onNameChange = { name ->
-                        viewModel.savePlayer(
-                            prediction.copy(predictedName = name)
-                        )
-                    }
-                )
+                PlayerCard(prediction = prediction)
             }
 
             item {
@@ -106,14 +97,9 @@ fun PlayersScreen(
 }
 
 @Composable
-private fun PlayerCard(
-    prediction: PlayerPredictionEntity,
-    onNameChange: (String) -> Unit
-) {
+private fun PlayerCard(prediction: PlayerPredictionEntity) {
     val colors = listOf(WCGold, AccentBlue, AccentOrange)
     val medals = listOf("🥇", "🥈", "🥉")
-
-    var playerName by remember(prediction.rank) { mutableStateOf(prediction.predictedName ?: "") }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -144,36 +130,22 @@ private fun PlayerCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            OutlinedTextField(
-                value = playerName,
-                onValueChange = {
-                    playerName = it
-                    onNameChange(it)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = {
-                    Text(
-                        "Escribe el nombre del jugador...",
-                        color = TextMuted
-                    )
-                },
-                leadingIcon = {
-                    Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = colors[prediction.rank - 1])
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = InputBg,
-                    unfocusedContainerColor = InputBg,
-                    focusedBorderColor = colors[prediction.rank - 1],
-                    unfocusedBorderColor = InputBorder,
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary
-                ),
-                singleLine = true,
-                shape = RoundedCornerShape(10.dp),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(InputBg, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.SportsSoccer, contentDescription = null, tint = colors[prediction.rank - 1])
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = prediction.predictedName ?: "-",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (prediction.predictedName != null) TextPrimary else TextMuted,
+                    fontWeight = if (prediction.predictedName != null) FontWeight.Medium else FontWeight.Normal
                 )
-            )
+            }
 
             if (prediction.goalsScored > 0) {
                 Spacer(modifier = Modifier.height(8.dp))

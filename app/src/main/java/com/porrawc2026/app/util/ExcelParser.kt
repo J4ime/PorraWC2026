@@ -172,6 +172,7 @@ object ExcelParser {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
 
         val groupHeaders = listOf(2, 10, 18, 26, 34, 42, 50, 58, 66, 74, 82, 90)
+        var loggedFirst = false
 
         for (baseRow in groupHeaders) {
             for (offset in 1..6) {
@@ -187,6 +188,15 @@ object ExcelParser {
 
                 val homeCell = cellText(row, COL_MATCH_HOME) ?: continue
                 val awayCell = cellText(row, COL_MATCH_AWAY) ?: continue
+
+                if (!loggedFirst) {
+                    loggedFirst = true
+                    val h = row.getCell(COL_MATCH_HOME)
+                    val a = row.getCell(COL_MATCH_AWAY)
+                    val dh = row.getCell(COL_GOAL_HOME)
+                    val da = row.getCell(COL_GOAL_AWAY)
+                    Log.d("ExcelParser", "Match1(r$rowIdx): home=$homeCell (ct=${h?.cellType}, raw=${h?.stringCellValue}), away=$awayCell (ct=${a?.cellType}, raw=${a?.stringCellValue}), gH=${cellText(row, COL_GOAL_HOME)}, gA=${cellText(row, COL_GOAL_AWAY)}")
+                }
 
                 val predHome = cellInt(row, COL_GOAL_HOME)
                 val predAway = cellInt(row, COL_GOAL_AWAY)
@@ -407,33 +417,28 @@ object ExcelParser {
 
     private fun cellText(row: Row, colIndex: Int): String? {
         val cell = row.getCell(colIndex) ?: return null
-        return when (cell.cellType) {
-            CellType.STRING -> cell.stringCellValue.trim().takeIf { it.isNotEmpty() }
-            CellType.NUMERIC -> {
-                if (DateUtil.isCellDateFormatted(cell)) null
-                else {
-                    val d = cell.numericCellValue
-                    if (d == d.toLong().toDouble()) d.toLong().toString() else d.toString()
+        val result = try {
+            when (cell.cellType) {
+                CellType.STRING -> cell.stringCellValue
+                CellType.NUMERIC -> {
+                    if (DateUtil.isCellDateFormatted(cell)) null
+                    else cell.numericCellValue.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() }
                 }
-            }
-            CellType.BOOLEAN -> cell.booleanCellValue.toString()
-            CellType.FORMULA -> {
-                try {
-                    when (cell.cachedFormulaResultType) {
-                        CellType.STRING -> cell.stringCellValue.trim().takeIf { it.isNotEmpty() }
-                        CellType.NUMERIC -> {
-                            val d = cell.numericCellValue
-                            if (d == d.toLong().toDouble()) d.toLong().toString() else d.toString()
-                        }
-                        CellType.BOOLEAN -> cell.booleanCellValue.toString()
-                        else -> formatter.formatCellValue(cell).trim().takeIf { it.isNotEmpty() }
-                    }
-                } catch (e: Exception) {
-                    formatter.formatCellValue(cell).trim().takeIf { it.isNotEmpty() }
+                CellType.BOOLEAN -> cell.booleanCellValue.toString()
+                CellType.FORMULA -> when (cell.cachedFormulaResultType) {
+                    CellType.STRING -> cell.stringCellValue
+                    CellType.NUMERIC -> cell.numericCellValue.let { if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString() }
+                    CellType.BOOLEAN -> cell.booleanCellValue.toString()
+                    else -> null
                 }
+                CellType.BLANK -> null
+                else -> null
             }
-            else -> formatter.formatCellValue(cell).trim().takeIf { it.isNotEmpty() }
-        }
+        } catch (e: Exception) { null }
+        if (result != null) return result.trim().takeIf { it.isNotEmpty() }
+        // Fallback to DataFormatter
+        val fb = formatter.formatCellValue(cell).trim()
+        return fb.takeIf { it.isNotEmpty() }
     }
 
     private fun cellInt(row: Row, colIndex: Int): Int? {

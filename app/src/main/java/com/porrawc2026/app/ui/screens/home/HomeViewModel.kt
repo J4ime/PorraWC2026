@@ -99,6 +99,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun enrichScheduleFromApi() {
+        var enriched = 0
         try {
             val response = apiService.getWorldCupMatches()
             Log.d("HomeVM", "API schedule: ${response.matches.size} matches")
@@ -110,25 +111,22 @@ class HomeViewModel @Inject constructor(
                 }
                 if (entities.size == 1) {
                     val entity = entities.first()
-                    val apiDate = fm.utcDate
-                    val apiTv = fm.stage ?: ""
                     cachedMatches = cachedMatches.map {
-                        if (it.id == entity.id) it.copy(
-                            dateTime = apiDate,
-                            tvChannel = resolveTvChannel(it, fm)
-                        ) else it
+                        if (it.id == entity.id) it.copy(dateTime = fm.utcDate, tvChannel = resolveTvChannel(it, fm)) else it
                     }
-                    Log.d("HomeVM", "Schedule match: ${entity.homeTeam} vs ${entity.awayTeam} @ $apiDate TV=${resolveTvChannel(entity, fm)}")
+                    enriched++
                 }
             }
         } catch (e: Exception) {
-            Log.d("HomeVM", "API schedule fetch failed: ${e.message}, using fallback")
+            Log.d("HomeVM", "API schedule failed: ${e.message}")
+        }
+        if (enriched == 0) {
+            Log.d("HomeVM", "API enriched 0 matches, applying fallback schedule")
             enrichScheduleFallback()
         }
     }
 
     private fun resolveTvChannel(match: MatchEntity, fm: com.porrawc2026.app.data.remote.FootballMatch): String {
-        if (match.tvChannel.isNotBlank()) return match.tvChannel
         if (match.tvChannel.isNotBlank()) return match.tvChannel
         return "DAZN"
     }
@@ -164,14 +162,12 @@ class HomeViewModel @Inject constructor(
     private fun parseMadridDate(dateTime: String): Date? {
         if (dateTime.isBlank()) return null
         return try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-            sdf.timeZone = TimeZone.getTimeZone("UTC")
-            sdf.parse(dateTime)
-        } catch (e: Exception) {
-            try {
+            if (dateTime.endsWith("Z")) {
                 SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(dateTime)
-            } catch (e2: Exception) { null }
-        }
+            } else {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = madridTZ }.parse(dateTime)
+            }
+        } catch (e: Exception) { null }
     }
 
     private fun getTodayMatchesWithDates(): List<MatchEntity> {

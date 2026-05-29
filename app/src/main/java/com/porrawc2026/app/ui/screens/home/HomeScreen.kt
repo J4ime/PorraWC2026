@@ -298,11 +298,11 @@ private fun PointsItem(label: String, points: Int, color: Color) {
 @Composable
 private fun TvChannelBadge(channel: String) {
     if (channel.isBlank() || channel.all { it.isDigit() || it == '.' }) return
-    val bg = when (channel.uppercase()) {
-        "RTVE", "TVE", "LA 1", "LA1", "LA 2", "LA2", "TELEDEPORTE" -> Color(0xFFC41522)
-        "DAZN" -> Color(0xFF0A162A)
-        "MOVISTAR", "M+", "MOVISTAR+", "#VAMOS" -> Color(0xFF019DF4)
-        else -> SurfaceMedium
+    val (bg, fg) = when (channel.uppercase()) {
+        "RTVE", "TVE", "LA 1", "LA1", "LA 2", "LA2", "TELEDEPORTE", "RTVE PLAY" -> Color(0xFF0B1D3A) to Color.White
+        "DAZN", "DAZN MUNDIAL", "DAZN APP GRATIS" -> Color(0xFF0A0A0A) to Color.White
+        "MOVISTAR", "M+", "MOVISTAR+", "#VAMOS" -> Color(0xFF019DF4) to Color.White
+        else -> SurfaceMedium to TextPrimary
     }
     val label = when (channel.uppercase()) {
         "RTVE", "TVE", "LA 1", "LA1" -> "RTVE"
@@ -316,7 +316,7 @@ private fun TvChannelBadge(channel: String) {
     Text(
         label,
         style = MaterialTheme.typography.labelSmall,
-        color = TextPrimary,
+        color = fg,
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .background(bg, RoundedCornerShape(4.dp))

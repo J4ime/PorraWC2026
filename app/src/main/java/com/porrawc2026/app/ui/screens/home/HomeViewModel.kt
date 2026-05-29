@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
+import com.porrawc2026.app.util.TvScraper
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.ValidationResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -392,16 +393,18 @@ class HomeViewModel @Inject constructor(
 
     private fun enrichScheduleFallback() {
         val fallbackDates = hardcodedMatchDates()
+        val tvSchedule = TvScraper.fetchSchedule()
+        Log.d("HomeVM", "TV scraper: ${tvSchedule.size} matches from futbolenlatv.es")
+
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
-            if (fb != null) {
-                val tv = if (match.tvChannel.isNotBlank() && match.tvChannel.all { !it.isDigit() }) match.tvChannel else fb.second
-                match.copy(dateTime = fb.first, tvChannel = tv)
-            } else if (match.dateTime.isBlank()) {
-                match.copy(tvChannel = match.tvChannel.ifBlank { "DAZN" })
+            val date = fb?.first ?: match.dateTime
+            val tv = if (match.tvChannel.isNotBlank() && match.tvChannel.all { !it.isDigit() }) {
+                match.tvChannel
             } else {
-                match.copy(tvChannel = match.tvChannel.ifBlank { "DAZN" })
+                TvScraper.matchTv(match.homeTeam, match.awayTeam, tvSchedule)
             }
+            match.copy(dateTime = date, tvChannel = tv)
         }
     }
 

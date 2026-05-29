@@ -150,12 +150,12 @@ object ExcelParser {
         val sheet = workbook.getSheet("Equipos") ?: return emptyList()
         val teams = mutableListOf<TeamEntity>()
 
-        for (rowIdx in 1..48) {
+        for (rowIdx in 0..47) {
             val row = sheet.getRow(rowIdx) ?: continue
-            val id = getCellValue(row, 1)?.toString() ?: continue
-            val name = getCellValue(row, 2)?.toString() ?: continue
-            val group = getCellValue(row, 3)?.toString() ?: continue
-            val rank = (getCellValue(row, 4) as? Double)?.toInt() ?: rowIdx
+            val id = getCellValue(row, 0)?.toString() ?: continue
+            val name = getCellValue(row, 1)?.toString() ?: continue
+            val group = getCellValue(row, 2)?.toString() ?: continue
+            val rank = (getCellValue(row, 3) as? Double)?.toInt() ?: rowIdx
 
             teams.add(TeamEntity(id = id, name = cleanText(name), groupLetter = group, rank = rank, flagEmoji = getFlagEmoji(name)))
         }
@@ -167,7 +167,7 @@ object ExcelParser {
         var matchId = 0
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
 
-        val groupHeaders = listOf(3, 11, 19, 27, 35, 43, 51, 59, 67, 75, 83, 91)
+        val groupHeaders = listOf(2, 10, 18, 26, 34, 42, 50, 58, 66, 74, 82, 90)
 
         for (baseRow in groupHeaders) {
             for (offset in 1..6) {
@@ -221,10 +221,10 @@ object ExcelParser {
 
         // Knockout matches (rounds of 32, 16, 8, 4, 3rd, final)
         val koRounds = listOf(
-            Triple(99, 16, "Dieciseisavos"),
-            Triple(118, 8, "Octavos"),
-            Triple(129, 4, "Cuartos"),
-            Triple(136, 2, "Semifinales")
+            Triple(98, 16, "Dieciseisavos"),
+            Triple(117, 8, "Octavos"),
+            Triple(128, 4, "Cuartos"),
+            Triple(135, 2, "Semifinales")
         )
 
         for ((startRow, count, round) in koRounds) {
@@ -262,7 +262,7 @@ object ExcelParser {
 
     private fun parseQuestions(sheet: Sheet): List<QuestionEntity> {
         val questions = mutableListOf<QuestionEntity>()
-        for (rowIdx in 159..208) {
+        for (rowIdx in 158..207) {
             val row = sheet.getRow(rowIdx) ?: continue
             val id = (getCellValue(row, COL_QUESTION_ID) as? Double)?.toInt() ?: continue
             val text = getCellValue(row, COL_QUESTION_TEXT)?.toString() ?: continue
@@ -293,7 +293,7 @@ object ExcelParser {
         val players = mutableListOf<PlayerPredictionEntity>()
 
         for (rank in 1..3) {
-            val rowIdx = 153 + rank
+            val rowIdx = 152 + rank
             val row = sheet.getRow(rowIdx) ?: continue
             val name = getCellValue(row, COL_PLAYER_NAME)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 
@@ -316,10 +316,10 @@ object ExcelParser {
         val predictions = mutableListOf<KnockoutPredictionEntity>()
 
         val rounds = mapOf(
-            99 to "Dieciseisavos",
-            118 to "Octavos",
-            129 to "Cuartos",
-            136 to "Semifinales"
+            98 to "Dieciseisavos",
+            117 to "Octavos",
+            128 to "Cuartos",
+            135 to "Semifinales"
         )
 
         for ((startRow, round) in rounds) {
@@ -367,7 +367,7 @@ object ExcelParser {
         }
 
         // 3rd place
-        val thirdRow = sheet.getRow(143)
+        val thirdRow = sheet.getRow(142)
         if (thirdRow != null) {
             val wHome = getCellValue(thirdRow, COL_KNOCKOUT_WINNER_HOME)?.let {
                 when (it) { is Double -> if (it == 1.0) 1 else null; is String -> if (it.trim() == "1") 1 else null; else -> null }
@@ -379,7 +379,7 @@ object ExcelParser {
         }
 
         // Final
-        val finalRow = sheet.getRow(147)
+        val finalRow = sheet.getRow(146)
         if (finalRow != null) {
             val wHome = getCellValue(finalRow, COL_KNOCKOUT_WINNER_HOME)?.let {
                 when (it) { is Double -> if (it == 1.0) 1 else null; is String -> if (it.trim() == "1") 1 else null; else -> null }

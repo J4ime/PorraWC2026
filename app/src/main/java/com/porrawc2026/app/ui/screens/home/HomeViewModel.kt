@@ -261,8 +261,8 @@ class HomeViewModel @Inject constructor(
         val year = cal.get(Calendar.YEAR)
 
         val groupMatches = cachedMatches.filter { !it.isKnockout }
+            .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = groupMatches.map { match -> toDisplay(match) }
-            .sortedBy { it.time.ifBlank { "99:99" } }
 
         val todayMatches = allDisplay.filter { display ->
             val d = parseMadridDate(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false

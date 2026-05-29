@@ -109,22 +109,14 @@ fun HomeScreen(
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Schedule, null, tint = WCGold, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                sectionTitle,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = WCGold,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text(
-                                upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextMuted
-                            )
-                        }
+                        Text(
+                            upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = WCGold,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center
+                        )
                         Spacer(modifier = Modifier.height(6.dp))
                         upcomingMatches.take(8).forEach { match ->
                             MatchRow(match)
@@ -179,6 +171,7 @@ fun HomeScreen(
 
 @Composable
 private fun MatchRow(match: MatchDisplay) {
+    val hasScore = match.homeGoals != null && match.awayGoals != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -202,55 +195,65 @@ private fun MatchRow(match: MatchDisplay) {
         )
 
         Text(
-            match.homeFlag,
-            fontSize = 18.sp,
-            modifier = Modifier.padding(horizontal = 2.dp)
+            match.homeTeam,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextPrimary,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.End,
+            maxLines = 1
         )
 
-        if (match.homeGoals != null && match.awayGoals != null) {
-            Text(
-                "${match.homeGoals} - ${match.awayGoals}",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-        } else {
-            Text(
-                "vs",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextMuted,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-        }
+        Text(
+            match.homeFlag,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(horizontal = 3.dp)
+        )
+
+        Text(
+            if (hasScore) "${match.homeGoals}" else "-",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (hasScore) TextPrimary else TextMuted,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            " - ",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextMuted
+        )
+
+        Text(
+            if (hasScore) "${match.awayGoals}" else "-",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (hasScore) TextPrimary else TextMuted,
+            fontWeight = FontWeight.Bold
+        )
 
         Text(
             match.awayFlag,
-            fontSize = 18.sp,
-            modifier = Modifier.padding(horizontal = 2.dp)
+            fontSize = 16.sp,
+            modifier = Modifier.padding(horizontal = 3.dp)
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            match.awayTeam,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextPrimary,
+            modifier = Modifier.weight(1f),
+            maxLines = 1
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
 
         TvChannelBadge(match.tvChannel)
 
-        Spacer(modifier = Modifier.width(8.dp))
-
-        when (match.status) {
-            MatchStatus.LIVE -> {
-                val infiniteTransition = rememberInfiniteTransition("live_${match.id}")
-                val alpha by infiniteTransition.animateFloat(
-                    initialValue = 1f, targetValue = 0.3f,
-                    animationSpec = infiniteRepeatable(animation = tween(600), repeatMode = RepeatMode.Reverse)
-                )
-                Text("LIVE", color = AccentRed.copy(alpha = alpha), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
-            }
-            MatchStatus.FINISHED -> {
-                Icon(Icons.Filled.CheckCircle, "Finalizado", tint = AccentGreen, modifier = Modifier.size(16.dp))
-            }
-            MatchStatus.UPCOMING -> {
-                Icon(Icons.Filled.Schedule, "Próximo", tint = TextMuted, modifier = Modifier.size(14.dp))
-            }
+        if (match.status == MatchStatus.LIVE) {
+            val infiniteTransition = rememberInfiniteTransition("live_${match.id}")
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 1f, targetValue = 0.3f,
+                animationSpec = infiniteRepeatable(animation = tween(600), repeatMode = RepeatMode.Reverse)
+            )
+            Text("LIVE", color = AccentRed.copy(alpha = alpha), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, modifier = Modifier.padding(start = 4.dp))
         }
     }
 }

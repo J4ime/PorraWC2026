@@ -82,6 +82,7 @@ class HomeViewModel @Inject constructor(
                 cachedMatches = data.matches
                 lastWrittenScores.clear()
                 enrichScheduleFromApi()
+                recalcAllPoints()
                 refreshPoints()
                 refreshUpcomingMatches()
                 startAutoRefresh()
@@ -97,6 +98,28 @@ class HomeViewModel @Inject constructor(
 
     fun refreshPoints() {
         viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
+    }
+
+    private suspend fun recalcAllPoints() {
+        cachedMatches = cachedMatches.map { match ->
+            val realHome = match.homeGoals
+            val realAway = match.awayGoals
+            if (realHome != null && realAway != null) {
+                val predHome = match.predictedHomeGoals
+                val predAway = match.predictedAwayGoals
+                var pts = 0
+                if (predHome != null && predAway != null) {
+                    if (predHome == realHome) pts += 10
+                    if (predAway == realAway) pts += 10
+                    val predRes = when { predHome > predAway -> "h"; predHome < predAway -> "a"; else -> "d" }
+                    val realRes = when { realHome > realAway -> "h"; realHome < realAway -> "a"; else -> "d" }
+                    if (predRes == realRes) pts += 30
+                }
+                val updated = match.copy(pointsEarned = pts)
+                repository.updateMatchPrediction(updated)
+                updated
+            } else match
+        }
     }
 
     private suspend fun enrichScheduleFromApi() {

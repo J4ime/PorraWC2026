@@ -168,6 +168,9 @@ private fun StandingRow(entry: StandingEntry, position: Int) {
 
 @Composable
 private fun MatchPredictionCard(match: MatchEntity) {
+    val hasRealResult = match.homeGoals != null && match.awayGoals != null
+    val hasPrediction = match.predictedHomeGoals != null && match.predictedAwayGoals != null
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = if (match.matchday == "J1") MatchBg else MatchBgAlternate),
@@ -178,16 +181,21 @@ private fun MatchPredictionCard(match: MatchEntity) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    match.matchday,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = WCGold
-                )
-                if (match.pointsEarned > 0) {
+                Text(match.matchday, style = MaterialTheme.typography.labelSmall, color = WCGold)
+                Row {
+                    if (hasRealResult) {
+                        Text(
+                            "${match.homeGoals} - ${match.awayGoals}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AccentOrange,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
                     Text(
-                        "+${match.pointsEarned} pts",
+                        if (hasRealResult && match.pointsEarned > 0) "+${match.pointsEarned} pts" else "",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AccentGreen,
+                        color = if (match.pointsEarned > 0) AccentGreen else TextMuted,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -197,54 +205,21 @@ private fun MatchPredictionCard(match: MatchEntity) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    match.homeTeam,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.End,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                Text(match.homeTeam, style = MaterialTheme.typography.bodyMedium, color = TextPrimary, modifier = Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = FontWeight.Medium)
                 Text(
                     text = match.predictedHomeGoals?.toString() ?: "-",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (match.predictedHomeGoals != null) TextPrimary else TextMuted,
-                    modifier = Modifier.width(50.dp),
-                    textAlign = TextAlign.Center
+                    color = if (hasPrediction) TextPrimary else TextMuted,
+                    modifier = Modifier.width(50.dp), textAlign = TextAlign.Center
                 )
-                Text(
-                    " - ",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = TextMuted
-                )
+                Text(" - ", style = MaterialTheme.typography.bodyLarge, color = TextMuted)
                 Text(
                     text = match.predictedAwayGoals?.toString() ?: "-",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (match.predictedAwayGoals != null) TextPrimary else TextMuted,
-                    modifier = Modifier.width(50.dp),
-                    textAlign = TextAlign.Center
+                    color = if (hasPrediction) TextPrimary else TextMuted,
+                    modifier = Modifier.width(50.dp), textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    match.awayTeam,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary,
-                    modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            // Real score display
-            if (match.homeGoals != null && match.awayGoals != null) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Resultado real: ${match.homeGoals} - ${match.awayGoals}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AccentOrange,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
+                Text(match.awayTeam, style = MaterialTheme.typography.bodyMedium, color = TextPrimary, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
             }
         }
     }

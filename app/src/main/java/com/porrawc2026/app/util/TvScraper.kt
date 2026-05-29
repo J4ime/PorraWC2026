@@ -31,59 +31,65 @@ object TvScraper {
     }
 
     private fun parseMatches(html: String): List<TvMatch> {
-        val results = mutableListOf<TvMatch>()
-        val text = html
+        val cleaned = html
             .replace(Regex("<[^>]+>"), " ")
-            .replace("&nbsp;", " ")
-            .replace("&aacute;", "á").replace("&eacute;", "é")
-            .replace("&iacute;", "í").replace("&oacute;", "ó")
-            .replace("&uacute;", "ú").replace("&ntilde;", "ñ")
-            .replace("&Aacute;", "Á").replace("&Eacute;", "É")
-            .replace("&Oacute;", "Ó").replace("&Uacute;", "Ú")
-            .replace(Regex("\\s+"), " ")
+            .replace("&nbsp;", " ").replace("&aacute;", "á")
+            .replace("&eacute;", "é").replace("&iacute;", "í")
+            .replace("&oacute;", "ó").replace("&uacute;", "ú")
+            .replace("&ntilde;", "ñ").replace(Regex("\\s+"), " ")
             .replace("R.D. Congo", "RD Congo")
             .replace("Holanda", "Países Bajos")
+            .replace("Costa de Marfil", "Costa Marfil")
+            .replace("Arabia Saudí", "Arabia Saudita")
+            .replace("República Checa", "Republica Checa")
+            .replace("Corea del Sur", "Corea Sur")
+            .replace("Estados Unidos", "EEUU")
 
-        val pattern = Regex(
-            """FIFA Copa Mundial 2026\s+Fase de grupos\s+(.+?)\s{2,}(.+?)\s{2,}DAZN\s""",
-            RegexOption.IGNORE_CASE
-        )
-
-        val matches = pattern.findAll(text)
-        for (m in matches) {
-            val home = cleanTeamName(m.groupValues[1])
-            val away = cleanTeamName(m.groupValues[2])
-            if (home.length > 2 && away.length > 2 && home.length < 30 && away.length < 30) {
-                val tv = resolveTv(text, m.range.first)
-                results.add(TvMatch(home, away, tv))
+        val results = mutableListOf<TvMatch>()
+        val marker = "FIFA Copa Mundial 2026 Fase de grupos "
+        var idx = 0
+        while (true) {
+            idx = cleaned.indexOf(marker, idx)
+            if (idx < 0) break
+            val after = cleaned.substring(idx + marker.length)
+            val parts = after.trim().split(Regex("\\s{2,}"), limit = 4)
+            if (parts.size >= 3) {
+                val home = parts[0].trim()
+                val away = parts[1].trim()
+                val tvBlock = if (parts.size > 2) parts[2] else ""
+                val channels = mutableListOf<String>()
+                val tvUpper = tvBlock.uppercase()
+                if (tvUpper.contains("LA 1 TVE") || tvUpper.contains("RTVE PLAY") || tvUpper.contains("TELEDEPORTE")) channels.add("RTVE")
+                if (tvUpper.contains("DAZN")) channels.add("DAZN")
+                if (channels.isEmpty()) channels.add("DAZN")
+                if (home.length in 3..25 && away.length in 3..25) {
+                    results.add(TvMatch(home, away, channels.joinToString(",")))
+                }
             }
+            idx += marker.length
         }
-        Log.d("TvScraper", "Parsed ${results.size} matches")
+        Log.d("TvScraper", "Parsed ${results.size} matches: ${results.take(5).joinToString { "${it.homeTeam} vs ${it.awayTeam} → ${it.tvChannel}" }}")
         return results
-    }
-
-    private fun cleanTeamName(name: String): String {
-        return name.trim().replace(Regex("\\s+"), " ")
-    }
-
-    private fun resolveTv(text: String, matchStart: Int): String {
-        val afterMatch = text.substring(matchStart, minOf(matchStart + 300, text.length))
-        val upper = afterMatch.uppercase()
-        val channels = mutableListOf<String>()
-        if (upper.contains("LA 1 TVE") || upper.contains("RTVE PLAY") || upper.contains("TELEDEPORTE")) channels.add("RTVE")
-        if (upper.contains("DAZN")) channels.add("DAZN")
-        return channels.joinToString(",")
     }
 
     fun matchTv(homeTeam: String, awayTeam: String, schedule: List<TvMatch>): String {
         val h = homeTeam.trim().lowercase()
         val a = awayTeam.trim().lowercase()
+        val hNorm = normalizeTeam(h)
+        val aNorm = normalizeTeam(a)
         for (m in schedule) {
-            val mh = m.homeTeam.lowercase()
-            val ma = m.awayTeam.lowercase()
-            if ((mh.contains(h) || h.contains(mh)) && (ma.contains(a) || a.contains(ma))) return m.tvChannel
-            if ((mh.contains(a) || a.contains(mh)) && (ma.contains(h) || h.contains(ma))) return m.tvChannel
+            val mh = normalizeTeam(m.homeTeam.lowercase())
+            val ma = normalizeTeam(m.awayTeam.lowercase())
+            if ((mh.contains(hNorm) || hNorm.contains(mh)) && (ma.contains(aNorm) || aNorm.contains(ma))) return m.tvChannel
+            if ((mh.contains(aNorm) || aNorm.contains(mh)) && (ma.contains(hNorm) || hNorm.contains(ma))) return m.tvChannel
         }
         return "DAZN"
+    }
+
+    private fun normalizeTeam(name: String): String {
+        return name.lowercase()
+            .replace("á", "a").replace("é", "e").replace("í", "i")
+            .replace("ó", "o").replace("ú", "u").replace("ñ", "n")
+            .replace(" ", "")
     }
 }

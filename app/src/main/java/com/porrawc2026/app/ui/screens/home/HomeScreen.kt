@@ -56,12 +56,12 @@ fun HomeScreen(
     ) {
         item {
             Box(
-                modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(WCBlue, WCDarkBlue, WCBlue))).padding(horizontal = 20.dp, vertical = 16.dp)
+                modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(WCBlue, WCDarkBlue, WCBlue))).padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text("Porra Mundial 26", style = MaterialTheme.typography.headlineLarge, color = TextPrimary, fontWeight = FontWeight.Bold)
                 }
-                if (hasData) {
+                if (true) {
                     Box(
                         modifier = Modifier.size(42.dp).clip(CircleShape).background(SurfaceMedium).align(Alignment.CenterEnd),
                         contentAlignment = Alignment.Center

@@ -490,7 +490,7 @@ public final class DaggerPorraWCApplication_HiltComponents_SingletonC {
           return (T) new GroupsViewModel(singletonCImpl.porraRepositoryProvider.get());
 
           case 1: // com.porrawc2026.app.ui.screens.home.HomeViewModel 
-          return (T) new HomeViewModel(singletonCImpl.porraRepositoryProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+          return (T) new HomeViewModel(singletonCImpl.porraRepositoryProvider.get(), singletonCImpl.provideApiServiceProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
           case 2: // com.porrawc2026.app.ui.screens.knockout.KnockoutViewModel 
           return (T) new KnockoutViewModel(singletonCImpl.porraRepositoryProvider.get());

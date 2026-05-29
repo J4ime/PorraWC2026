@@ -67,6 +67,9 @@ class HomeViewModel @Inject constructor(
     private var refreshJob: Job? = null
     private var livePollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
+    private val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+    private val timeFmt = SimpleDateFormat("HH:mm", Locale.US)
+    private val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "ES"))
 
     init {
         refreshPoints()
@@ -117,32 +120,46 @@ class HomeViewModel @Inject constructor(
                     lastDay = currentDay
                     refreshUpcomingMatches()
                 }
-                checkAndStartLivePolling()
+                checkLiveWindow()
                 delay(60_000)
             }
         }
     }
 
-    private suspend fun checkAndStartLivePolling() {
-        if (hasLiveMatch()) {
-            if (livePollJob?.isActive != true) {
-                startLivePolling()
-            }
-        } else {
+    private suspend fun checkLiveWindow() {
+        val todayMatchesWithDates = getTodayMatchesWithDates()
+        if (todayMatchesWithDates.isEmpty()) {
             livePollJob?.cancel()
+            return
+        }
+
+        val now = Date()
+        val firstStart = todayMatchesWithDates.map { parseDate(it.dateTime) }.filterNotNull().minOrNull() ?: return
+        val lastEnd = todayMatchesWithDates.map { parseDate(it.dateTime)?.let { Date(it.time + 150L * 60 * 1000) } }.filterNotNull().maxOrNull() ?: return
+
+        if (now.before(firstStart) || now.after(lastEnd)) {
+            livePollJob?.cancel()
+            return
+        }
+
+        if (livePollJob?.isActive != true) {
+            startLivePolling()
         }
     }
 
-    private fun hasLiveMatch(): Boolean {
-        val now = Date()
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        return cachedMatches.any { match ->
-            try {
-                if (match.dateTime.isBlank()) return@any false
-                val start = sdf.parse(match.dateTime) ?: return@any false
-                val end = Date(start.time + 150L * 60 * 1000) // 2.5h match window
-                now.after(start) && now.before(end)
-            } catch (e: Exception) { false }
+    private fun parseDate(dateTime: String): Date? {
+        if (dateTime.isBlank()) return null
+        return try { sdf.parse(dateTime) } catch (e: Exception) { null }
+    }
+
+    private fun getTodayMatchesWithDates(): List<MatchEntity> {
+        val now = Calendar.getInstance()
+        val today = now.get(Calendar.DAY_OF_YEAR)
+        val year = now.get(Calendar.YEAR)
+        return cachedMatches.filter { m ->
+            val d = parseDate(m.dateTime) ?: return@filter false
+            val c = Calendar.getInstance().apply { time = d }
+            c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today
         }
     }
 
@@ -150,7 +167,14 @@ class HomeViewModel @Inject constructor(
         livePollJob?.cancel()
         livePollJob = viewModelScope.launch(Dispatchers.IO) {
             Log.d("HomeVM", "Live polling started")
-            while (isActive && hasLiveMatch()) {
+            while (isActive) {
+                val todayMatches = getTodayMatchesWithDates()
+                if (todayMatches.isEmpty()) break
+                val now = Date()
+                val firstStart = todayMatches.map { parseDate(it.dateTime) }.filterNotNull().minOrNull()
+                val lastEnd = todayMatches.map { parseDate(it.dateTime)?.let { Date(it.time + 150L * 60 * 1000) } }.filterNotNull().maxOrNull()
+                if (firstStart != null && now.before(firstStart)) break
+                if (lastEnd != null && now.after(lastEnd)) break
                 try {
                     fetchLiveResults()
                 } catch (e: Exception) {
@@ -167,9 +191,9 @@ class HomeViewModel @Inject constructor(
         val response = apiService.getWorldCupMatches(dateFrom = dateStr, dateTo = dateStr)
         response.matches.forEach { fm ->
             val entities = cachedMatches.filter {
+                fm.homeTeam?.name?.contains(it.homeTeam, ignoreCase = true) == true ||
                 it.homeTeam.contains(fm.homeTeam?.name ?: "", ignoreCase = true) ||
-                it.homeTeam.contains(fm.homeTeam?.shortName ?: "", ignoreCase = true) ||
-                fm.homeTeam?.name?.contains(it.homeTeam, ignoreCase = true) == true
+                it.homeTeam.contains(fm.homeTeam?.shortName ?: "", ignoreCase = true)
             }
             if (entities.size == 1) {
                 val entity = entities.first()
@@ -180,10 +204,10 @@ class HomeViewModel @Inject constructor(
                     lastWrittenScores[entity.id] = home to away
                     repository.updateMatchResults(entity.id, home, away)
                     Log.d("HomeVM", "Live result: ${entity.homeTeam} $home-$away ${entity.awayTeam}")
-                    refreshPoints()
                     cachedMatches = cachedMatches.map {
                         if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it
                     }
+                    refreshPoints()
                     refreshUpcomingMatches()
                 }
             }
@@ -191,43 +215,31 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun refreshUpcomingMatches() {
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        val timeFmt = SimpleDateFormat("HH:mm", Locale.US)
-        val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "ES"))
         val now = Calendar.getInstance()
         val today = now.get(Calendar.DAY_OF_YEAR)
         val year = now.get(Calendar.YEAR)
 
         val groupMatches = cachedMatches.filter { !it.isKnockout }
         val allDisplay = groupMatches.map { match ->
-            val time = if (match.dateTime.isNotBlank()) {
-                try { val d = sdf.parse(match.dateTime); if (d != null) timeFmt.format(d) else "" } catch (e: Exception) { "" }
-            } else ""
-            val dateLabel = if (match.dateTime.isNotBlank()) {
-                try { val d = sdf.parse(match.dateTime); if (d != null) dateFmt.format(d).replace(".", "") else "" } catch (e: Exception) { "" }
-            } else ""
+            val time = parseTime(match.dateTime)
+            val dateLabel = parseDateLabel(match.dateTime)
             val status = matchStatus(match)
             MatchDisplay(
-                id = match.id,
-                dateLabel = dateLabel,
-                time = time,
-                homeTeam = match.homeTeam,
-                awayTeam = match.awayTeam,
+                id = match.id, dateLabel = dateLabel, time = time,
+                homeTeam = match.homeTeam, awayTeam = match.awayTeam,
                 homeFlag = ExcelParser.getFlagEmoji(match.homeTeam),
                 awayFlag = ExcelParser.getFlagEmoji(match.awayTeam),
-                homeGoals = match.homeGoals,
-                awayGoals = match.awayGoals,
-                groupLabel = match.groupName,
-                status = status,
-                tvChannel = match.tvChannel
+                homeGoals = match.homeGoals, awayGoals = match.awayGoals,
+                groupLabel = match.groupName, status = status, tvChannel = match.tvChannel
             )
-        }.sortedBy { it.time }
+        }
 
-        val todayMatches = allDisplay.filter { display ->
+        val withDates = allDisplay.filter { it.dateLabel.isNotBlank() }.sortedBy { it.time }
+        val withoutDates = allDisplay.filter { it.dateLabel.isBlank() }
+
+        val todayMatches = withDates.filter { display ->
             try {
-                val m = cachedMatches.firstOrNull { it.id == display.id } ?: return@filter false
-                if (m.dateTime.isBlank()) return@filter false
-                val d = sdf.parse(m.dateTime) ?: return@filter false
+                val d = sdf.parse(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
                 val c = Calendar.getInstance().apply { time = d }
                 c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today
             } catch (e: Exception) { false }
@@ -237,11 +249,9 @@ class HomeViewModel @Inject constructor(
             _sectionTitle.value = "HOY \u2014 ${todayMatches.first().dateLabel.uppercase()}"
             _upcomingMatches.value = todayMatches
         } else {
-            val futureMatches = allDisplay.filter { display ->
+            val futureMatches = withDates.filter { display ->
                 try {
-                    val m = cachedMatches.firstOrNull { it.id == display.id } ?: return@filter false
-                    if (m.dateTime.isBlank()) return@filter false
-                    val d = sdf.parse(m.dateTime) ?: return@filter false
+                    val d = sdf.parse(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
                     d.after(Date())
                 } catch (e: Exception) { false }
             }
@@ -249,24 +259,37 @@ class HomeViewModel @Inject constructor(
                 val firstDate = futureMatches.first().dateLabel
                 _sectionTitle.value = "PR\u00D3XIMA JORNADA \u2014 ${firstDate.uppercase()}"
                 _upcomingMatches.value = futureMatches.filter { it.dateLabel == firstDate }.take(8)
+            } else if (withoutDates.isNotEmpty()) {
+                _sectionTitle.value = "TODOS LOS PARTIDOS"
+                _upcomingMatches.value = withoutDates.take(8)
             } else {
-                _sectionTitle.value = "SIN PARTIDOS PR\u00D3XIMOS"
+                _sectionTitle.value = "SIN PARTIDOS"
                 _upcomingMatches.value = emptyList()
             }
         }
+
+        Log.d("HomeVM", "refreshUpcoming: today=${todayMatches.size} future=${withDates.filter { display ->
+            try { sdf.parse(cachedMatches.first { it.id == display.id }.dateTime)?.after(Date()) == true } catch (e: Exception) { false }
+        }.size} noDate=${withoutDates.size} total=${allDisplay.size}")
+    }
+
+    private fun parseTime(dateTime: String): String {
+        if (dateTime.isBlank()) return ""
+        return try { val d = sdf.parse(dateTime); if (d != null) timeFmt.format(d) else "" } catch (e: Exception) { "" }
+    }
+
+    private fun parseDateLabel(dateTime: String): String {
+        if (dateTime.isBlank()) return ""
+        return try { val d = sdf.parse(dateTime); if (d != null) dateFmt.format(d).replace(".", "") else "" } catch (e: Exception) { "" }
     }
 
     private fun matchStatus(match: MatchEntity): MatchStatus {
         if (match.homeGoals != null && match.awayGoals != null) return MatchStatus.FINISHED
+        if (match.dateTime.isBlank()) return MatchStatus.UPCOMING
+        val start = parseDate(match.dateTime) ?: return MatchStatus.UPCOMING
         val now = Date()
-        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        return try {
-            if (match.dateTime.isBlank()) return MatchStatus.UPCOMING
-            val start = sdf.parse(match.dateTime) ?: return MatchStatus.UPCOMING
-            val end = Date(start.time + 150L * 60 * 1000)
-            if (now.after(start) && now.before(end)) MatchStatus.LIVE
-            else MatchStatus.UPCOMING
-        } catch (e: Exception) { MatchStatus.UPCOMING }
+        val end = Date(start.time + 150L * 60 * 1000)
+        return if (now.after(start) && now.before(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
     }
 
     override fun onCleared() {

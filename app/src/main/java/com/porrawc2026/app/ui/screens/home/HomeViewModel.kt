@@ -418,18 +418,11 @@ class HomeViewModel @Inject constructor(
 
     private fun enrichScheduleFallback() {
         val fallbackDates = hardcodedMatchDates()
-        var tvCount = 0
-        lateinit var tvSchedule: List<TvScraper.TvMatch>
-        try {
-            tvSchedule = TvScraper.fetchSchedule()
-            Log.d("HomeVM", "TV scraper returned ${tvSchedule.size} matches")
-            if (tvSchedule.isNotEmpty()) {
-                Log.d("HomeVM", "First TV match: ${tvSchedule.first().homeTeam} vs ${tvSchedule.first().awayTeam} → ${tvSchedule.first().tvChannel}")
-            }
-        } catch (e: Exception) {
-            Log.e("HomeVM", "TV scraper exception: ${e.message}")
-            tvSchedule = emptyList()
+        var tvSchedule = TvScraper.fetchSchedule()
+        if (tvSchedule.isEmpty()) {
+            Log.d("HomeVM", "Web scraper empty, using hardcoded TV map")
         }
+        val hardcodedTv = TvScraper.getHardcodedTv()
 
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
@@ -437,12 +430,18 @@ class HomeViewModel @Inject constructor(
             val tv = if (match.tvChannel.isNotBlank() && match.tvChannel.all { !it.isDigit() }) {
                 match.tvChannel
             } else {
-                TvScraper.matchTv(match.homeTeam, match.awayTeam, tvSchedule)
+                val fromWeb = TvScraper.matchTv(match.homeTeam, match.awayTeam, tvSchedule)
+                if (fromWeb != "DAZN") {
+                    fromWeb
+                } else {
+                    val key = TvScraper.normalizeTeam("#${match.homeTeam}#${match.awayTeam}")
+                    hardcodedTv[key] ?: "DAZN"
+                }
             }
-            if (tv.isNotBlank() && tv != "DAZN") tvCount++
             match.copy(dateTime = date, tvChannel = tv)
         }
-        Log.d("HomeVM", "Enriched ${cachedMatches.size} matches, $tvCount with RTVE, dates from schedule")
+        val withRtv = cachedMatches.count { it.tvChannel.contains("RTVE") }
+        Log.d("HomeVM", "Enriched ${cachedMatches.size} matches, $withRtv with RTVE, dates from schedule")
     }
 
     override fun onCleared() {

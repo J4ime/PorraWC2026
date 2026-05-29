@@ -74,8 +74,7 @@ private fun ChronologicalMatchList(matches: List<MatchEntity>) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("Hora", Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                Text("Partido", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                Text("Pred.", Modifier.width(44.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
+                Text("Partido · Predicción", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 Text("Real", Modifier.width(44.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
                 Text("Pts", Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
             }
@@ -126,19 +125,11 @@ private fun ChronologicalMatchRow(match: MatchEntity) {
         val time = if (match.dateTime.length >= 16) match.dateTime.substring(11, 16) else match.dateTime
         Text(time, Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold)
 
-        Column(Modifier.weight(1f)) {
-            Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1)
-            Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1)
-            if (match.groupName.isNotBlank() && match.matchday.isNotBlank()) {
-                Text("${match.groupName} · ${match.matchday}", style = MaterialTheme.typography.labelSmall, color = TextMuted, fontSize = 10.sp)
-            }
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+            Text(" ${if (hasPred) match.predictedHomeGoals?.toString() ?: "-" else "-"} - ${if (hasPred) match.predictedAwayGoals?.toString() ?: "-" else "-"} ", style = MaterialTheme.typography.bodySmall, color = if (hasPred) TextPrimary else TextMuted, maxLines = 1)
+            Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f))
         }
-
-        Text(
-            if (hasPred) "${match.predictedHomeGoals}-${match.predictedAwayGoals}" else "-",
-            Modifier.width(44.dp),
-            style = MaterialTheme.typography.bodySmall, color = if (hasPred) TextPrimary else TextMuted, textAlign = TextAlign.Center
-        )
 
         Text(
             if (hasResult) "${match.homeGoals}-${match.awayGoals}" else "-",

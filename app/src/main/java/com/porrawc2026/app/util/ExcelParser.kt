@@ -44,7 +44,8 @@ object ExcelParser {
     private const val COL_QUESTION_ID = 22
     private const val COL_QUESTION_TEXT = 23
     private const val COL_QUESTION_ANSWER = 31  // AF
-    private const val COL_PLAYER_NAME = 32
+    private const val COL_PLAYER_NAME = 26  // AA (rows 154-156)
+    private const val COL_PLAYER_POINTS = 22  // W (rows 154-156)
     private const val COL_KNOCKOUT_WINNER_HOME = 28  // AC
     private const val COL_KNOCKOUT_WINNER_AWAY = 29  // AD
     private const val COL_KNOCKOUT_MATCH_NUM = 9
@@ -401,18 +402,19 @@ object ExcelParser {
         val players = mutableListOf<PlayerPredictionEntity>()
 
         for (rank in 1..3) {
-            val rowIdx = 152 + rank
+            val rowIdx = 153 + rank  // rows 154-156
             val row = sheet.getRow(rowIdx) ?: continue
-            val raw = cellText(row, COL_PLAYER_NAME)?.trim() ?: ""
-            val name = raw.takeIf { it.isNotEmpty() && !it.matches(Regex("^[\\d.]+$")) && it != "0" && it != "0.0" }
+            val name = cellText(row, COL_PLAYER_NAME)?.trim()?.takeIf { it.isNotEmpty() && !it.matches(Regex("^[\\d.]+$")) }
+            val pts = cellInt(row, COL_PLAYER_POINTS) ?: when (rank) { 1 -> 50; 2 -> 30; else -> 10 }
 
-            Log.d("ExcelParser", "Player $rank (r$rowIdx): raw='$raw' name='$name'")
+            Log.d("ExcelParser", "Player $rank (r$rowIdx): name='$name' pts=$pts")
 
             players.add(
                 PlayerPredictionEntity(
                     rank = rank,
                     playerName = when (rank) { 1 -> "1er Goleador"; 2 -> "2do Goleador"; else -> "3er Goleador" },
-                    predictedName = name
+                    predictedName = name,
+                    pointsPerGoal = pts
                 )
             )
         }

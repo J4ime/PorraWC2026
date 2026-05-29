@@ -107,6 +107,52 @@ fun HomeScreen(
             }
         }
 
+        // Cargar Excel button — arriba del todo
+        item {
+            Button(
+                onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = WCGold,
+                    contentColor = WCDarkBlue
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = WCDarkBlue,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(Icons.Filled.FileUpload, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Cargar Excel",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        if (!hasData) {
+            item {
+                Text(
+                    text = "Carga tu Excel con las predicciones para empezar",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
         // Points Card
         item {
             Card(
@@ -206,52 +252,6 @@ fun HomeScreen(
             }
         }
 
-        // Import button
-        item {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = WCGold,
-                        contentColor = WCDarkBlue
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            color = WCDarkBlue,
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(Icons.Filled.FileUpload, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Cargar Excel",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                if (!hasData) {
-                    Text(
-                        text = "Carga tu Excel con las predicciones para empezar",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
-
         item { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }
@@ -277,7 +277,6 @@ private fun ValidationDialog(
             shape = RoundedCornerShape(20.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                // Header
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         if (result.isValid) Icons.Filled.CheckCircle else Icons.Filled.Warning,
@@ -296,7 +295,6 @@ private fun ValidationDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Progress
                 val progress = if (result.totalChecks > 0) result.passedChecks.toFloat() / result.totalChecks else 0f
                 LinearProgressIndicator(
                     progress = { progress },
@@ -311,48 +309,37 @@ private fun ValidationDialog(
                     color = TextSecondary
                 )
 
-                // Errors
-                if (result.errors.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Pendiente (${result.errors.size}):",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = AccentRed,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                    Column(
-                        modifier = Modifier
-                            .heightIn(max = 250.dp)
-                    ) {
-                        LazyColumn {
-                            items(result.errors.take(15)) { error ->
-                                Row(
-                                    modifier = Modifier.padding(vertical = 2.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Text("• ", color = AccentRed, style = MaterialTheme.typography.bodySmall)
-                                    Text(
-                                        error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = TextSecondary
-                                    )
-                                }
-                            }
-                            if (result.errors.size > 15) {
-                                item {
-                                    Text(
-                                        "...y ${result.errors.size - 15} más",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = TextMuted,
-                                        modifier = Modifier.padding(start = 12.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                // Category breakdown
+                CategoryStatus(
+                    icon = Icons.Filled.Groups,
+                    label = "Resultados fase de grupos",
+                    pending = result.pendingMatches,
+                    total = 72,
+                    color = WCGold
+                )
+                CategoryStatus(
+                    icon = Icons.Filled.EmojiEvents,
+                    label = "Eliminatorias",
+                    pending = result.pendingKnockout,
+                    total = 32,
+                    color = AccentGreen
+                )
+                CategoryStatus(
+                    icon = Icons.Filled.Quiz,
+                    label = "Preguntas (V/F)",
+                    pending = result.pendingQuestions,
+                    total = 50,
+                    color = AccentBlue
+                )
+                CategoryStatus(
+                    icon = Icons.Filled.Person,
+                    label = "Goleadores",
+                    pending = result.pendingPlayers,
+                    total = 3,
+                    color = AccentOrange
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -382,6 +369,38 @@ private fun ValidationDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CategoryStatus(
+    icon: ImageVector,
+    label: String,
+    pending: Int,
+    total: Int,
+    color: Color
+) {
+    val completed = total - pending
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextPrimary,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$completed/$total",
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (pending == 0) AccentGreen else color,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

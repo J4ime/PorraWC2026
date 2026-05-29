@@ -23,7 +23,11 @@ data class ValidationResult(
     val passedChecks: Int,
     val failedChecks: Int,
     val errors: List<String>,
-    val warnings: List<String>
+    val warnings: List<String>,
+    val pendingMatches: Int = 0,
+    val pendingQuestions: Int = 0,
+    val pendingKnockout: Int = 0,
+    val pendingPlayers: Int = 0
 )
 
 object ExcelParser {
@@ -123,13 +127,22 @@ object ExcelParser {
         }
 
         val failed = total - passed
+        val missingMatches = groupMatches.count { it.predictedHomeGoals == null || it.predictedAwayGoals == null }
+        val missingQuestions = data.questions.count { it.predictedAnswer == null }
+        val missingKnockout = knockoutOnly.count { it.winner == null || it.winner !in 1..2 }
+        val missingPlayers = data.playerPredictions.count { it.predictedName.isNullOrBlank() }
+
         return ValidationResult(
             isValid = failed == 0,
             totalChecks = totalExpected,
             passedChecks = totalPredicted,
             failedChecks = failed,
             errors = errors,
-            warnings = warnings
+            warnings = warnings,
+            pendingMatches = missingMatches,
+            pendingQuestions = missingQuestions,
+            pendingKnockout = missingKnockout,
+            pendingPlayers = missingPlayers
         )
     }
 

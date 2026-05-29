@@ -13,11 +13,11 @@ private val WCColorScheme = darkColorScheme(
     onPrimary = WCDarkBlue,
     primaryContainer = WCBlue,
     onPrimaryContainer = WCGoldLight,
-    secondary = WCGreen,
+    secondary = AccentGreen,
     onSecondary = TextPrimary,
     secondaryContainer = SurfaceMedium,
     onSecondaryContainer = TextSecondary,
-    tertiary = WCRed,
+    tertiary = AccentRed,
     onTertiary = TextPrimary,
     background = WCNavy,
     onBackground = TextPrimary,
@@ -37,8 +37,8 @@ fun WC2026Theme(content: @Composable () -> Unit) {
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = WCDarkBlue.toArgb()
-            window.navigationBarColor = WCDarkBlue.toArgb()
+    window.statusBarColor = WCNavy.toArgb()
+    window.navigationBarColor = WCNavy.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         }
     }

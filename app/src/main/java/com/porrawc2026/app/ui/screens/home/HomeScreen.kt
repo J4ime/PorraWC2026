@@ -52,7 +52,7 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).padding(horizontal = 20.dp, vertical = 18.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().padding(horizontal = 20.dp, vertical = 18.dp)) {
                 Text("Porra Mundial 26", Modifier.align(Alignment.CenterStart), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
                 Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF333333)).align(Alignment.CenterEnd), contentAlignment = Alignment.Center) {
                     Text("$totalPoints", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
@@ -60,7 +60,7 @@ fun HomeScreen(
             }
         },
         bottomBar = {
-            Surface(modifier = Modifier.fillMaxWidth(), color = Color(0xFF1A1A1A)) {
+            Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding(), color = Color(0xFF1A1A1A)) {
                 Button(
                     onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(48.dp),

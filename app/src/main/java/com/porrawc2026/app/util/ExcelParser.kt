@@ -238,8 +238,6 @@ object ExcelParser {
     private fun parseMatches(sheet: Sheet): List<MatchEntity> {
         val matches = mutableListOf<MatchEntity>()
         var matchId = 0
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-
         val groupHeaders = listOf(2, 10, 18, 26, 34, 42, 50, 58, 66, 74, 82, 90)
         var loggedFirst = false
 
@@ -248,13 +246,7 @@ object ExcelParser {
                 val rowIdx = baseRow + offset
                 val row = sheet.getRow(rowIdx) ?: continue
 
-                val dateCell = getCellValue(row, COL_MATCH_DATE)
-                val dateStr = when (dateCell) {
-                    is Date -> dateFormat.format(dateCell)
-                    is String -> dateCell
-                    is Number -> dateCell.toString()
-                    else -> ""
-                }
+                val dateStr = readDateCell(row)
 
                 val homeCell = cellText(row, COL_MATCH_HOME) ?: getCellValue(row, COL_MATCH_HOME)?.toString()
                 if (homeCell == null) { Log.d("ExcelParser", "Skip r$rowIdx: no home team"); continue }
@@ -263,7 +255,10 @@ object ExcelParser {
 
                 if (!loggedFirst) {
                     loggedFirst = true
-                    Log.d("ExcelParser", "Match1(r$rowIdx): home=$homeCell, away=$awayCell, dateCell=$dateCell (${dateCell?.javaClass?.simpleName}), gH=${cellText(row, COL_GOAL_HOME)}, gA=${cellText(row, COL_GOAL_AWAY)}")
+                    val rawDateCell = row.getCell(COL_MATCH_DATE)
+                    val rawDateType = rawDateCell?.cellType
+                    val rawDateDf = if (rawDateCell != null) formatter.formatCellValue(rawDateCell) else "null"
+                    Log.d("ExcelParser", "Match1(r$rowIdx): home=$homeCell, away=$awayCell, dateRaw='$rawDateDf' type=$rawDateType dateParsed='$dateStr', col25='${cellText(row, 25)}', col24='${cellText(row, 24)}', col33='${cellText(row, COL_TV)}', gH=${cellText(row, COL_GOAL_HOME)}, gA=${cellText(row, COL_GOAL_AWAY)}")
                 }
 
                 val predHome = cellInt(row, COL_GOAL_HOME)
@@ -284,7 +279,7 @@ object ExcelParser {
                         predictedHomeGoals = predHome,
                         predictedAwayGoals = predAway,
                         isKnockout = false,
-                        tvChannel = cellText(row, COL_TV) ?: ""
+                        tvChannel = parseTvChannel(row)
                     )
                 )
             }
@@ -303,13 +298,7 @@ object ExcelParser {
                 val row = sheet.getRow(rowIdx) ?: continue
                 val matchNumber = cellInt(row, COL_KNOCKOUT_MATCH_NUM) ?: continue
 
-                val dateCell = getCellValue(row, COL_MATCH_DATE)
-                val dateStr = when (dateCell) {
-                    is Date -> dateFormat.format(dateCell)
-                    is String -> dateCell
-                    is Number -> dateCell.toString()
-                    else -> ""
-                }
+                val dateStr = readDateCell(row)
 
                 matchId++
                 matches.add(
@@ -323,7 +312,7 @@ object ExcelParser {
                         isKnockout = true,
                         knockoutRound = round,
                         matchNumber = matchNumber,
-                        tvChannel = cellText(row, COL_TV) ?: ""
+                        tvChannel = parseTvChannel(row)
                     )
                 )
             }
@@ -331,6 +320,26 @@ object ExcelParser {
 
         Log.d("ExcelParser", "parseMatches: found ${matches.size} (group=${matches.count { !it.isKnockout }}, ko=${matches.count { it.isKnockout }})")
         return matches
+    }
+
+    private fun parseTvChannel(row: Row): String {
+        val raw = cellText(row, COL_TV) ?: return ""
+        if (raw.all { it.isDigit() || it == '.' }) return ""
+        return raw.trim()
+    }
+
+    private fun readDateCell(row: Row): String {
+        val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+        for (col in listOf(COL_MATCH_DATE, 24, 22)) {
+            val cell = getCellValue(row, col) ?: continue
+            return when (cell) {
+                is Date -> fmt.format(cell)
+                is String -> cell
+                is Number -> cell.toString()
+                else -> continue
+            }
+        }
+        return ""
     }
 
     private fun parseQuestions(sheet: Sheet): List<QuestionEntity> {

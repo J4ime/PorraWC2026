@@ -113,11 +113,11 @@ fun HomeScreen(
         }
 
         // Footer button
-        Box(Modifier.fillMaxWidth().background(WCDarkBlue).padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Box(Modifier.fillMaxWidth().background(WCBlue).padding(horizontal = 16.dp, vertical = 10.dp)) {
             Button(
                 onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SurfaceMedium, contentColor = TextPrimary), shape = RoundedCornerShape(12.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = TextSecondary, contentColor = WCDarkBlue), shape = RoundedCornerShape(12.dp)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(color = TextPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)

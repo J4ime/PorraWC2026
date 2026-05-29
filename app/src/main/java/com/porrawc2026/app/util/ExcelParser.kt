@@ -50,12 +50,18 @@ object ExcelParser {
     private const val COL_KNOCKOUT_HOME_REF = 12
     private const val COL_KNOCKOUT_AWAY_REF = 13
 
+    private lateinit var formatter: DataFormatter
+
     fun parse(context: Context, uri: Uri): ExcelData {
         val inputStream: InputStream = context.contentResolver.openInputStream(uri)
             ?: throw Exception("No se pudo abrir el archivo")
-        val workbook = WorkbookFactory.create(inputStream)
+        val workbook = WorkbookFactory.create(inputStream, "")
+        formatter = DataFormatter()
+
         val sheet = workbook.getSheet("WORLDCUP")
             ?: workbook.getSheetAt(1)
+
+        Log.d("ExcelParser", "WORLDCUP sheet: rows=${sheet.lastRowNum + 1}, protected=${sheet.protect}")
 
         val teams = parseTeams(workbook)
         val matches = parseMatches(sheet)
@@ -78,7 +84,6 @@ object ExcelParser {
         var total = 0
         var passed = 0
 
-        // 1. Validate group stage matches (72 matches × 2 scores = 144 fields)
         val groupMatches = data.matches.filter { !it.isKnockout }
         total += groupMatches.size
         var predictedMatches = 0
@@ -92,7 +97,6 @@ object ExcelParser {
         }
         passed += predictedMatches
 
-        // 2. Validate 50 questions
         total += data.questions.size
         val answeredQuestions = data.questions.count { it.predictedAnswer != null }
         passed += answeredQuestions
@@ -102,7 +106,6 @@ object ExcelParser {
             }
         }
 
-        // 3. Validate 3 player names
         total += data.playerPredictions.size
         val namedPlayers = data.playerPredictions.count { !it.predictedName.isNullOrBlank() }
         passed += namedPlayers
@@ -110,7 +113,6 @@ object ExcelParser {
             errors.add("Faltan ${3 - namedPlayers} jugador(es) por nombrar")
         }
 
-        // 4. Validate knockout predictions (32 matches)
         val knockoutOnly = data.knockoutPredictions
         total += knockoutOnly.size
         val predictedKnockout = knockoutOnly.count { it.winner != null && it.winner in 1..2 }
@@ -121,7 +123,6 @@ object ExcelParser {
             }
         }
 
-        // 5. Warnings (not blockers)
         val totalPredicted = predictedMatches + answeredQuestions + namedPlayers + predictedKnockout
         val totalExpected = groupMatches.size + data.questions.size + 3 + knockoutOnly.size
 
@@ -155,10 +156,10 @@ object ExcelParser {
 
         for (rowIdx in 0..47) {
             val row = sheet.getRow(rowIdx) ?: continue
-            val id = getCellValue(row, 0)?.toString() ?: continue
-            val name = getCellValue(row, 1)?.toString() ?: continue
-            val group = getCellValue(row, 2)?.toString() ?: continue
-            val rank = (getCellValue(row, 3) as? Double)?.toInt() ?: rowIdx
+            val id = cellText(row, 0) ?: continue
+            val name = cellText(row, 1) ?: continue
+            val group = cellText(row, 2) ?: continue
+            val rank = cellInt(row, 3) ?: rowIdx
 
             teams.add(TeamEntity(id = id, name = cleanText(name), groupLetter = group, rank = rank, flagEmoji = getFlagEmoji(name)))
         }
@@ -184,27 +185,15 @@ object ExcelParser {
                     else -> null
                 } ?: continue
 
-                val homeCell = getCellValue(row, COL_MATCH_HOME)?.toString() ?: continue
-                val awayCell = getCellValue(row, COL_MATCH_AWAY)?.toString() ?: continue
+                val homeCell = cellText(row, COL_MATCH_HOME) ?: continue
+                val awayCell = cellText(row, COL_MATCH_AWAY) ?: continue
 
-                val predHome = getCellValue(row, COL_GOAL_HOME)?.let {
-                    when (it) {
-                        is Double -> it.toInt()
-                        is String -> it.toIntOrNull()
-                        else -> null
-                    }
-                }
-                val predAway = getCellValue(row, COL_GOAL_AWAY)?.let {
-                    when (it) {
-                        is Double -> it.toInt()
-                        is String -> it.toIntOrNull()
-                        else -> null
-                    }
-                }
+                val predHome = cellInt(row, COL_GOAL_HOME)
+                val predAway = cellInt(row, COL_GOAL_AWAY)
 
                 matchId++
-                val groupName = getCellValue(row, COL_MATCH_GROUP)?.toString() ?: ""
-                val matchday = getCellValue(row, COL_MATCH_DAY)?.toString() ?: "J1"
+                val groupName = cellText(row, COL_MATCH_GROUP) ?: ""
+                val matchday = cellText(row, COL_MATCH_DAY) ?: "J1"
 
                 matches.add(
                     MatchEntity(
@@ -222,7 +211,6 @@ object ExcelParser {
             }
         }
 
-        // Knockout matches (rounds of 32, 16, 8, 4, 3rd, final)
         val koRounds = listOf(
             Triple(99, 16, "Dieciseisavos"),
             Triple(118, 8, "Octavos"),
@@ -234,7 +222,7 @@ object ExcelParser {
             for (offset in 1..count) {
                 val rowIdx = startRow + offset
                 val row = sheet.getRow(rowIdx) ?: continue
-                val matchNumber = (getCellValue(row, COL_KNOCKOUT_MATCH_NUM) as? Double)?.toInt() ?: continue
+                val matchNumber = cellInt(row, COL_KNOCKOUT_MATCH_NUM) ?: continue
 
                 val dateCell = getCellValue(row, COL_MATCH_DATE)
                 val dateStr = when (dateCell) {
@@ -265,32 +253,26 @@ object ExcelParser {
 
     private fun parseQuestions(sheet: Sheet): List<QuestionEntity> {
         val questions = mutableListOf<QuestionEntity>()
-        var skipped = 0
+        val sampleRows = listOf(158, 159, 160, 170, 180, 190, 200, 207)
+
         for (rowIdx in 158..207) {
             val row = sheet.getRow(rowIdx) ?: continue
-            val idVal = getCellValue(row, COL_QUESTION_ID)
-            val id = when (idVal) {
-                is Double -> idVal.toInt()
-                is String -> idVal.toIntOrNull()
-                else -> null
-            }
-            if (id == null) { skipped++; continue }
-            val text = getCellValue(row, COL_QUESTION_TEXT)?.toString() ?: continue
+            val id = cellInt(row, COL_QUESTION_ID) ?: continue
+            val text = cellText(row, COL_QUESTION_TEXT) ?: continue
 
-            val answerRaw = getCellValue(row, COL_QUESTION_ANSWER)
-            val answer: Boolean? = when (answerRaw) {
-                is Boolean -> answerRaw
-                is String -> when (answerRaw.trim().uppercase()) {
-                    "TRUE", "VERDADERO", "V", "1", "YES", "SÍ", "SI" -> true
-                    "FALSE", "FALSO", "F", "0", "NO" -> false
-                    else -> null
-                }
+            val answerRaw = cellText(row, COL_QUESTION_ANSWER)
+            val answer: Boolean? = when {
+                answerRaw == null -> null
+                answerRaw.uppercase() in listOf("TRUE", "VERDADERO", "V", "1", "YES", "SÍ", "SI") -> true
+                answerRaw.uppercase() in listOf("FALSE", "FALSO", "F", "0", "NO") -> false
+                answerRaw == "1.0" || answerRaw == "1,0" -> true
+                answerRaw == "0.0" || answerRaw == "0,0" -> false
                 else -> null
             }
 
-            if (id <= 3) {
+            if (rowIdx in sampleRows) {
                 val cell = row.getCell(COL_QUESTION_ANSWER)
-                Log.d("ExcelParser", "Q$id: cell=$cell, type=${cell?.cellType}, answerRaw=$answerRaw ($answerRaw), answer=$answer")
+                Log.d("ExcelParser", "Q$id(row$rowIdx): cell=${cell?.cellType}, raw='$answerRaw', answer=$answer")
             }
 
             questions.add(
@@ -301,7 +283,8 @@ object ExcelParser {
                 )
             )
         }
-        Log.d("ExcelParser", "parseQuestions: found ${questions.size}, skipped=$skipped, answered=${questions.count { it.predictedAnswer != null }}")
+
+        Log.d("ExcelParser", "parseQuestions: found ${questions.size}, answered=${questions.count { it.predictedAnswer != null }}")
         return questions
     }
 
@@ -311,7 +294,7 @@ object ExcelParser {
         for (rank in 1..3) {
             val rowIdx = 152 + rank
             val row = sheet.getRow(rowIdx) ?: continue
-            val name = getCellValue(row, COL_PLAYER_NAME)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+            val name = cellText(row, COL_PLAYER_NAME)?.trim()?.takeIf { it.isNotEmpty() && it != "0" && it != "0.0" }
 
             players.add(
                 PlayerPredictionEntity(
@@ -330,7 +313,6 @@ object ExcelParser {
 
     private fun parseKnockout(sheet: Sheet): List<KnockoutPredictionEntity> {
         val predictions = mutableListOf<KnockoutPredictionEntity>()
-        var skipped = 0
 
         val rounds = mapOf(
             99 to "Dieciseisavos",
@@ -347,44 +329,29 @@ object ExcelParser {
                 "Semifinales" -> 2
                 else -> 0
             }
-            var roundSkipped = 0
 
             for (offset in 1..matchCount) {
                 val rowIdx = startRow + offset
-                val row = sheet.getRow(rowIdx)
-                if (row == null) { roundSkipped++; continue }
-                val matchNumVal = getCellValue(row, COL_KNOCKOUT_MATCH_NUM)
-                val matchNumber = when (matchNumVal) {
-                    is Double -> matchNumVal.toInt()
-                    is String -> matchNumVal.toIntOrNull()
+                val row = sheet.getRow(rowIdx) ?: continue
+                val matchNumber = cellInt(row, COL_KNOCKOUT_MATCH_NUM) ?: continue
+                val homeRef = cellText(row, COL_KNOCKOUT_HOME_REF) ?: continue
+                val awayRef = cellText(row, COL_KNOCKOUT_AWAY_REF) ?: continue
+
+                val whRaw = cellText(row, COL_KNOCKOUT_WINNER_HOME)
+                val waRaw = cellText(row, COL_KNOCKOUT_WINNER_AWAY)
+
+                val winnerHome = when {
+                    whRaw == "1" || whRaw == "1.0" -> 1
                     else -> null
                 }
-                if (matchNumber == null) { roundSkipped++; continue }
-                val homeRef = getCellValue(row, COL_KNOCKOUT_HOME_REF)?.toString()
-                if (homeRef == null) { roundSkipped++; continue }
-                val awayRef = getCellValue(row, COL_KNOCKOUT_AWAY_REF)?.toString()
-                if (awayRef == null) { roundSkipped++; continue }
-
-                val winnerHome = getCellValue(row, COL_KNOCKOUT_WINNER_HOME)?.let {
-                    when (it) {
-                        is Double -> if (it == 1.0) 1 else null
-                        is String -> if (it.trim() == "1") 1 else null
-                        else -> null
-                    }
-                }
-                val winnerAway = getCellValue(row, COL_KNOCKOUT_WINNER_AWAY)?.let {
-                    when (it) {
-                        is Double -> if (it == 1.0) 2 else null
-                        is String -> if (it.trim() == "1") 2 else null
-                        else -> null
-                    }
+                val winnerAway = when {
+                    waRaw == "1" || waRaw == "1.0" -> 2
+                    else -> null
                 }
                 val winner = winnerHome ?: winnerAway
 
-                if (matchNumber <= 75) {
-                    val cellAb = row.getCell(COL_KNOCKOUT_WINNER_HOME)
-                    val cellAe = row.getCell(COL_KNOCKOUT_WINNER_AWAY)
-                    Log.d("ExcelParser", "KO$matchNumber: AB=${cellAb?.cellType}=${getCellValue(row, COL_KNOCKOUT_WINNER_HOME)}, AE=${cellAe?.cellType}=${getCellValue(row, COL_KNOCKOUT_WINNER_AWAY)}, winner=$winner")
+                if (matchNumber <= 76) {
+                    Log.d("ExcelParser", "KO$matchNumber(row$rowIdx): AB='$whRaw', AE='$waRaw', winner=$winner")
                 }
 
                 predictions.add(
@@ -397,39 +364,45 @@ object ExcelParser {
                     )
                 )
             }
-            skipped += roundSkipped
-            Log.d("ExcelParser", "parseKnockout $round: expected $matchCount, found ${matchCount - roundSkipped}, skipped $roundSkipped")
         }
 
-        // 3rd place
         val thirdRow = sheet.getRow(142)
         if (thirdRow != null) {
-            val wHome = getCellValue(thirdRow, COL_KNOCKOUT_WINNER_HOME)?.let {
-                when (it) { is Double -> if (it == 1.0) 1 else null; is String -> if (it.trim() == "1") 1 else null; else -> null }
-            }
-            val wAway = getCellValue(thirdRow, COL_KNOCKOUT_WINNER_AWAY)?.let {
-                when (it) { is Double -> if (it == 1.0) 2 else null; is String -> if (it.trim() == "1") 2 else null; else -> null }
-            }
-            predictions.add(KnockoutPredictionEntity(103, "3er puesto", "L101", "L102", wHome ?: wAway))
+            val wh = cellText(thirdRow, COL_KNOCKOUT_WINNER_HOME)
+            val wa = cellText(thirdRow, COL_KNOCKOUT_WINNER_AWAY)
+            predictions.add(KnockoutPredictionEntity(103, "3er puesto", "L101", "L102",
+                when { wh == "1" || wh == "1.0" -> 1; wa == "1" || wa == "1.0" -> 2; else -> null }))
         }
 
-        // Final
         val finalRow = sheet.getRow(146)
         if (finalRow != null) {
-            val wHome = getCellValue(finalRow, COL_KNOCKOUT_WINNER_HOME)?.let {
-                when (it) { is Double -> if (it == 1.0) 1 else null; is String -> if (it.trim() == "1") 1 else null; else -> null }
-            }
-            val wAway = getCellValue(finalRow, COL_KNOCKOUT_WINNER_AWAY)?.let {
-                when (it) { is Double -> if (it == 1.0) 2 else null; is String -> if (it.trim() == "1") 2 else null; else -> null }
-            }
-            predictions.add(KnockoutPredictionEntity(104, "Final", "W101", "W102", wHome ?: wAway))
+            val wh = cellText(finalRow, COL_KNOCKOUT_WINNER_HOME)
+            val wa = cellText(finalRow, COL_KNOCKOUT_WINNER_AWAY)
+            predictions.add(KnockoutPredictionEntity(104, "Final", "W101", "W102",
+                when { wh == "1" || wh == "1.0" -> 1; wa == "1" || wa == "1.0" -> 2; else -> null }))
         }
 
+        Log.d("ExcelParser", "parseKnockout: ${predictions.size} predictions, picked=${predictions.count { it.winner != null }}")
         return predictions
     }
 
     private fun parseStandings(teams: List<TeamEntity>): List<GroupStandingEntity> {
         return teams.map { team -> GroupStandingEntity(teamId = team.id, groupLetter = team.groupLetter) }
+    }
+
+    // ── New helper functions that use DataFormatter ──────────────
+
+    private fun cellText(row: Row, colIndex: Int): String? {
+        val cell = row.getCell(colIndex) ?: return null
+        val text = formatter.formatCellValue(cell).trim()
+        return text.ifEmpty { null }
+    }
+
+    private fun cellInt(row: Row, colIndex: Int): Int? {
+        val cell = row.getCell(colIndex) ?: return null
+        val text = formatter.formatCellValue(cell).trim()
+        if (text.isEmpty()) return null
+        return text.replace(',', '.').toDoubleOrNull()?.toInt()
     }
 
     private fun getCellValue(row: Row, colIndex: Int): Any? {

@@ -263,48 +263,21 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
     if (dismissed) return
     Dialog(onDismissRequest = { dismissed = true; onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(modifier = Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = SurfaceMedium), shape = RoundedCornerShape(20.dp)) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (result.isValid) Icons.Filled.CheckCircle else Icons.Filled.Warning, null,
-                        tint = if (result.isValid) AccentGreen else AccentOrange, modifier = Modifier.size(32.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(if (result.isValid) "EXCEL V\u00C1LIDO" else "EXCEL INCOMPLETO",
-                        style = MaterialTheme.typography.titleLarge, color = if (result.isValid) AccentGreen else AccentOrange, fontWeight = FontWeight.Bold)
-                }
+            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(if (result.isValid) Icons.Filled.CheckCircle else Icons.Filled.Warning, null,
+                    tint = if (result.isValid) AccentGreen else AccentOrange, modifier = Modifier.size(40.dp))
                 Spacer(modifier = Modifier.height(12.dp))
-                val progress = if (result.totalChecks > 0) result.passedChecks.toFloat() / result.totalChecks else 0f
-                LinearProgressIndicator(progress = { progress }, Modifier.fillMaxWidth(),
-                    color = if (result.isValid) AccentGreen else AccentOrange, trackColor = InputBg)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "${result.passedChecks}/${result.totalChecks} celdas v\u00E1lidas (columna AG)",
-                    style = MaterialTheme.typography.bodyMedium, color = TextSecondary
-                )
-                if (result.failedChecks > 0) {
-                    Text(
-                        "${result.failedChecks} errores encontrados",
-                        style = MaterialTheme.typography.bodySmall, color = AccentOrange
-                    )
-                }
-                if (result.errors.isNotEmpty()) {
+                Text(if (result.isValid) "EXCEL V\u00C1LIDO" else "EXCEL INCOMPLETO",
+                    style = MaterialTheme.typography.titleLarge, color = if (result.isValid) AccentGreen else AccentOrange, fontWeight = FontWeight.Bold)
+                if (!result.isValid) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    result.errors.take(8).forEach { err ->
-                        Text(err, style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(vertical = 1.dp))
-                    }
-                    if (result.errors.size > 8) {
-                        Text("...y ${result.errors.size - 8} m\u00E1s", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                    }
+                    Text("No es v\u00E1lido. Revisa el Excel y vuelve a cargarlo.",
+                        style = MaterialTheme.typography.bodyMedium, color = TextSecondary, textAlign = TextAlign.Center)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { dismissed = true; onDismiss() }, Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = if (result.isValid) AccentGreen else WCBlue), shape = RoundedCornerShape(10.dp)) {
                     Text(if (result.isValid) "CONTINUAR" else "ENTENDIDO", fontWeight = FontWeight.Bold)
-                }
-                if (!result.isValid) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Corrige los errores en el Excel (columna AG) y vuelve a cargarlo",
-                        style = MaterialTheme.typography.labelSmall, color = TextMuted,
-                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 }
             }
         }

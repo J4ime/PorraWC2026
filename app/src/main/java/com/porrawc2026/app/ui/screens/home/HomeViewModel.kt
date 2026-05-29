@@ -162,12 +162,27 @@ class HomeViewModel @Inject constructor(
             } catch (e: Exception) { false }
         }
 
-        _sectionTitle.value = if (todayMatches.isNotEmpty()) {
-            "HOY \u2014 ${todayMatches.first().dateLabel.uppercase()}"
+        if (todayMatches.isNotEmpty()) {
+            _sectionTitle.value = "HOY \u2014 ${todayMatches.first().dateLabel.uppercase()}"
+            _upcomingMatches.value = todayMatches
         } else {
-            "HOY \u2014 ${dateFmt.format(now.time).replace(".", "").uppercase()} - SIN PARTIDOS"
+            val futureMatches = allDisplay.filter { display ->
+                try {
+                    val m = cachedMatches.firstOrNull { it.id == display.id } ?: return@filter false
+                    if (m.dateTime.isBlank()) return@filter false
+                    val d = sdf.parse(m.dateTime) ?: return@filter false
+                    d.after(Date())
+                } catch (e: Exception) { false }
+            }
+            if (futureMatches.isNotEmpty()) {
+                val firstDate = futureMatches.first().dateLabel
+                _sectionTitle.value = "PR\u00D3XIMA JORNADA \u2014 ${firstDate.uppercase()}"
+                _upcomingMatches.value = futureMatches.filter { it.dateLabel == firstDate }.take(8)
+            } else {
+                _sectionTitle.value = "SIN PARTIDOS PR\u00D3XIMOS"
+                _upcomingMatches.value = emptyList()
+            }
         }
-        _upcomingMatches.value = todayMatches
     }
 
     override fun onCleared() {

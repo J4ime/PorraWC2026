@@ -221,10 +221,10 @@ object ExcelParser {
 
         // Knockout matches (rounds of 32, 16, 8, 4, 3rd, final)
         val koRounds = listOf(
-            Triple(98, 16, "Dieciseisavos"),
-            Triple(117, 8, "Octavos"),
-            Triple(128, 4, "Cuartos"),
-            Triple(135, 2, "Semifinales")
+            Triple(99, 16, "Dieciseisavos"),
+            Triple(118, 8, "Octavos"),
+            Triple(129, 4, "Cuartos"),
+            Triple(136, 2, "Semifinales")
         )
 
         for ((startRow, count, round) in koRounds) {
@@ -316,10 +316,10 @@ object ExcelParser {
         val predictions = mutableListOf<KnockoutPredictionEntity>()
 
         val rounds = mapOf(
-            98 to "Dieciseisavos",
-            117 to "Octavos",
-            128 to "Cuartos",
-            135 to "Semifinales"
+            99 to "Dieciseisavos",
+            118 to "Octavos",
+            129 to "Cuartos",
+            136 to "Semifinales"
         )
 
         for ((startRow, round) in rounds) {

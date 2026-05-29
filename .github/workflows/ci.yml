@@ -13,14 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-
       - uses: gradle/actions/setup-gradle@v3
-
+      - name: Make gradlew executable
+        run: chmod +x gradlew
       - name: Run all tests
         run: ./gradlew :app:test --no-daemon
 
@@ -29,17 +28,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-
       - uses: gradle/actions/setup-gradle@v3
-
+      - name: Make gradlew executable
+        run: chmod +x gradlew
       - name: Run lint
         run: ./gradlew :app:lint --no-daemon
-
       - uses: actions/upload-artifact@v4
         if: success() || failure()
         with:
@@ -52,17 +49,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-
       - uses: gradle/actions/setup-gradle@v3
-
+      - name: Make gradlew executable
+        run: chmod +x gradlew
       - name: Assemble debug
         run: ./gradlew :app:assembleDebug --no-daemon
-
       - uses: actions/upload-artifact@v4
         with:
           name: PorraWC2026-debug
@@ -79,9 +74,7 @@ jobs:
           echo "Tests: ${{ needs.tests.result }}"
           echo "Lint: ${{ needs.lint.result }}"
           echo "Build: ${{ needs.build.result }}"
-
-          if [[ "${{ needs.tests.result }}" != "success" || \
-                "${{ needs.build.result }}" != "success" ]]; then
+          if [[ "${{ needs.tests.result }}" != "success" || "${{ needs.build.result }}" != "success" ]]; then
             echo "CI FAILED"
             exit 1
           fi

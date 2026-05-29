@@ -85,7 +85,7 @@ fun HomeScreen(
             }
         }
 
-        if (!hasData) { item { Spacer(Modifier.height(16.dp)) }; return@LazyColumn }
+        if (!hasData) { item { Spacer(Modifier.height(100.dp)) }; return@LazyColumn }
 
         if (upcomingMatches.isNotEmpty()) {
             item {

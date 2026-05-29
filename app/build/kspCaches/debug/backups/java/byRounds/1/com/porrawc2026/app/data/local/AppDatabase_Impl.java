@@ -53,17 +53,17 @@ public final class AppDatabase_Impl extends AppDatabase {
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(1) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `teams` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `groupLetter` TEXT NOT NULL, `rank` INTEGER NOT NULL, `flagEmoji` TEXT NOT NULL, PRIMARY KEY(`id`))");
-        db.execSQL("CREATE TABLE IF NOT EXISTS `matches` (`id` INTEGER NOT NULL, `groupName` TEXT NOT NULL, `matchday` TEXT NOT NULL, `dateTime` TEXT NOT NULL, `homeTeam` TEXT NOT NULL, `awayTeam` TEXT NOT NULL, `homeGoals` INTEGER, `awayGoals` INTEGER, `predictedHomeGoals` INTEGER, `predictedAwayGoals` INTEGER, `isKnockout` INTEGER NOT NULL, `knockoutRound` TEXT, `matchNumber` INTEGER, `pointsEarned` INTEGER NOT NULL, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `matches` (`id` INTEGER NOT NULL, `groupName` TEXT NOT NULL, `matchday` TEXT NOT NULL, `dateTime` TEXT NOT NULL, `homeTeam` TEXT NOT NULL, `awayTeam` TEXT NOT NULL, `homeGoals` INTEGER, `awayGoals` INTEGER, `predictedHomeGoals` INTEGER, `predictedAwayGoals` INTEGER, `isKnockout` INTEGER NOT NULL, `knockoutRound` TEXT, `matchNumber` INTEGER, `pointsEarned` INTEGER NOT NULL, `tvChannel` TEXT NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `questions` (`id` INTEGER NOT NULL, `text` TEXT NOT NULL, `predictedAnswer` INTEGER, `correctAnswer` INTEGER, `pointsEarned` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `player_predictions` (`rank` INTEGER NOT NULL, `playerName` TEXT NOT NULL, `predictedName` TEXT, `goalsScored` INTEGER NOT NULL, `pointsPerGoal` INTEGER NOT NULL, `pointsEarned` INTEGER NOT NULL, PRIMARY KEY(`rank`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `knockout_predictions` (`matchNumber` INTEGER NOT NULL, `round` TEXT NOT NULL, `homeTeamRef` TEXT NOT NULL, `awayTeamRef` TEXT NOT NULL, `winner` INTEGER, `pointsEarned` INTEGER NOT NULL, PRIMARY KEY(`matchNumber`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `group_standings` (`teamId` TEXT NOT NULL, `groupLetter` TEXT NOT NULL, `position` INTEGER NOT NULL, `played` INTEGER NOT NULL, `won` INTEGER NOT NULL, `drawn` INTEGER NOT NULL, `lost` INTEGER NOT NULL, `goalsFor` INTEGER NOT NULL, `goalsAgainst` INTEGER NOT NULL, `points` INTEGER NOT NULL, PRIMARY KEY(`teamId`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '793ef87ca89c18dd30c261d8458114de')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bbedc7006e8b7f3a6ef48f0332a6cf1b')");
       }
 
       @Override
@@ -132,7 +132,7 @@ public final class AppDatabase_Impl extends AppDatabase {
                   + " Expected:\n" + _infoTeams + "\n"
                   + " Found:\n" + _existingTeams);
         }
-        final HashMap<String, TableInfo.Column> _columnsMatches = new HashMap<String, TableInfo.Column>(14);
+        final HashMap<String, TableInfo.Column> _columnsMatches = new HashMap<String, TableInfo.Column>(15);
         _columnsMatches.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsMatches.put("groupName", new TableInfo.Column("groupName", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsMatches.put("matchday", new TableInfo.Column("matchday", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -147,6 +147,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         _columnsMatches.put("knockoutRound", new TableInfo.Column("knockoutRound", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsMatches.put("matchNumber", new TableInfo.Column("matchNumber", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsMatches.put("pointsEarned", new TableInfo.Column("pointsEarned", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsMatches.put("tvChannel", new TableInfo.Column("tvChannel", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysMatches = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesMatches = new HashSet<TableInfo.Index>(0);
         final TableInfo _infoMatches = new TableInfo("matches", _columnsMatches, _foreignKeysMatches, _indicesMatches);
@@ -225,7 +226,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "793ef87ca89c18dd30c261d8458114de", "80581616767bf260cede66899da1bf67");
+    }, "bbedc7006e8b7f3a6ef48f0332a6cf1b", "85df72a0aa4306c3f0a672aac0360636");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;

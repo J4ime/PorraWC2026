@@ -28,7 +28,7 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "porra_wc2026.db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides

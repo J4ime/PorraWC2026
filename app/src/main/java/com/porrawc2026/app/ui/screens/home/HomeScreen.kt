@@ -226,12 +226,7 @@ private fun MatchRow(match: MatchDisplay) {
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Icon(
-            Icons.Filled.Tv,
-            contentDescription = "TV",
-            tint = TextMuted,
-            modifier = Modifier.size(16.dp)
-        )
+        TvChannelBadge(match.tvChannel)
 
         Spacer(modifier = Modifier.width(8.dp))
 
@@ -316,6 +311,35 @@ private fun PointsItem(label: String, points: Int, color: Color) {
         Text(points.toString(), style = MaterialTheme.typography.titleLarge, color = color, fontWeight = FontWeight.Bold)
         Text(label, style = MaterialTheme.typography.labelSmall, color = TextMuted)
     }
+}
+
+@Composable
+private fun TvChannelBadge(channel: String) {
+    if (channel.isBlank()) return
+    val bg = when (channel.uppercase()) {
+        "RTVE", "TVE", "LA 1", "LA1", "LA 2", "LA2", "TELEDEPORTE" -> Color(0xFFC41522)
+        "DAZN" -> Color(0xFF0A162A)
+        "MOVISTAR", "M+", "MOVISTAR+", "#VAMOS" -> Color(0xFF019DF4)
+        else -> SurfaceMedium
+    }
+    val label = when (channel.uppercase()) {
+        "RTVE", "TVE", "LA 1", "LA1" -> "RTVE"
+        "LA 2", "LA2" -> "TVE2"
+        "TELEDEPORTE" -> "TDP"
+        "DAZN" -> "DAZN"
+        "MOVISTAR", "M+", "MOVISTAR+" -> "M+"
+        "#VAMOS" -> "VAMOS"
+        else -> channel.take(4).uppercase()
+    }
+    Text(
+        label,
+        style = MaterialTheme.typography.labelSmall,
+        color = TextPrimary,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .background(bg, RoundedCornerShape(4.dp))
+            .padding(horizontal = 5.dp, vertical = 2.dp)
+    )
 }
 
 @Composable

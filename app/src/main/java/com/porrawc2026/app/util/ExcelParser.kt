@@ -50,6 +50,7 @@ object ExcelParser {
     private const val COL_KNOCKOUT_MATCH_NUM = 9
     private const val COL_KNOCKOUT_HOME_REF = 12
     private const val COL_KNOCKOUT_AWAY_REF = 13
+    private const val COL_TV = 33
 
     private lateinit var formatter: DataFormatter
     private var cachedSheet: Sheet? = null
@@ -136,17 +137,23 @@ object ExcelParser {
             if (ag32.isNotEmpty()) dv to ag32 else null
         }
 
+        if (agValidationRegions.isEmpty()) {
+            warnings.add("No se encontraron validaciones en la columna AG")
+            return AgValidationResult(true, 0, 0, 0, emptyList(), warnings)
+        }
+
         for (rowIdx in 4..208) {
             val row = sheet.getRow(rowIdx) ?: continue
             val agCell = row.getCell(32) ?: continue
+
+            val matched = agValidationRegions.firstOrNull { (_, regions) ->
+                regions.any { it.isInRange(rowIdx, 32) }
+            } ?: continue
+
             total++
-
             val cellValue = try { formatter.formatCellValue(agCell).trim() } catch (e: Exception) { "" }
-            val cellType = try { agCell.cellType } catch (e: Exception) { null }
 
-            val isValid = isAgCellValid(agCell, agValidationRegions)
-
-            if (isValid) {
+            if (isAgCellValid(agCell, matched.first)) {
                 green++
             } else {
                 red++
@@ -169,7 +176,7 @@ object ExcelParser {
                     else -> "Fila $rowIdx"
                 }
                 if (red <= 10) {
-                    errors.add("$rowLabel — valor: '$cellValue' (${cellType})")
+                    errors.add("$rowLabel — valor: '$cellValue'")
                 }
             }
         }
@@ -178,7 +185,7 @@ object ExcelParser {
             warnings.add("Columna AG validada: $green celdas OK")
         }
 
-        Log.d("ExcelParser", "AG validate: total=$total green=$green red=$red")
+        Log.d("ExcelParser", "AG validate: total=$total green=$green red=$red (only cells with validation)")
         return AgValidationResult(
             isValid = red == 0 && total > 0,
             totalRows = total,
@@ -189,41 +196,27 @@ object ExcelParser {
         )
     }
 
-    private fun isAgCellValid(cell: Cell, validations: List<Pair<DataValidation, List<CellRangeAddress>>>): Boolean {
+    private fun isAgCellValid(cell: Cell, dv: DataValidation): Boolean {
         val cellValue = try { formatter.formatCellValue(cell).trim() } catch (e: Exception) { "" }
+        val isEmpty = cellValue.isEmpty() || cellValue == "0" || cellValue == "0.0"
 
-        if (cellValue.isEmpty() || cellValue == "0" || cellValue == "0.0") return false
+        if (isEmpty) return dv.emptyCellAllowed
 
-        for ((dv, regions) in validations) {
-            val rowIdx = cell.rowIndex
-            val colIdx = cell.columnIndex
-            if (regions.any { it.isInRange(rowIdx, colIdx) }) {
-                val constraint = dv.validationConstraint
-                return when (constraint.validationType) {
-                    DataValidationConstraint.ValidationType.LIST -> {
-                        val allowed = constraint.explicitListValues
-                        allowed.any { it.equals(cellValue, ignoreCase = true) }
-                    }
-                    DataValidationConstraint.ValidationType.INTEGER,
-                    DataValidationConstraint.ValidationType.DECIMAL -> {
-                        val v = cellValue.replace(',', '.').toDoubleOrNull()
-                        if (v == null) {
-                            dv.emptyCellAllowed
-                        } else {
-                            val min = constraint.formula1.replace(",", ".").toDoubleOrNull() ?: Double.MIN_VALUE
-                            val max = constraint.formula2.replace(",", ".").toDoubleOrNull() ?: Double.MAX_VALUE
-                            v in min..max
-                        }
-                    }
-                    DataValidationConstraint.ValidationType.TEXT_LENGTH,
-                    DataValidationConstraint.ValidationType.FORMULA,
-                    DataValidationConstraint.ValidationType.ANY -> true
-                    else -> true
-                }
+        val constraint = dv.validationConstraint
+        return when (constraint.validationType) {
+            DataValidationConstraint.ValidationType.LIST -> {
+                val allowed = constraint.explicitListValues
+                allowed.any { it.equals(cellValue, ignoreCase = true) }
             }
+            DataValidationConstraint.ValidationType.INTEGER,
+            DataValidationConstraint.ValidationType.DECIMAL -> {
+                val v = cellValue.replace(',', '.').toDoubleOrNull() ?: return false
+                val min = constraint.formula1.replace(",", ".").toDoubleOrNull() ?: Double.MIN_VALUE
+                val max = constraint.formula2.replace(",", ".").toDoubleOrNull() ?: Double.MAX_VALUE
+                v in min..max
+            }
+            else -> true
         }
-
-        return cellValue.isNotBlank() && cellValue != "0" && cellValue != "0.0"
     }
 
     private fun parseTeams(workbook: Workbook): List<TeamEntity> {
@@ -290,7 +283,8 @@ object ExcelParser {
                         awayTeam = cleanText(awayCell),
                         predictedHomeGoals = predHome,
                         predictedAwayGoals = predAway,
-                        isKnockout = false
+                        isKnockout = false,
+                        tvChannel = cellText(row, COL_TV) ?: ""
                     )
                 )
             }
@@ -328,7 +322,8 @@ object ExcelParser {
                         awayTeam = "W$matchNumber",
                         isKnockout = true,
                         knockoutRound = round,
-                        matchNumber = matchNumber
+                        matchNumber = matchNumber,
+                        tvChannel = cellText(row, COL_TV) ?: ""
                     )
                 )
             }

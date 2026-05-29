@@ -14,7 +14,7 @@ import com.porrawc2026.app.data.local.entity.*
         KnockoutPredictionEntity::class,
         GroupStandingEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -46,7 +46,7 @@ public final class MatchDao_Impl implements MatchDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `matches` (`id`,`groupName`,`matchday`,`dateTime`,`homeTeam`,`awayTeam`,`homeGoals`,`awayGoals`,`predictedHomeGoals`,`predictedAwayGoals`,`isKnockout`,`knockoutRound`,`matchNumber`,`pointsEarned`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        return "INSERT OR REPLACE INTO `matches` (`id`,`groupName`,`matchday`,`dateTime`,`homeTeam`,`awayTeam`,`homeGoals`,`awayGoals`,`predictedHomeGoals`,`predictedAwayGoals`,`isKnockout`,`knockoutRound`,`matchNumber`,`pointsEarned`,`tvChannel`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
@@ -91,13 +91,14 @@ public final class MatchDao_Impl implements MatchDao {
           statement.bindLong(13, entity.getMatchNumber());
         }
         statement.bindLong(14, entity.getPointsEarned());
+        statement.bindString(15, entity.getTvChannel());
       }
     };
     this.__updateAdapterOfMatchEntity = new EntityDeletionOrUpdateAdapter<MatchEntity>(__db) {
       @Override
       @NonNull
       protected String createQuery() {
-        return "UPDATE OR ABORT `matches` SET `id` = ?,`groupName` = ?,`matchday` = ?,`dateTime` = ?,`homeTeam` = ?,`awayTeam` = ?,`homeGoals` = ?,`awayGoals` = ?,`predictedHomeGoals` = ?,`predictedAwayGoals` = ?,`isKnockout` = ?,`knockoutRound` = ?,`matchNumber` = ?,`pointsEarned` = ? WHERE `id` = ?";
+        return "UPDATE OR ABORT `matches` SET `id` = ?,`groupName` = ?,`matchday` = ?,`dateTime` = ?,`homeTeam` = ?,`awayTeam` = ?,`homeGoals` = ?,`awayGoals` = ?,`predictedHomeGoals` = ?,`predictedAwayGoals` = ?,`isKnockout` = ?,`knockoutRound` = ?,`matchNumber` = ?,`pointsEarned` = ?,`tvChannel` = ? WHERE `id` = ?";
       }
 
       @Override
@@ -142,7 +143,8 @@ public final class MatchDao_Impl implements MatchDao {
           statement.bindLong(13, entity.getMatchNumber());
         }
         statement.bindLong(14, entity.getPointsEarned());
-        statement.bindLong(15, entity.getId());
+        statement.bindString(15, entity.getTvChannel());
+        statement.bindLong(16, entity.getId());
       }
     };
     this.__preparedStmtOfDeleteAll = new SharedSQLiteStatement(__db) {
@@ -239,6 +241,7 @@ public final class MatchDao_Impl implements MatchDao {
           final int _cursorIndexOfKnockoutRound = CursorUtil.getColumnIndexOrThrow(_cursor, "knockoutRound");
           final int _cursorIndexOfMatchNumber = CursorUtil.getColumnIndexOrThrow(_cursor, "matchNumber");
           final int _cursorIndexOfPointsEarned = CursorUtil.getColumnIndexOrThrow(_cursor, "pointsEarned");
+          final int _cursorIndexOfTvChannel = CursorUtil.getColumnIndexOrThrow(_cursor, "tvChannel");
           final List<MatchEntity> _result = new ArrayList<MatchEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final MatchEntity _item;
@@ -296,7 +299,9 @@ public final class MatchDao_Impl implements MatchDao {
             }
             final int _tmpPointsEarned;
             _tmpPointsEarned = _cursor.getInt(_cursorIndexOfPointsEarned);
-            _item = new MatchEntity(_tmpId,_tmpGroupName,_tmpMatchday,_tmpDateTime,_tmpHomeTeam,_tmpAwayTeam,_tmpHomeGoals,_tmpAwayGoals,_tmpPredictedHomeGoals,_tmpPredictedAwayGoals,_tmpIsKnockout,_tmpKnockoutRound,_tmpMatchNumber,_tmpPointsEarned);
+            final String _tmpTvChannel;
+            _tmpTvChannel = _cursor.getString(_cursorIndexOfTvChannel);
+            _item = new MatchEntity(_tmpId,_tmpGroupName,_tmpMatchday,_tmpDateTime,_tmpHomeTeam,_tmpAwayTeam,_tmpHomeGoals,_tmpAwayGoals,_tmpPredictedHomeGoals,_tmpPredictedAwayGoals,_tmpIsKnockout,_tmpKnockoutRound,_tmpMatchNumber,_tmpPointsEarned,_tmpTvChannel);
             _result.add(_item);
           }
           return _result;
@@ -338,6 +343,7 @@ public final class MatchDao_Impl implements MatchDao {
           final int _cursorIndexOfKnockoutRound = CursorUtil.getColumnIndexOrThrow(_cursor, "knockoutRound");
           final int _cursorIndexOfMatchNumber = CursorUtil.getColumnIndexOrThrow(_cursor, "matchNumber");
           final int _cursorIndexOfPointsEarned = CursorUtil.getColumnIndexOrThrow(_cursor, "pointsEarned");
+          final int _cursorIndexOfTvChannel = CursorUtil.getColumnIndexOrThrow(_cursor, "tvChannel");
           final List<MatchEntity> _result = new ArrayList<MatchEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final MatchEntity _item;
@@ -395,7 +401,9 @@ public final class MatchDao_Impl implements MatchDao {
             }
             final int _tmpPointsEarned;
             _tmpPointsEarned = _cursor.getInt(_cursorIndexOfPointsEarned);
-            _item = new MatchEntity(_tmpId,_tmpGroupName,_tmpMatchday,_tmpDateTime,_tmpHomeTeam,_tmpAwayTeam,_tmpHomeGoals,_tmpAwayGoals,_tmpPredictedHomeGoals,_tmpPredictedAwayGoals,_tmpIsKnockout,_tmpKnockoutRound,_tmpMatchNumber,_tmpPointsEarned);
+            final String _tmpTvChannel;
+            _tmpTvChannel = _cursor.getString(_cursorIndexOfTvChannel);
+            _item = new MatchEntity(_tmpId,_tmpGroupName,_tmpMatchday,_tmpDateTime,_tmpHomeTeam,_tmpAwayTeam,_tmpHomeGoals,_tmpAwayGoals,_tmpPredictedHomeGoals,_tmpPredictedAwayGoals,_tmpIsKnockout,_tmpKnockoutRound,_tmpMatchNumber,_tmpPointsEarned,_tmpTvChannel);
             _result.add(_item);
           }
           return _result;
@@ -435,6 +443,7 @@ public final class MatchDao_Impl implements MatchDao {
           final int _cursorIndexOfKnockoutRound = CursorUtil.getColumnIndexOrThrow(_cursor, "knockoutRound");
           final int _cursorIndexOfMatchNumber = CursorUtil.getColumnIndexOrThrow(_cursor, "matchNumber");
           final int _cursorIndexOfPointsEarned = CursorUtil.getColumnIndexOrThrow(_cursor, "pointsEarned");
+          final int _cursorIndexOfTvChannel = CursorUtil.getColumnIndexOrThrow(_cursor, "tvChannel");
           final List<MatchEntity> _result = new ArrayList<MatchEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final MatchEntity _item;
@@ -492,7 +501,9 @@ public final class MatchDao_Impl implements MatchDao {
             }
             final int _tmpPointsEarned;
             _tmpPointsEarned = _cursor.getInt(_cursorIndexOfPointsEarned);
-            _item = new MatchEntity(_tmpId,_tmpGroupName,_tmpMatchday,_tmpDateTime,_tmpHomeTeam,_tmpAwayTeam,_tmpHomeGoals,_tmpAwayGoals,_tmpPredictedHomeGoals,_tmpPredictedAwayGoals,_tmpIsKnockout,_tmpKnockoutRound,_tmpMatchNumber,_tmpPointsEarned);
+            final String _tmpTvChannel;
+            _tmpTvChannel = _cursor.getString(_cursorIndexOfTvChannel);
+            _item = new MatchEntity(_tmpId,_tmpGroupName,_tmpMatchday,_tmpDateTime,_tmpHomeTeam,_tmpAwayTeam,_tmpHomeGoals,_tmpAwayGoals,_tmpPredictedHomeGoals,_tmpPredictedAwayGoals,_tmpIsKnockout,_tmpKnockoutRound,_tmpMatchNumber,_tmpPointsEarned,_tmpTvChannel);
             _result.add(_item);
           }
           return _result;
@@ -532,6 +543,7 @@ public final class MatchDao_Impl implements MatchDao {
           final int _cursorIndexOfKnockoutRound = CursorUtil.getColumnIndexOrThrow(_cursor, "knockoutRound");
           final int _cursorIndexOfMatchNumber = CursorUtil.getColumnIndexOrThrow(_cursor, "matchNumber");
           final int _cursorIndexOfPointsEarned = CursorUtil.getColumnIndexOrThrow(_cursor, "pointsEarned");
+          final int _cursorIndexOfTvChannel = CursorUtil.getColumnIndexOrThrow(_cursor, "tvChannel");
           final List<MatchEntity> _result = new ArrayList<MatchEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final MatchEntity _item;
@@ -589,7 +601,9 @@ public final class MatchDao_Impl implements MatchDao {
             }
             final int _tmpPointsEarned;
             _tmpPointsEarned = _cursor.getInt(_cursorIndexOfPointsEarned);
-            _item = new MatchEntity(_tmpId,_tmpGroupName,_tmpMatchday,_tmpDateTime,_tmpHomeTeam,_tmpAwayTeam,_tmpHomeGoals,_tmpAwayGoals,_tmpPredictedHomeGoals,_tmpPredictedAwayGoals,_tmpIsKnockout,_tmpKnockoutRound,_tmpMatchNumber,_tmpPointsEarned);
+            final String _tmpTvChannel;
+            _tmpTvChannel = _cursor.getString(_cursorIndexOfTvChannel);
+            _item = new MatchEntity(_tmpId,_tmpGroupName,_tmpMatchday,_tmpDateTime,_tmpHomeTeam,_tmpAwayTeam,_tmpHomeGoals,_tmpAwayGoals,_tmpPredictedHomeGoals,_tmpPredictedAwayGoals,_tmpIsKnockout,_tmpKnockoutRound,_tmpMatchNumber,_tmpPointsEarned,_tmpTvChannel);
             _result.add(_item);
           }
           return _result;

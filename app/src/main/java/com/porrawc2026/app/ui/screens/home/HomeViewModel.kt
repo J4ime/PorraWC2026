@@ -29,7 +29,8 @@ data class MatchDisplay(
     val homeGoals: Int?,
     val awayGoals: Int?,
     val groupLabel: String,
-    val status: MatchStatus
+    val status: MatchStatus,
+    val tvChannel: String
 )
 
 @HiltViewModel
@@ -125,7 +126,8 @@ class HomeViewModel @Inject constructor(
                 homeGoals = match.homeGoals,
                 awayGoals = match.awayGoals,
                 groupLabel = match.groupName,
-                status = status
+                status = status,
+                tvChannel = match.tvChannel
             )
         }.sortedBy { it.time }
 
@@ -140,7 +142,7 @@ class HomeViewModel @Inject constructor(
         }
 
         if (todayMatches.isNotEmpty()) {
-            _sectionTitle.value = "PARTIDOS DE HOY"
+            _sectionTitle.value = "HOY — ${todayMatches.first().dateLabel.uppercase()}"
             _upcomingMatches.value = todayMatches.take(8)
         } else {
             val futureMatches = allDisplay.filter {
@@ -152,8 +154,8 @@ class HomeViewModel @Inject constructor(
                 } catch (e: Exception) { false }
             }
             if (futureMatches.isNotEmpty()) {
-                _sectionTitle.value = "PRÓXIMA JORNADA"
                 val firstDate = futureMatches.first().dateLabel
+                _sectionTitle.value = firstDate.uppercase().ifBlank { "PRÓXIMA JORNADA" }
                 _upcomingMatches.value = futureMatches.filter { it.dateLabel == firstDate }.take(8)
             } else {
                 _sectionTitle.value = "PARTIDOS"

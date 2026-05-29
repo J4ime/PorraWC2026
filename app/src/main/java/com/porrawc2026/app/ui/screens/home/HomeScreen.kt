@@ -56,15 +56,18 @@ fun HomeScreen(
     ) {
         item {
             Box(
-                modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(WCBlue, WCDarkBlue, WCBlue))).padding(24.dp),
-                contentAlignment = Alignment.Center
+                modifier = Modifier.fillMaxWidth().background(Brush.horizontalGradient(colors = listOf(WCBlue, WCDarkBlue, WCBlue))).padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "\uD83C\uDFC6", fontSize = 48.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("PORRA", style = MaterialTheme.typography.displayLarge, color = WCGold, fontWeight = FontWeight.Black)
-                    Text("MUNDIAL 2026", style = MaterialTheme.typography.displayMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-                    Text("USA \u00B7 M\u00C9XICO \u00B7 CANAD\u00C1", style = MaterialTheme.typography.titleMedium, color = WCGoldLight, letterSpacing = 3.sp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("Porra Mundial 26", style = MaterialTheme.typography.headlineLarge, color = TextPrimary, fontWeight = FontWeight.Bold)
+                }
+                if (hasData) {
+                    Box(
+                        modifier = Modifier.size(42.dp).clip(CircleShape).background(SurfaceMedium).align(Alignment.CenterEnd),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("$totalPoints", style = MaterialTheme.typography.labelMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -117,16 +120,6 @@ fun HomeScreen(
                 }
             }
             item { Spacer(Modifier.height(8.dp)) }
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = CardDark), shape = RoundedCornerShape(16.dp)) {
-                Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("PUNTOS TOTALES", style = MaterialTheme.typography.labelMedium, color = TextMuted, letterSpacing = 2.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("$totalPoints", style = MaterialTheme.typography.displayLarge, color = WCGold, fontWeight = FontWeight.Black)
-                }
-            }
         }
 
         item {

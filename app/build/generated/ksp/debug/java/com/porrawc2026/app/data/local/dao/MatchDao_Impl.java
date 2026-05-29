@@ -40,6 +40,8 @@ public final class MatchDao_Impl implements MatchDao {
 
   private final SharedSQLiteStatement __preparedStmtOfDeleteAll;
 
+  private final SharedSQLiteStatement __preparedStmtOfUpdateMatchResult;
+
   public MatchDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
     this.__insertionAdapterOfMatchEntity = new EntityInsertionAdapter<MatchEntity>(__db) {
@@ -155,6 +157,14 @@ public final class MatchDao_Impl implements MatchDao {
         return _query;
       }
     };
+    this.__preparedStmtOfUpdateMatchResult = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "UPDATE matches SET homeGoals = ?, awayGoals = ? WHERE id = ?";
+        return _query;
+      }
+    };
   }
 
   @Override
@@ -212,6 +222,36 @@ public final class MatchDao_Impl implements MatchDao {
           }
         } finally {
           __preparedStmtOfDeleteAll.release(_stmt);
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Object updateMatchResult(final int matchId, final int homeGoals, final int awayGoals,
+      final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfUpdateMatchResult.acquire();
+        int _argIndex = 1;
+        _stmt.bindLong(_argIndex, homeGoals);
+        _argIndex = 2;
+        _stmt.bindLong(_argIndex, awayGoals);
+        _argIndex = 3;
+        _stmt.bindLong(_argIndex, matchId);
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfUpdateMatchResult.release(_stmt);
         }
       }
     }, $completion);

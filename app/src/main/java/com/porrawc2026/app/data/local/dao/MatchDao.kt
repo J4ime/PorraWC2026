@@ -29,4 +29,7 @@ interface MatchDao {
 
     @Query("SELECT SUM(pointsEarned) FROM matches")
     suspend fun getTotalMatchPoints(): Int
+
+    @Query("UPDATE matches SET homeGoals = :homeGoals, awayGoals = :awayGoals WHERE id = :matchId")
+    suspend fun updateMatchResult(matchId: Int, homeGoals: Int, awayGoals: Int)
 }

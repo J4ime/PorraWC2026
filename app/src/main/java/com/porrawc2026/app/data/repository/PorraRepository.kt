@@ -74,7 +74,6 @@ class PorraRepository @Inject constructor(
     }
 
     suspend fun updateMatchResults(matchId: Int, homeGoals: Int, awayGoals: Int) {
-        val matches = matchDao.getAllGroupMatches()
-        // Will be used for live score updates
+        matchDao.updateMatchResult(matchId, homeGoals, awayGoals)
     }
 }

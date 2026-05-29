@@ -1,6 +1,7 @@
 package com.porrawc2026.app.ui.screens.home;
 
 import android.content.Context;
+import com.porrawc2026.app.data.remote.ApiService;
 import com.porrawc2026.app.data.repository.PorraRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
@@ -25,25 +26,29 @@ import javax.inject.Provider;
 public final class HomeViewModel_Factory implements Factory<HomeViewModel> {
   private final Provider<PorraRepository> repositoryProvider;
 
+  private final Provider<ApiService> apiServiceProvider;
+
   private final Provider<Context> contextProvider;
 
   public HomeViewModel_Factory(Provider<PorraRepository> repositoryProvider,
-      Provider<Context> contextProvider) {
+      Provider<ApiService> apiServiceProvider, Provider<Context> contextProvider) {
     this.repositoryProvider = repositoryProvider;
+    this.apiServiceProvider = apiServiceProvider;
     this.contextProvider = contextProvider;
   }
 
   @Override
   public HomeViewModel get() {
-    return newInstance(repositoryProvider.get(), contextProvider.get());
+    return newInstance(repositoryProvider.get(), apiServiceProvider.get(), contextProvider.get());
   }
 
   public static HomeViewModel_Factory create(Provider<PorraRepository> repositoryProvider,
-      Provider<Context> contextProvider) {
-    return new HomeViewModel_Factory(repositoryProvider, contextProvider);
+      Provider<ApiService> apiServiceProvider, Provider<Context> contextProvider) {
+    return new HomeViewModel_Factory(repositoryProvider, apiServiceProvider, contextProvider);
   }
 
-  public static HomeViewModel newInstance(PorraRepository repository, Context context) {
-    return new HomeViewModel(repository, context);
+  public static HomeViewModel newInstance(PorraRepository repository, ApiService apiService,
+      Context context) {
+    return new HomeViewModel(repository, apiService, context);
   }
 }

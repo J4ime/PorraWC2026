@@ -42,10 +42,10 @@ object ExcelParser {
     private const val COL_GOAL_AWAY = 29
     private const val COL_QUESTION_ID = 22
     private const val COL_QUESTION_TEXT = 23
-    private const val COL_QUESTION_ANSWER = 35
+    private const val COL_QUESTION_ANSWER = 31  // AF
     private const val COL_PLAYER_NAME = 32
-    private const val COL_KNOCKOUT_WINNER_HOME = 27
-    private const val COL_KNOCKOUT_WINNER_AWAY = 30
+    private const val COL_KNOCKOUT_WINNER_HOME = 28  // AC
+    private const val COL_KNOCKOUT_WINNER_AWAY = 29  // AD
     private const val COL_KNOCKOUT_MATCH_NUM = 9
     private const val COL_KNOCKOUT_HOME_REF = 12
     private const val COL_KNOCKOUT_AWAY_REF = 13

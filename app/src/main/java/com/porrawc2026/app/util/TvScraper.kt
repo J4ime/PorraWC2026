@@ -69,10 +69,10 @@ object TvScraper {
     private fun resolveTv(text: String, matchStart: Int): String {
         val afterMatch = text.substring(matchStart, minOf(matchStart + 300, text.length))
         val upper = afterMatch.uppercase()
-        return when {
-            upper.contains("LA 1 TVE") || upper.contains("RTVE PLAY") || upper.contains("TELEDEPORTE") -> "RTVE"
-            else -> "DAZN"
-        }
+        val channels = mutableListOf<String>()
+        if (upper.contains("LA 1 TVE") || upper.contains("RTVE PLAY") || upper.contains("TELEDEPORTE")) channels.add("RTVE")
+        if (upper.contains("DAZN")) channels.add("DAZN")
+        return channels.joinToString(",")
     }
 
     fun matchTv(homeTeam: String, awayTeam: String, schedule: List<TvMatch>): String {

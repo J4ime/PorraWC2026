@@ -245,7 +245,11 @@ private fun MatchRow(match: MatchDisplay) {
 
         Spacer(modifier = Modifier.width(4.dp))
 
-        TvChannelBadge(match.tvChannel)
+        val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
+        channels.forEach { ch ->
+            TvChannelBadge(ch.trim())
+            Spacer(modifier = Modifier.width(2.dp))
+        }
 
         if (match.status == MatchStatus.LIVE) {
             val infiniteTransition = rememberInfiniteTransition("live_${match.id}")

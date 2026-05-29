@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -13,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -75,8 +75,9 @@ private fun ChronologicalMatchList(matches: List<MatchEntity>) {
             ) {
                 Text("Hora", Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 Text("Partido · Predicción", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                Text("Real", Modifier.width(44.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
-                Text("Pts", Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
+                Text("TV", Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
+                Text("Real", Modifier.width(40.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
+                Text("Pts", Modifier.width(36.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
             }
         }
 
@@ -131,15 +132,31 @@ private fun ChronologicalMatchRow(match: MatchEntity) {
             Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f))
         }
 
+        val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
+        Column(
+            Modifier.width(40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            channels.forEach { ch ->
+                val (bg, fg) = when {
+                    ch.contains("RTVE", ignoreCase = true) -> AccentBlue to TextPrimary
+                    ch.contains("DAZN", ignoreCase = true) -> Color(0xFF0A0A0A) to TextPrimary
+                    else -> SurfaceMedium to TextMuted
+                }
+                Text(ch.trim().take(4), fontSize = 8.sp, color = fg,
+                    modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
+            }
+        }
+
         Text(
             if (hasResult) "${match.homeGoals}-${match.awayGoals}" else "-",
-            Modifier.width(44.dp),
+            Modifier.width(40.dp),
             style = MaterialTheme.typography.bodySmall, color = if (hasResult) AccentOrange else TextMuted, textAlign = TextAlign.Center
         )
 
         Text(
             if (hasResult) "+${match.pointsEarned}" else "",
-            Modifier.width(40.dp),
+            Modifier.width(36.dp),
             style = MaterialTheme.typography.bodySmall, color = if (match.pointsEarned > 0) AccentGreen else TextMuted,
             fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
         )

@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.repository.PorraRepository
-import com.porrawc2026.app.util.ExcelData
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.ValidationResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,13 +16,20 @@ import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 
+enum class MatchStatus { UPCOMING, LIVE, FINISHED }
+
 data class MatchDisplay(
     val id: Int,
+    val dateLabel: String,
+    val time: String,
     val homeTeam: String,
     val awayTeam: String,
+    val homeFlag: String,
+    val awayFlag: String,
+    val homeGoals: Int?,
+    val awayGoals: Int?,
     val groupLabel: String,
-    val dateTime: String,
-    val time: String
+    val status: MatchStatus
 )
 
 @HiltViewModel
@@ -47,6 +53,9 @@ class HomeViewModel @Inject constructor(
     private val _upcomingMatches = MutableStateFlow<List<MatchDisplay>>(emptyList())
     val upcomingMatches: StateFlow<List<MatchDisplay>> = _upcomingMatches.asStateFlow()
 
+    private val _sectionTitle = MutableStateFlow("PRÓXIMA JORNADA")
+    val sectionTitle: StateFlow<String> = _sectionTitle.asStateFlow()
+
     private val _errorMessage = MutableSharedFlow<String>()
     val errorMessage: SharedFlow<String> = _errorMessage.asSharedFlow()
 
@@ -60,7 +69,7 @@ class HomeViewModel @Inject constructor(
             _validationResult.value = null
             try {
                 val data = ExcelParser.parse(context, uri)
-                val validation = ExcelParser.validate(data)
+                val validation = ExcelParser.validate()
                 _validationResult.value = validation
                 repository.insertAllData(
                     data.teams, data.matches, data.questions,
@@ -88,49 +97,67 @@ class HomeViewModel @Inject constructor(
     private fun refreshUpcomingMatches(matches: List<MatchEntity>) {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
         val timeFmt = SimpleDateFormat("HH:mm", Locale.US)
+        val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "ES"))
         val now = Calendar.getInstance()
         val today = now.get(Calendar.DAY_OF_YEAR)
         val year = now.get(Calendar.YEAR)
 
         val groupMatches = matches.filter { !it.isKnockout }
-        val upcoming = groupMatches.map { match ->
+        val allDisplay = groupMatches.map { match ->
             val time = if (match.dateTime.isNotBlank()) {
                 try { val d = sdf.parse(match.dateTime); if (d != null) timeFmt.format(d) else "" } catch (e: Exception) { "" }
             } else ""
+            val dateLabel = if (match.dateTime.isNotBlank()) {
+                try { val d = sdf.parse(match.dateTime); if (d != null) dateFmt.format(d).replace(".", "") else "" } catch (e: Exception) { "" }
+            } else ""
+            val status = when {
+                match.homeGoals != null && match.awayGoals != null -> MatchStatus.FINISHED
+                else -> MatchStatus.UPCOMING
+            }
             MatchDisplay(
                 id = match.id,
+                dateLabel = dateLabel,
+                time = time,
                 homeTeam = match.homeTeam,
                 awayTeam = match.awayTeam,
+                homeFlag = ExcelParser.getFlagEmoji(match.homeTeam),
+                awayFlag = ExcelParser.getFlagEmoji(match.awayTeam),
+                homeGoals = match.homeGoals,
+                awayGoals = match.awayGoals,
                 groupLabel = match.groupName,
-                dateTime = match.dateTime,
-                time = time
+                status = status
             )
-        }.sortedBy { it.dateTime }
+        }.sortedBy { it.time }
 
-        val todayMatches = upcoming.filter {
+        val todayMatches = allDisplay.filter {
             try {
-                if (it.dateTime.isBlank()) return@filter false
-                val d = sdf.parse(it.dateTime) ?: return@filter false
+                val dateStr = matches.firstOrNull { m -> m.id == it.id }?.dateTime ?: return@filter false
+                if (dateStr.isBlank()) return@filter false
+                val d = sdf.parse(dateStr) ?: return@filter false
                 val c = Calendar.getInstance().apply { time = d }
                 c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today
             } catch (e: Exception) { false }
         }
 
-        _upcomingMatches.value = if (todayMatches.isNotEmpty()) {
-            todayMatches.take(6)
+        if (todayMatches.isNotEmpty()) {
+            _sectionTitle.value = "PARTIDOS DE HOY"
+            _upcomingMatches.value = todayMatches.take(8)
         } else {
-            val futureMatches = upcoming.filter {
+            val futureMatches = allDisplay.filter {
                 try {
-                    if (it.dateTime.isBlank()) return@filter false
-                    val d = sdf.parse(it.dateTime) ?: return@filter false
+                    val dateStr = matches.firstOrNull { m -> m.id == it.id }?.dateTime ?: return@filter false
+                    if (dateStr.isBlank()) return@filter false
+                    val d = sdf.parse(dateStr) ?: return@filter false
                     d.after(Date())
                 } catch (e: Exception) { false }
             }
             if (futureMatches.isNotEmpty()) {
-                val firstDate = futureMatches.first().dateTime.take(10)
-                futureMatches.filter { it.dateTime.startsWith(firstDate) }.take(6)
+                _sectionTitle.value = "PRÓXIMA JORNADA"
+                val firstDate = futureMatches.first().dateLabel
+                _upcomingMatches.value = futureMatches.filter { it.dateLabel == firstDate }.take(8)
             } else {
-                upcoming.take(6)
+                _sectionTitle.value = "PARTIDOS"
+                _upcomingMatches.value = allDisplay.take(8)
             }
         }
     }

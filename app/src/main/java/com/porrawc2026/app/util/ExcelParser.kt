@@ -81,7 +81,7 @@ object ExcelParser {
         return ExcelData(teams, matches, questions, playerPredictions, knockoutPredictions, standings)
     }
 
-    fun validate(data: ExcelData): ValidationResult {
+    fun validate(): ValidationResult {
         val errors = mutableListOf<String>()
         val warnings = mutableListOf<String>()
 
@@ -91,49 +91,21 @@ object ExcelParser {
             errors.addAll(agResult.errors)
             warnings.addAll(agResult.warnings)
 
-            val missingMatches = data.matches.count { it.predictedHomeGoals == null || it.predictedAwayGoals == null }
-            val missingQuestions = data.questions.count { it.predictedAnswer == null }
-            val missingKnockout = data.knockoutPredictions.count { it.winner == null || it.winner !in 1..2 }
-            val missingPlayers = data.playerPredictions.count { it.predictedName.isNullOrBlank() }
-
             return ValidationResult(
                 isValid = agResult.isValid,
                 totalChecks = agResult.totalRows,
                 passedChecks = agResult.greenCount,
                 failedChecks = agResult.redCount,
                 errors = errors,
-                warnings = warnings,
-                pendingMatches = missingMatches,
-                pendingQuestions = missingQuestions,
-                pendingKnockout = missingKnockout,
-                pendingPlayers = missingPlayers
+                warnings = warnings
             )
         }
 
-        val groupMatches = data.matches.filter { !it.isKnockout }
-        val predictedMatches = groupMatches.count { it.predictedHomeGoals != null && it.predictedAwayGoals != null }
-        val answeredQuestions = data.questions.count { it.predictedAnswer != null }
-        val namedPlayers = data.playerPredictions.count { !it.predictedName.isNullOrBlank() }
-        val predictedKnockout = data.knockoutPredictions.count { it.winner != null && it.winner in 1..2 }
-
-        if (data.matches.isEmpty() && data.questions.isEmpty() && data.playerPredictions.isEmpty()) {
-            errors.add("EL EXCEL NO CONTIENE PREDICCIONES. ¿Has rellenado las casillas?")
-        }
-
-        val totalPredicted = predictedMatches + answeredQuestions + namedPlayers + predictedKnockout
-        val totalExpected = groupMatches.size + data.questions.size + 3 + data.knockoutPredictions.size
-
         return ValidationResult(
-            isValid = data.matches.isNotEmpty() && predictedKnockout > 0,
-            totalChecks = totalExpected,
-            passedChecks = totalPredicted,
-            failedChecks = totalExpected - totalPredicted,
-            errors = errors,
-            warnings = warnings,
-            pendingMatches = groupMatches.count { it.predictedHomeGoals == null || it.predictedAwayGoals == null },
-            pendingQuestions = data.questions.count { it.predictedAnswer == null },
-            pendingKnockout = data.knockoutPredictions.count { it.winner == null || it.winner !in 1..2 },
-            pendingPlayers = data.playerPredictions.count { it.predictedName.isNullOrBlank() }
+            isValid = false,
+            totalChecks = 0, passedChecks = 0, failedChecks = 0,
+            errors = listOf("No se pudo validar la columna AG. Revisa el archivo Excel."),
+            warnings = warnings
         )
     }
 
@@ -583,7 +555,7 @@ object ExcelParser {
             .replace("ÔåÆ", "→")
     }
 
-    private fun getFlagEmoji(teamName: String): String {
+    fun getFlagEmoji(teamName: String): String {
         return when (teamName) {
             "México" -> "🇲🇽"; "Sudáfrica" -> "🇿🇦"; "Corea del Sur" -> "🇰🇷"
             "República Checa" -> "🇨🇿"; "Canadá" -> "🇨🇦"; "Bosnia y Herzegovina" -> "🇧🇦"

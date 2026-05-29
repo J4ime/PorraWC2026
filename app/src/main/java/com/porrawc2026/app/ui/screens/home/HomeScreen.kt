@@ -3,10 +3,10 @@ package com.porrawc2026.app.ui.screens.home
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -43,15 +43,12 @@ fun HomeScreen(
     val validationResult by viewModel.validationResult.collectAsState()
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
+    val sectionTitle by viewModel.sectionTitle.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let { viewModel.importExcel(it) }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.errorMessage.collect { /* handled by snackbar */ }
     }
 
     validationResult?.let { result ->
@@ -63,7 +60,6 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Brush.verticalGradient(colors = listOf(WCDarkBlue, WCNavy, SurfaceDark)))
     ) {
-        // Header
         item {
             Box(
                 modifier = Modifier
@@ -73,16 +69,15 @@ fun HomeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "🏆", fontSize = 48.sp)
+                    Text(text = "\uD83C\uDFC6", fontSize = 48.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("PORRA", style = MaterialTheme.typography.displayLarge, color = WCGold, fontWeight = FontWeight.Black)
                     Text("MUNDIAL 2026", style = MaterialTheme.typography.displayMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-                    Text("USA · MÉXICO · CANADÁ", style = MaterialTheme.typography.titleMedium, color = WCGoldLight, letterSpacing = 3.sp)
+                    Text("USA \u00B7 M\u00C9XICO \u00B7 CANAD\u00C1", style = MaterialTheme.typography.titleMedium, color = WCGoldLight, letterSpacing = 3.sp)
                 }
             }
         }
 
-        // Cargar Excel button
         item {
             Button(
                 onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
@@ -100,36 +95,36 @@ fun HomeScreen(
             }
         }
 
-        // Upcoming matches
         if (upcomingMatches.isNotEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                     colors = CardDefaults.cardColors(containerColor = CardDark),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.Schedule, null, tint = WCGold, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Filled.Schedule, null, tint = WCGold, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                if (upcomingMatches.firstOrNull()?.dateTime?.let {
-                                        try { val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US); sdf.parse(it) } catch (e: Exception) { null }
-                                    }?.let { val c = java.util.Calendar.getInstance(); val d = java.util.Calendar.getInstance().apply { time = it }; c.get(java.util.Calendar.DAY_OF_YEAR) == d.get(java.util.Calendar.DAY_OF_YEAR) } == true) "PARTIDOS DE HOY" else "PRÓXIMA JORNADA",
-                                style = MaterialTheme.typography.titleMedium,
+                                sectionTitle,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = WCGold,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.weight(1f))
                             Text(
-                                upcomingMatches.firstOrNull()?.dateTime?.take(10) ?: "",
+                                upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextMuted
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        upcomingMatches.take(6).forEach { match ->
+                        Spacer(modifier = Modifier.height(6.dp))
+                        upcomingMatches.take(8).forEach { match ->
                             MatchRow(match)
+                            if (match != upcomingMatches.take(8).last()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
                         }
                     }
                 }
@@ -158,7 +153,6 @@ fun HomeScreen(
             }
         }
 
-        // Sections
         item {
             Text("SECCIONES", style = MaterialTheme.typography.labelMedium, color = TextMuted,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp), letterSpacing = 2.sp)
@@ -167,9 +161,9 @@ fun HomeScreen(
             Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionButton("Fase de Grupos", "Predicciones de 72 partidos", Icons.Filled.Groups, WCGold, hasData, onNavigateToGroups)
                 SectionButton("Eliminatorias", "Dieciseisavos a la Final", Icons.Filled.EmojiEvents, WCGold, hasData, onNavigateToKnockout)
-                SectionButton("50 Preguntas", "Verdadero o Falso · 20 pts", Icons.Filled.Quiz, AccentBlue, hasData, onNavigateToQuestions)
-                SectionButton("Goleadores", "3 jugadores · 50/30/10 pts", Icons.Filled.Person, AccentOrange, hasData, onNavigateToPlayers)
-                SectionButton("Resultados", "Puntos, estadísticas, compartir", Icons.Filled.Update, AccentGreen, hasData, onNavigateToResults)
+                SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, AccentBlue, hasData, onNavigateToQuestions)
+                SectionButton("Goleadores", "3 jugadores \u00B7 50/30/10 pts", Icons.Filled.Person, AccentOrange, hasData, onNavigateToPlayers)
+                SectionButton("Resultados", "Puntos, estad\u00EDsticas, compartir", Icons.Filled.Update, AccentGreen, hasData, onNavigateToResults)
             }
         }
 
@@ -182,21 +176,85 @@ private fun MatchRow(match: MatchDisplay) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(SurfaceMedium.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .background(
+                when (match.status) {
+                    MatchStatus.LIVE -> AccentRed.copy(alpha = 0.1f)
+                    MatchStatus.FINISHED -> SurfaceMedium.copy(alpha = 0.2f)
+                    MatchStatus.UPCOMING -> SurfaceMedium.copy(alpha = 0.3f)
+                },
+                RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.width(46.dp)) {
-            Text(match.time.ifBlank { "?" }, style = MaterialTheme.typography.labelMedium, color = WCGold, fontWeight = FontWeight.Bold)
-            Text(match.groupLabel, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+        Text(
+            match.time.ifBlank { "?" },
+            style = MaterialTheme.typography.labelMedium,
+            color = WCGold,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(38.dp)
+        )
+
+        Text(
+            match.homeFlag,
+            fontSize = 18.sp,
+            modifier = Modifier.padding(horizontal = 2.dp)
+        )
+
+        if (match.homeGoals != null && match.awayGoals != null) {
+            Text(
+                "${match.homeGoals} - ${match.awayGoals}",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        } else {
+            Text(
+                "vs",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
         }
-        Text(match.homeTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary, textAlign = TextAlign.End, maxLines = 1)
-        Text(" vs ", style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(horizontal = 2.dp))
-        Text(match.awayTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1)
+
+        Text(
+            match.awayFlag,
+            fontSize = 18.sp,
+            modifier = Modifier.padding(horizontal = 2.dp)
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Icon(
+            Icons.Filled.Tv,
+            contentDescription = "TV",
+            tint = TextMuted,
+            modifier = Modifier.size(16.dp)
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        when (match.status) {
+            MatchStatus.LIVE -> {
+                val infiniteTransition = rememberInfiniteTransition("live_${match.id}")
+                val alpha by infiniteTransition.animateFloat(
+                    initialValue = 1f, targetValue = 0.3f,
+                    animationSpec = infiniteRepeatable(animation = tween(600), repeatMode = RepeatMode.Reverse)
+                )
+                Text("LIVE", color = AccentRed.copy(alpha = alpha), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black)
+            }
+            MatchStatus.FINISHED -> {
+                Icon(Icons.Filled.CheckCircle, "Finalizado", tint = AccentGreen, modifier = Modifier.size(16.dp))
+            }
+            MatchStatus.UPCOMING -> {
+                Icon(Icons.Filled.Schedule, "Próximo", tint = TextMuted, modifier = Modifier.size(14.dp))
+            }
+        }
     }
 }
 
-// ── Dialog, PointsItem, SectionButton (unchanged) ─────────────
+// ── Validation dialog ─────────────
 
 @Composable
 private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
@@ -209,7 +267,7 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
                     Icon(if (result.isValid) Icons.Filled.CheckCircle else Icons.Filled.Warning, null,
                         tint = if (result.isValid) AccentGreen else AccentOrange, modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text(if (result.isValid) "EXCEL VÁLIDO" else "EXCEL INCOMPLETO",
+                    Text(if (result.isValid) "EXCEL V\u00C1LIDO" else "EXCEL INCOMPLETO",
                         style = MaterialTheme.typography.titleLarge, color = if (result.isValid) AccentGreen else AccentOrange, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -217,12 +275,25 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
                 LinearProgressIndicator(progress = { progress }, Modifier.fillMaxWidth(),
                     color = if (result.isValid) AccentGreen else AccentOrange, trackColor = InputBg)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("${result.passedChecks}/${result.totalChecks} campos completados", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
-                Spacer(modifier = Modifier.height(12.dp))
-                CategoryStatus(Icons.Filled.Groups, "Resultados fase de grupos", result.pendingMatches, 72, WCGold)
-                CategoryStatus(Icons.Filled.EmojiEvents, "Eliminatorias", result.pendingKnockout, 32, AccentGreen)
-                CategoryStatus(Icons.Filled.Quiz, "Preguntas (V/F)", result.pendingQuestions, 50, AccentBlue)
-                CategoryStatus(Icons.Filled.Person, "Goleadores", result.pendingPlayers, 3, AccentOrange)
+                Text(
+                    "${result.passedChecks}/${result.totalChecks} celdas v\u00E1lidas (columna AG)",
+                    style = MaterialTheme.typography.bodyMedium, color = TextSecondary
+                )
+                if (result.failedChecks > 0) {
+                    Text(
+                        "${result.failedChecks} errores encontrados",
+                        style = MaterialTheme.typography.bodySmall, color = AccentOrange
+                    )
+                }
+                if (result.errors.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    result.errors.take(8).forEach { err ->
+                        Text(err, style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(vertical = 1.dp))
+                    }
+                    if (result.errors.size > 8) {
+                        Text("...y ${result.errors.size - 8} m\u00E1s", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    }
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { dismissed = true; onDismiss() }, Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = if (result.isValid) AccentGreen else WCBlue), shape = RoundedCornerShape(10.dp)) {
@@ -230,23 +301,12 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
                 }
                 if (!result.isValid) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Corrige los errores en el Excel y vuelve a cargarlo", style = MaterialTheme.typography.labelSmall, color = TextMuted,
+                    Text("Corrige los errores en el Excel (columna AG) y vuelve a cargarlo",
+                        style = MaterialTheme.typography.labelSmall, color = TextMuted,
                         modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CategoryStatus(icon: ImageVector, label: String, pending: Int, total: Int, color: Color) {
-    val completed = total - pending
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
-        Text("$completed/$total", style = MaterialTheme.typography.bodyMedium,
-            color = if (pending == 0) AccentGreen else color, fontWeight = FontWeight.Bold)
     }
 }
 

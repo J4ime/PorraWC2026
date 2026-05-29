@@ -113,20 +113,32 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun preloadSchedule() {
-        val scheduleDates = hardcodedMatchDates()
-        val placeholder = scheduleDates.map { (id, pair) ->
-            val (date, _) = pair
-            val groupIndex = (id - 1) / 6
-            val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
-            MatchEntity(
-                id = id, groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
-                matchday = "J${(id - 1) % 6 + 1}", dateTime = date,
-                homeTeam = "Equipo A", awayTeam = "Equipo B",
-                isKnockout = false
-            )
+        viewModelScope.launch(Dispatchers.IO) {
+            val dbMatches = repository.getAllMatches().first()
+            if (dbMatches.isNotEmpty()) {
+                cachedMatches = dbMatches
+                _hasData.value = true
+                enrichScheduleFromApi()
+                recalcAllPoints()
+                refreshPoints()
+                loadPlayers()
+                startAutoRefresh()
+            } else {
+                val scheduleDates = hardcodedMatchDates()
+                val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
+                cachedMatches = scheduleDates.map { (id, pair) ->
+                    val (date, tv) = pair
+                    val groupIndex = (id - 1) / 6
+                    MatchEntity(
+                        id = id, groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
+                        matchday = "J${(id - 1) % 6 + 1}", dateTime = date,
+                        homeTeam = "Local", awayTeam = "Visitante",
+                        tvChannel = tv, isKnockout = false
+                    )
+                }
+            }
+            refreshUpcomingMatches()
         }
-        cachedMatches = placeholder
-        refreshUpcomingMatches()
     }
 
     private suspend fun recalcAllPoints() {

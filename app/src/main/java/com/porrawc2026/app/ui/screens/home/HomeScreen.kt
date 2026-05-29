@@ -53,7 +53,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().padding(horizontal = 20.dp, vertical = 18.dp)) {
-                Text("Porra Mundial 26", Modifier.align(Alignment.CenterStart), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                Text("PORRA MUNDIAL 26", Modifier.fillMaxWidth(), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF333333)).align(Alignment.CenterEnd), contentAlignment = Alignment.Center) {
                     Text("$totalPoints", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
                 }

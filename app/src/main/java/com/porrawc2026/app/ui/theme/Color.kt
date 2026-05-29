@@ -23,9 +23,9 @@ val TextMuted = Color(0xFF777777)
 
 // Accent
 val AccentBlue = Color(0xFF777777)
-val AccentGreen = Color(0xFF6A6A6A)
+val AccentGreen = Color(0xFF4CAF50)
 val AccentOrange = Color(0xFF888888)
-val AccentRed = Color(0xFF555555)
+val AccentRed = Color(0xFFE53935)
 
 // Misc
 val GroupHeaderBg = Color(0xFF222222)

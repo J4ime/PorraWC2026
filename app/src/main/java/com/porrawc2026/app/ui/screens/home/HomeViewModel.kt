@@ -99,10 +99,10 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun enrichScheduleFromApi() {
-        var enriched = 0
+        enrichScheduleFallback()
         try {
             val response = apiService.getWorldCupMatches()
-            Log.d("HomeVM", "API schedule: ${response.matches.size} matches")
+            Log.d("HomeVM", "API schedule: ${response.matches.size} matches, overlaying dates")
             response.matches.forEach { fm ->
                 val entities = cachedMatches.filter {
                     fm.homeTeam?.name?.contains(it.homeTeam, ignoreCase = true) == true ||
@@ -112,23 +112,13 @@ class HomeViewModel @Inject constructor(
                 if (entities.size == 1) {
                     val entity = entities.first()
                     cachedMatches = cachedMatches.map {
-                        if (it.id == entity.id) it.copy(dateTime = fm.utcDate, tvChannel = resolveTvChannel(it, fm)) else it
+                        if (it.id == entity.id) it.copy(dateTime = fm.utcDate) else it
                     }
-                    enriched++
                 }
             }
         } catch (e: Exception) {
             Log.d("HomeVM", "API schedule failed: ${e.message}")
         }
-        if (enriched == 0) {
-            Log.d("HomeVM", "API enriched 0 matches, applying fallback schedule")
-            enrichScheduleFallback()
-        }
-    }
-
-    private fun resolveTvChannel(match: MatchEntity, fm: com.porrawc2026.app.data.remote.FootballMatch): String {
-        if (match.tvChannel.isNotBlank()) return match.tvChannel
-        return "DAZN"
     }
 
     private fun startAutoRefresh() {

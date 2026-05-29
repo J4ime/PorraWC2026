@@ -330,13 +330,22 @@ object ExcelParser {
 
     private fun readDateCell(row: Row): String {
         val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        for (col in listOf(COL_MATCH_DATE, 24, 22)) {
-            val cell = getCellValue(row, col) ?: continue
-            return when (cell) {
-                is Date -> fmt.format(cell)
-                is String -> cell
-                is Number -> cell.toString()
-                else -> continue
+        for (col in listOf(COL_MATCH_DATE, 24, 25, 22, 20, 21, 26)) {
+            val cell = row.getCell(col) ?: continue
+            val value = formatter.formatCellValue(cell).trim()
+            if (value.isBlank()) continue
+            try {
+                val d = cell.dateCellValue
+                if (d != null) return fmt.format(d)
+            } catch (e: Exception) {}
+            try {
+                val n = cell.numericCellValue
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return fmt.format(cell.dateCellValue)
+                }
+            } catch (e: Exception) {}
+            if (value.matches(Regex("\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}.*"))) {
+                return value
             }
         }
         return ""

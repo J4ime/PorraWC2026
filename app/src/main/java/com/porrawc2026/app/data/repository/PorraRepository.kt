@@ -27,6 +27,8 @@ class PorraRepository @Inject constructor(
 
     fun getPlayerPredictions(): Flow<List<PlayerPredictionEntity>> = playerPredictionDao.getAll()
 
+    suspend fun getPlayerPredictionsList(): List<PlayerPredictionEntity> = playerPredictionDao.getAllList()
+
     fun getKnockoutPredictions(): Flow<List<KnockoutPredictionEntity>> = knockoutPredictionDao.getAll()
     fun getKnockoutPredictionsByRound(round: String): Flow<List<KnockoutPredictionEntity>> =
         knockoutPredictionDao.getByRound(round)

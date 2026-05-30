@@ -29,8 +29,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
-import com.porrawc2026.app.util.PlayerPhotoResolver
 import com.porrawc2026.app.util.ValidationResult
+import java.io.File
 
 @Composable
 fun HomeScreen(
@@ -84,16 +84,13 @@ fun HomeScreen(
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 16.dp)) {
             if (upcomingMatches.isNotEmpty()) {
                 item {
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), shape = RoundedCornerShape(14.dp)) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PR\u00D3XIMOS PARTIDOS", style = MaterialTheme.typography.titleSmall,
-                                color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            upcomingMatches.take(8).forEach { match ->
-                                MatchRow(match)
-                                if (match != upcomingMatches.take(8).last()) Spacer(Modifier.height(4.dp))
-                            }
+                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PR\u00D3XIMOS PARTIDOS", style = MaterialTheme.typography.titleSmall,
+                            color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        upcomingMatches.take(8).forEach { match ->
+                            MatchRow(match)
+                            if (match != upcomingMatches.take(8).last()) Spacer(Modifier.height(4.dp))
                         }
                     }
                 }
@@ -130,10 +127,10 @@ fun HomeScreen(
 @Composable
 private fun PlayerRow(p: PlayerPredictionEntity) {
     Row(Modifier.fillMaxWidth().background(Color(0xFF222222), RoundedCornerShape(8.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        val photoUrl = PlayerPhotoResolver.resolve(p.predictedName)
+        val photoFile = p.photoPath?.let { File(it) }
         Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
-            if (photoUrl != null) {
-                AsyncImage(model = photoUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (photoFile != null && photoFile.exists()) {
+                AsyncImage(model = photoFile, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } else {
                 val initials = p.predictedName?.split(" ")?.take(2)?.mapNotNull { it.firstOrNull()?.uppercase() }?.joinToString("") ?: "${p.rank}"
                 Text(initials, style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
@@ -163,12 +160,11 @@ private fun MatchRow(match: MatchDisplay) {
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(match.time.ifBlank { "?" }, Modifier.width(34.dp), style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
         Text(match.homeTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(match.homeFlag, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 2.dp))
 
         if (hasResult) {
             Text("${match.homeGoals}", style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold)
@@ -184,7 +180,6 @@ private fun MatchRow(match: MatchDisplay) {
             Text("-", style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777))
         }
 
-        Text(match.awayFlag, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 2.dp))
         Text(match.awayTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.width(4.dp))
         val channels = match.tvChannel.split(",").filter { it.isNotBlank() }

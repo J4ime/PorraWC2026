@@ -11,6 +11,7 @@ import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.util.TvScraper
 import com.porrawc2026.app.util.ExcelParser
+import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.ValidationResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -70,7 +71,13 @@ class HomeViewModel @Inject constructor(
     private var livePollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
 
-    init { refreshPoints(); loadPlayers(); preloadSchedule() }
+    init { refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos() }
+
+    private fun precachePhotos() {
+        viewModelScope.launch(Dispatchers.IO) {
+            PlayerPhotoDownloader.precacheTopPlayers(context)
+        }
+    }
 
     fun importExcel(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -94,6 +101,7 @@ class HomeViewModel @Inject constructor(
                 refreshUpcomingMatches()
                 Log.d("HomeVM", "After enrich: match1 tv='${cachedMatches.firstOrNull()?.tvChannel}' dt='${cachedMatches.firstOrNull()?.dateTime}'")
                 loadPlayers()
+                downloadPlayerPhotos()
                 startAutoRefresh()
             } catch (e: Exception) {
                 _errorMessage.emit("Error al cargar el Excel: ${e.message}")
@@ -115,6 +123,22 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun downloadPlayerPhotos() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val predictions = repository.getPlayerPredictionsList()
+            for (p in predictions) {
+                val name = p.predictedName ?: continue
+                if (!p.photoPath.isNullOrBlank()) continue
+                val path = PlayerPhotoDownloader.download(context, name)
+                if (path != null) {
+                    val updated = p.copy(photoPath = path)
+                    repository.updatePlayerPrediction(updated)
+                }
+            }
+            loadPlayers()
+        }
+    }
+
     private fun preloadSchedule() {
         viewModelScope.launch(Dispatchers.IO) {
             val dbMatches = repository.getAllMatches().first()
@@ -125,6 +149,7 @@ class HomeViewModel @Inject constructor(
                 recalcAllPoints()
                 refreshPoints()
                 loadPlayers()
+                downloadPlayerPhotos()
                 startAutoRefresh()
             } else {
                 val scheduleDates = hardcodedMatchDates()

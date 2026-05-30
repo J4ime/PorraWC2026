@@ -9,6 +9,9 @@ interface PlayerPredictionDao {
     @Query("SELECT * FROM player_predictions ORDER BY rank")
     fun getAll(): Flow<List<PlayerPredictionEntity>>
 
+    @Query("SELECT * FROM player_predictions ORDER BY rank")
+    suspend fun getAllList(): List<PlayerPredictionEntity>
+
     @Update
     suspend fun update(prediction: PlayerPredictionEntity)
 

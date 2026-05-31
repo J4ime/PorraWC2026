@@ -14,6 +14,12 @@ import java.util.Locale
 object PlayerPhotoDownloader {
 
     private val client = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            val req = chain.request().newBuilder()
+                .header("User-Agent", "PorraWC2026/1.0 (Android; porrawc2026@example.com)")
+                .build()
+            chain.proceed(req)
+        }
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
         .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
         .build()
@@ -69,9 +75,9 @@ object PlayerPhotoDownloader {
                 val wikiUrl = entry?.wikiUrl ?: "https://en.wikipedia.org/wiki/${resolved.replace(" ", "_")}"
                 Log.d("PhotoDownloader", "Resolved '$playerName' → '$resolved' wiki=$wikiUrl")
 
-                val imageUrl = fetchImageFromHtml(wikiUrl)
+                val imageUrl = fetchOgImage(wikiUrl)
                 if (imageUrl == null) {
-                    Log.d("PhotoDownloader", "No image found in HTML for '$resolved'")
+                    Log.d("PhotoDownloader", "No og:image for '$resolved'")
                     return@withContext null
                 }
 
@@ -111,7 +117,7 @@ object PlayerPhotoDownloader {
         return name
     }
 
-    private fun fetchImageFromHtml(wikiUrl: String): String? {
+    private fun fetchOgImage(wikiUrl: String): String? {
         try {
             val request = Request.Builder().url(wikiUrl).build()
             val html = client.newCall(request).execute().use { r ->
@@ -122,22 +128,21 @@ object PlayerPhotoDownloader {
                 r.body?.string() ?: return null
             }
 
-            Log.d("PhotoDownloader", "Fetched ${html.length} bytes from $wikiUrl")
-
             val ogRegex = Regex(
                 """property\s*=\s*"og:image"\s*content\s*=\s*"([^"]+)"""",
                 RegexOption.IGNORE_CASE
             )
-            val ogImage = ogRegex.find(html)?.groupValues?.get(1)
-            if (ogImage != null && ogImage.startsWith("https://upload.wikimedia.org")) {
-                Log.d("PhotoDownloader", "Found og:image → $ogImage")
-                return ogImage
+            val match = ogRegex.find(html)
+            if (match != null) {
+                val url = match.groupValues[1]
+                Log.d("PhotoDownloader", "og:image → $url")
+                return url
             }
 
-            Log.d("PhotoDownloader", "No og:image in HTML, first 200 chars: ${html.take(200)}")
+            Log.d("PhotoDownloader", "No og:image found, HTML length=${html.length}")
             return null
         } catch (e: Exception) {
-            Log.e("PhotoDownloader", "HTML fetch failed: ${e.message}")
+            Log.e("PhotoDownloader", "Fetch failed: ${e.message}")
             return null
         }
     }

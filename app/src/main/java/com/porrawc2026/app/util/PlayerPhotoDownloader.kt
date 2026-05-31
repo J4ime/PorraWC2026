@@ -114,24 +114,23 @@ object PlayerPhotoDownloader {
     private fun fetchImageFromHtml(wikiUrl: String): String? {
         try {
             val request = Request.Builder().url(wikiUrl).build()
-            val response = client.newCall(request).execute()
-            val html = response.use { r ->
+            val html = client.newCall(request).execute().use { r ->
                 if (!r.isSuccessful) return null
                 r.body?.string() ?: return null
             }
 
-            val infoboxImg = extractInfoboxImage(html)
-            if (infoboxImg != null) return infoboxImg
-
-            val anyWikiImg = Regex(
-                """src\s*=\s*"(https://upload\.wikimedia\.org/[^"]+\.(?:jpg|jpeg|png))""",
+            val commonsRegex = Regex(
+                """src\s*=\s*"(https://upload\.wikimedia\.org/wikipedia/commons/[^"]+\.(?:jpg|jpeg|png))"""",
                 RegexOption.IGNORE_CASE
-            ).find(html)?.groupValues?.get(1)
-            if (anyWikiImg != null && !anyWikiImg.contains("Flag") && !anyWikiImg.contains("flag") &&
-                !anyWikiImg.contains("icon") && !anyWikiImg.contains("commons-logo") &&
-                !anyWikiImg.contains("50px") && !anyWikiImg.contains("20px") &&
-                !anyWikiImg.contains("25px")) {
-                return anyWikiImg
+            )
+            commonsRegex.find(html)?.groupValues?.get(1)?.let { return it }
+
+            val thumbRegex = Regex(
+                """src\s*=\s*"(//upload\.wikimedia\.org/wikipedia/commons/thumb/[^"]+\.(?:jpg|jpeg|png))"""",
+                RegexOption.IGNORE_CASE
+            )
+            thumbRegex.find(html)?.groupValues?.get(1)?.let { thumb ->
+                return "https:$thumb".replace(Regex("""/thumb/.*?/(\d+px-)"""), "/")
             }
 
             return null
@@ -139,23 +138,6 @@ object PlayerPhotoDownloader {
             Log.e("PhotoDownloader", "HTML fetch failed: ${e.message}")
             return null
         }
-    }
-
-    private fun extractInfoboxImage(html: String): String? {
-        val infoboxRegex = Regex(
-            """<table[^>]*class\s*=\s*"[^"]*infobox[^"]*"[^>]*>(.*?)</table>""",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
-        )
-        val infobox = infoboxRegex.find(html)?.groupValues?.get(1) ?: return null
-
-        val imgSrcRegex = Regex(
-            """<img[^>]*src\s*=\s*"(//upload\.wikimedia\.org/[^"]+\.(?:jpg|jpeg|png))"[^>]*>""",
-            RegexOption.IGNORE_CASE
-        )
-        val match = imgSrcRegex.find(infobox) ?: return null
-        val src = match.groupValues[1]
-
-        return "https:$src".replace(Regex("""/thumb/.*?/(\d+px-)"""), "/")
     }
 
     private suspend fun ensureSquadMap(context: Context) {

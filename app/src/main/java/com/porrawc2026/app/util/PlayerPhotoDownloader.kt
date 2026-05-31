@@ -41,6 +41,12 @@ object PlayerPhotoDownloader {
         }
     }
 
+    fun lookupCache(context: Context, playerName: String): String? {
+        val cacheDir = File(context.filesDir, "photos")
+        if (!cacheDir.exists()) return null
+        return findCachedFile(cacheDir, playerName)?.absolutePath
+    }
+
     suspend fun download(context: Context, playerName: String): String? {
         return withContext(Dispatchers.IO) {
             try {

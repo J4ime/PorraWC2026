@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,6 +30,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
+import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.ValidationResult
 import java.io.File
 
@@ -126,10 +128,16 @@ fun HomeScreen(
 
 @Composable
 private fun PlayerRow(p: PlayerPredictionEntity) {
+    val context = LocalContext.current
+    val photoFile = remember(p.predictedName, p.photoPath) {
+        p.photoPath?.let { File(it) }?.takeIf { it.exists() }
+            ?: p.predictedName?.let { name ->
+                PlayerPhotoDownloader.lookupCache(context, name)?.let { File(it) }
+            }
+    }
     Row(Modifier.fillMaxWidth().background(Color(0xFF222222), RoundedCornerShape(8.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        val photoFile = p.photoPath?.let { File(it) }
         Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
-            if (photoFile != null && photoFile.exists()) {
+            if (photoFile != null) {
                 AsyncImage(model = photoFile, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } else {
                 val initials = p.predictedName?.split(" ")?.take(2)?.mapNotNull { it.firstOrNull()?.uppercase() }?.joinToString("") ?: "${p.rank}"
@@ -142,7 +150,7 @@ private fun PlayerRow(p: PlayerPredictionEntity) {
             Text("${p.pointsPerGoal} pts/gol", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
         }
         Text("${p.goalsScored} goles", Modifier.width(60.dp), style = MaterialTheme.typography.bodySmall, color = Color.White, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-        Text("+${p.pointsEarned}", Modifier.width(50.dp), style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+        Text("${p.pointsEarned}", Modifier.width(50.dp), style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -152,10 +160,9 @@ private fun MatchRow(match: MatchDisplay) {
     val hasResult = match.homeGoals != null && match.awayGoals != null
     val isLive = match.status == MatchStatus.LIVE
 
-    val ptsColor = when {
-        hasResult && match.pointsEarned > 0 -> Color(0xFF4CAF50)
-        hasResult -> Color(0xFFE53935)
-        isLive -> Color(0xFFFFC107)
+    val scoreBg = when {
+        isLive -> Color(0xFF2E7D32)
+        hasResult -> Color.Transparent
         else -> Color.Transparent
     }
 
@@ -163,40 +170,59 @@ private fun MatchRow(match: MatchDisplay) {
         modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(match.time.ifBlank { "?" }, Modifier.width(34.dp), style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
-        Text(match.homeTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(match.time.ifBlank { "?" }, Modifier.width(36.dp),
+            style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold,
+            maxLines = 1, softWrap = false)
+        Text(match.homeTeam, Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall, color = Color.White,
+            textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
 
-        if (hasResult) {
-            Text("${match.homeGoals}", style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold)
-            Text(" - ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
-            Text("${match.awayGoals}", style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold)
-        } else if (hasPred) {
-            Text("${match.predictedHomeGoals}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF999999))
-            Text(" - ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
-            Text("${match.predictedAwayGoals}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF999999))
-        } else {
-            Text("-", style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777))
-            Text(" - ", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
-            Text("-", style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777))
+        Box(
+            modifier = Modifier.padding(horizontal = 4.dp).background(scoreBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)
+        ) {
+            if (hasResult || isLive) {
+                val h = if (hasResult) "${match.homeGoals}" else (match.homeGoals?.toString() ?: "0")
+                val a = if (hasResult) "${match.awayGoals}" else (match.awayGoals?.toString() ?: "0")
+                Text("$h - $a",
+                    style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold,
+                    maxLines = 1)
+            } else if (hasPred) {
+                Text("-",
+                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777),
+                    maxLines = 1)
+            } else {
+                Text("-",
+                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777),
+                    maxLines = 1)
+            }
         }
 
-        Text(match.awayTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(match.awayTeam, Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall, color = Color.White,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+
         Spacer(Modifier.width(4.dp))
         val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
         channels.forEach { ch ->
-            val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF555555) else Color(0xFF333333)
-            Text(ch.trim().take(4), fontSize = 8.sp, color = Color.White, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
+            val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF0037A1) else Color(0xFF333333)
+            Text(ch.trim().take(4), fontSize = 8.sp, color = Color.White,
+                modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
         }
 
         if (isLive) {
             val infiniteTransition = rememberInfiniteTransition("live_${match.id}")
             val alpha by infiniteTransition.animateFloat(1f, 0.3f, infiniteRepeatable(tween(600), RepeatMode.Reverse))
-            Text("LIVE", color = Color(0xFF888888).copy(alpha = alpha), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, modifier = Modifier.padding(start = 2.dp))
+            Text("LIVE", color = Color(0xFF888888).copy(alpha = alpha),
+                style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black,
+                modifier = Modifier.padding(start = 2.dp))
         }
 
         if (hasResult || (hasPred && isLive)) {
-            Text(if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0", Modifier.width(32.dp),
-                style = MaterialTheme.typography.labelSmall, color = ptsColor,
+            val ptsValue = if (match.pointsEarned > 0) "${match.pointsEarned}" else "0"
+            val ptsBg = if (isLive) Color(0xFF2E7D32) else Color.Transparent
+            Text(ptsValue,
+                modifier = Modifier.width(24.dp).background(ptsBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
+                style = MaterialTheme.typography.labelSmall, color = Color.White,
                 fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         }
     }

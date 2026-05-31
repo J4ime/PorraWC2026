@@ -148,16 +148,14 @@ object PlayerPhotoDownloader {
         )
         val infobox = infoboxRegex.find(html)?.groupValues?.get(1) ?: return null
 
-        val imgLinkRegex = Regex(
-            """<a\s[^>]*href\s*=\s*"([^"]*\.(?:jpg|jpeg|png))"[^>]*>""",
+        val imgSrcRegex = Regex(
+            """<img[^>]*src\s*=\s*"(//upload\.wikimedia\.org/[^"]+\.(?:jpg|jpeg|png))"[^>]*>""",
             RegexOption.IGNORE_CASE
         )
-        val match = imgLinkRegex.find(infobox)
-        val href = match?.groupValues?.get(1) ?: return null
+        val match = imgSrcRegex.find(infobox) ?: return null
+        val src = match.groupValues[1]
 
-        if (href.startsWith("//")) return "https:$href"
-        if (href.startsWith("http")) return href
-        return "https://en.wikipedia.org$href"
+        return "https:$src".replace(Regex("""/thumb/.*?/(\d+px-)"""), "/")
     }
 
     private suspend fun ensureSquadMap(context: Context) {

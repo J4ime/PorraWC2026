@@ -218,9 +218,14 @@ private fun MatchRow(match: MatchDisplay) {
         if (hasResult || (hasPred && isLive)) {
             val ptsValue = if (match.pointsEarned > 0) "${match.pointsEarned}" else "0"
             val ptsBg = if (isLive) Color(0xFF2E7D32) else Color.Transparent
+            val ptsColor = when {
+                isLive -> Color.White
+                hasResult && match.pointsEarned > 0 -> Color(0xFF4CAF50)
+                else -> Color(0xFF666666)
+            }
             Text(ptsValue,
                 modifier = Modifier.width(24.dp).background(ptsBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall, color = Color.White,
+                style = MaterialTheme.typography.labelSmall, color = ptsColor,
                 fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         }
     }

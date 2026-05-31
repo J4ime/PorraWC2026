@@ -79,13 +79,12 @@ object PlayerPhotoDownloader {
                 val fileName = sanitizeForFile(canonical) + ".jpg"
                 val destFile = File(cacheDir, fileName)
 
-                val request = Request.Builder().url(imageUrl).build()
-                val response = client.newCall(request).execute()
-                if (!response.isSuccessful) return@withContext null
-
-                response.body?.byteStream()?.use { input ->
-                    destFile.outputStream().use { output ->
-                        input.copyTo(output)
+                client.newCall(Request.Builder().url(imageUrl).build()).execute().use { imgResponse ->
+                    if (!imgResponse.isSuccessful) return@withContext null
+                    imgResponse.body?.byteStream()?.use { input ->
+                        destFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
                     }
                 }
                 Log.d("PhotoDownloader", "Downloaded photo for '$resolved' → ${destFile.absolutePath}")
@@ -116,27 +115,22 @@ object PlayerPhotoDownloader {
         try {
             val request = Request.Builder().url(wikiUrl).build()
             val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return null
-            val html = response.body?.string() ?: return null
-
-            val ogImage = Regex("""<meta\s[^>]*property\s*=\s*"og:image"\s[^>]*content\s*=\s*"([^"]+)""", RegexOption.IGNORE_CASE)
-                .find(html)?.groupValues?.get(1)
-            if (ogImage != null && ogImage.startsWith("https://upload.wikimedia.org") &&
-                !ogImage.contains("Flag") && !ogImage.contains("flag") && !ogImage.contains("icon")) {
-                return ogImage
+            val html = response.use { r ->
+                if (!r.isSuccessful) return null
+                r.body?.string() ?: return null
             }
 
-            val infoboxImg = Regex("""<a\s[^>]*class\s*=\s*"[^"]*image[^"]*"[^>]*href\s*=\s*"([^"]*)""", RegexOption.IGNORE_CASE)
-                .find(html)?.groupValues?.get(1)
-            if (infoboxImg != null && infoboxImg.contains("upload.wikimedia.org")) {
-                return "https:$infoboxImg".replace(Regex("/\\d+px-"), "/")
-            }
+            val infoboxImg = extractInfoboxImage(html)
+            if (infoboxImg != null) return infoboxImg
 
-            val anyWikiImg = Regex("""src\s*=\s*"(https://upload\.wikimedia\.org/[^"]+\.(?:jpg|jpeg|png))""", RegexOption.IGNORE_CASE)
-                .find(html)?.groupValues?.get(1)
+            val anyWikiImg = Regex(
+                """src\s*=\s*"(https://upload\.wikimedia\.org/[^"]+\.(?:jpg|jpeg|png))""",
+                RegexOption.IGNORE_CASE
+            ).find(html)?.groupValues?.get(1)
             if (anyWikiImg != null && !anyWikiImg.contains("Flag") && !anyWikiImg.contains("flag") &&
                 !anyWikiImg.contains("icon") && !anyWikiImg.contains("commons-logo") &&
-                !anyWikiImg.contains("50px") && !anyWikiImg.contains("20px")) {
+                !anyWikiImg.contains("50px") && !anyWikiImg.contains("20px") &&
+                !anyWikiImg.contains("25px")) {
                 return anyWikiImg
             }
 
@@ -145,6 +139,25 @@ object PlayerPhotoDownloader {
             Log.e("PhotoDownloader", "HTML fetch failed: ${e.message}")
             return null
         }
+    }
+
+    private fun extractInfoboxImage(html: String): String? {
+        val infoboxRegex = Regex(
+            """<table[^>]*class\s*=\s*"[^"]*infobox[^"]*"[^>]*>(.*?)</table>""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        )
+        val infobox = infoboxRegex.find(html)?.groupValues?.get(1) ?: return null
+
+        val imgLinkRegex = Regex(
+            """<a\s[^>]*href\s*=\s*"([^"]*\.(?:jpg|jpeg|png))"[^>]*>""",
+            RegexOption.IGNORE_CASE
+        )
+        val match = imgLinkRegex.find(infobox)
+        val href = match?.groupValues?.get(1) ?: return null
+
+        if (href.startsWith("//")) return "https:$href"
+        if (href.startsWith("http")) return href
+        return "https://en.wikipedia.org$href"
     }
 
     private suspend fun ensureSquadMap(context: Context) {
@@ -170,11 +183,12 @@ object PlayerPhotoDownloader {
             val request = Request.Builder()
                 .url("https://en.wikipedia.org/w/api.php?action=parse&page=2026_FIFA_World_Cup_squads&prop=text&format=json&formatversion=2")
                 .build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return
+            val respBody = client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return
+                response.body?.string() ?: return
+            }
 
-            val body = response.body?.string() ?: return
-            val json = JSONObject(body)
+            val json = JSONObject(respBody)
             val html = json.getJSONObject("parse").getString("text")
 
             val map = mutableMapOf<String, SquadEntry>()

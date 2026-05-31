@@ -6,7 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +30,7 @@ fun QuestionsScreen(
     Column(Modifier.fillMaxSize().background(SurfaceDark)) {
         TopAppBar(
             title = { Text("50 PREGUNTAS", style = MaterialTheme.typography.titleLarge, color = TextPrimary, fontWeight = FontWeight.Bold) },
-            navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Filled.ArrowBack, null, tint = TextPrimary) } },
+            navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = TextPrimary) } },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = WCDarkBlue)
         )
 

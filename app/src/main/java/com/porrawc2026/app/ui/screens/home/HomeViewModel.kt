@@ -45,7 +45,7 @@ data class MatchDisplay(
 class HomeViewModel @Inject constructor(
     private val repository: PorraRepository,
     private val apiService: ApiService,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val madridTZ = TimeZone.getTimeZone("Europe/Madrid")

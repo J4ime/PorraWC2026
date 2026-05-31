@@ -29,8 +29,11 @@ object PlayerPhotoDownloader {
         "Luis Díaz", "Jude Bellingham"
     )
 
+    private var squadNameMap: Map<String, String>? = null
+
     suspend fun precacheTopPlayers(context: Context) {
         withContext(Dispatchers.IO) {
+            ensureSquadMap(context)
             Log.d("PhotoDownloader", "Precaching ${topGoalScorers.size} top player photos...")
             var downloaded = 0
             for (name in topGoalScorers) {
@@ -59,13 +62,16 @@ object PlayerPhotoDownloader {
                     return@withContext cached.absolutePath
                 }
 
-                val imageUrl = searchWikipediaImage(playerName)
+                val resolved = resolveFullName(context, playerName)
+                Log.d("PhotoDownloader", "Resolved '$playerName' → '$resolved'")
+
+                val imageUrl = fetchSummaryImage(resolved)
                 if (imageUrl == null) {
-                    Log.d("PhotoDownloader", "No Wikipedia image found for '$playerName'")
+                    Log.d("PhotoDownloader", "No Wikipedia REST image for '$resolved'")
                     return@withContext null
                 }
 
-                val canonical = bestMatchTopScorer(playerName) ?: playerName.trim().lowercase()
+                val canonical = bestMatchTopScorer(resolved) ?: resolved.trim().lowercase()
                 val fileName = sanitizeForFile(canonical) + ".jpg"
                 val destFile = File(cacheDir, fileName)
 
@@ -78,7 +84,7 @@ object PlayerPhotoDownloader {
                         input.copyTo(output)
                     }
                 }
-                Log.d("PhotoDownloader", "Downloaded photo for '$playerName' → ${destFile.absolutePath}")
+                Log.d("PhotoDownloader", "Downloaded photo for '$resolved' → ${destFile.absolutePath}")
                 destFile.absolutePath
             } catch (e: Exception) {
                 Log.e("PhotoDownloader", "Failed for '$playerName': ${e.message}")
@@ -87,13 +93,112 @@ object PlayerPhotoDownloader {
         }
     }
 
+    private suspend fun resolveFullName(context: Context, name: String): String {
+        val canonical = bestMatchTopScorer(name)
+        if (canonical != null) return canonical
+
+        ensureSquadMap(context)
+        val map = squadNameMap ?: return name
+        val norm = normalize(name)
+        map[norm]?.let { return it }
+
+        val words = norm.split(" ")
+        for (word in words) {
+            if (word.length >= 4) {
+                map[word]?.let { return it }
+            }
+        }
+        return name
+    }
+
+    private suspend fun ensureSquadMap(context: Context) {
+        if (squadNameMap != null) return
+        try {
+            val mapFile = File(context.filesDir, "photos/squad_names.json")
+            if (mapFile.exists()) {
+                val json = JSONObject(mapFile.readText())
+                val map = mutableMapOf<String, String>()
+                json.keys().forEach { key -> map[key] = json.getString(key) }
+                squadNameMap = map
+                Log.d("PhotoDownloader", "Loaded ${map.size} names from squad cache")
+                return
+            }
+
+            Log.d("PhotoDownloader", "Fetching squad page to build name map...")
+            val request = Request.Builder()
+                .url("https://en.wikipedia.org/w/api.php?action=parse&page=2026_FIFA_World_Cup_squads&prop=text&format=json&formatversion=2")
+                .build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return
+
+            val body = response.body?.string() ?: return
+            val json = JSONObject(body)
+            val html = json.getJSONObject("parse").getString("text")
+
+            val map = mutableMapOf<String, String>()
+            val linkRegex = Regex("""<a\s[^>]*href\s*=\s*"([^"]*)"[^>]*title="([^"]*)"[^>]*>""")
+            val rowRegex = Regex("""<td[^>]*>\s*4FW\s*</td>((?:(?!<td[^>]*>4FW</td>).)*)""")
+
+            for (row in rowRegex.findAll(html)) {
+                val cell = row.value
+                val links = linkRegex.findAll(cell)
+                for (link in links) {
+                    val href = link.groupValues[1]
+                    val title = link.groupValues[2]
+                    if (href.startsWith("/wiki/") && !title.contains(":") && !title.contains("(disambiguation)") &&
+                        !title.contains("Coach") && !title.contains("Manager") && !title.contains("footballer") && !title.contains("born") && !title.contains("captain")) {
+                        val short = normalize(title)
+                        val shortWords = short.split(" ")
+                        for (w in shortWords) {
+                            if (w.length >= 4 && w != "júnior" && w != "junior") {
+                                if (!map.containsKey(w) || map[w]!!.length > title.length) {
+                                    map[w] = title
+                                }
+                            }
+                        }
+                        map[short] = title
+                    }
+                }
+            }
+
+            squadNameMap = map
+            mapFile.parentFile?.mkdirs()
+            mapFile.writeText(JSONObject(map.toMap()).toString())
+            Log.d("PhotoDownloader", "Built name map: ${map.size} entries")
+        } catch (e: Exception) {
+            Log.e("PhotoDownloader", "Failed to build squad map: ${e.message}")
+        }
+    }
+
+    private fun fetchSummaryImage(pageTitle: String): String? {
+        try {
+            val encoded = pageTitle.replace(" ", "_")
+            val url = "https://en.wikipedia.org/api/rest_v1/page/summary/$encoded"
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return null
+
+            val body = response.body?.string() ?: return null
+            val json = JSONObject(body)
+
+            val original = json.optJSONObject("originalimage")?.optString("source", "") ?: ""
+            if (original.isNotBlank()) return original
+
+            val thumb = json.optJSONObject("thumbnail")?.optString("source", "") ?: ""
+            if (thumb.isNotBlank()) return thumb
+
+            return null
+        } catch (e: Exception) {
+            Log.e("PhotoDownloader", "REST summary failed for '$pageTitle': ${e.message}")
+            return null
+        }
+    }
+
     private fun findCachedFile(cacheDir: File, playerName: String): File? {
         val norm = normalize(playerName)
         val files = cacheDir.listFiles { f -> f.isFile && f.extension == "jpg" } ?: return null
-
         var best: File? = null
         var bestScore = 0f
-
         for (file in files) {
             val fileNorm = normalize(file.nameWithoutExtension)
             val score = similarity(norm, fileNorm)
@@ -102,7 +207,6 @@ object PlayerPhotoDownloader {
                 best = file
             }
         }
-
         return if (bestScore >= 0.65f) best else null
     }
 
@@ -110,7 +214,6 @@ object PlayerPhotoDownloader {
         val norm = normalize(playerName)
         var best: String? = null
         var bestScore = 0f
-
         for (name in topGoalScorers) {
             val score = similarity(norm, normalize(name))
             if (score > bestScore) {
@@ -118,7 +221,6 @@ object PlayerPhotoDownloader {
                 best = name
             }
         }
-
         return if (bestScore >= 0.65f) best else null
     }
 
@@ -139,13 +241,10 @@ object PlayerPhotoDownloader {
     private fun similarity(a: String, b: String): Float {
         if (a == b) return 1f
         if (a.isEmpty() || b.isEmpty()) return 0f
-
         val shorter = if (a.length <= b.length) a else b
         val longer = if (a.length > b.length) a else b
-
         if (longer.contains(shorter) && shorter.length >= 3) return 0.85f
         if (shorter.contains(longer) && longer.length >= 3) return 0.85f
-
         val aWords = a.split(" ").toSet()
         val bWords = b.split(" ").toSet()
         if (aWords.isNotEmpty() && bWords.isNotEmpty()) {
@@ -154,98 +253,24 @@ object PlayerPhotoDownloader {
             val wordOverlap = intersection / union
             if (wordOverlap >= 0.5f) return 0.7f + wordOverlap * 0.3f
         }
-
         return levenshteinRatio(a, b)
     }
 
     private fun levenshteinRatio(a: String, b: String): Float {
         val maxLen = maxOf(a.length, b.length)
         if (maxLen == 0) return 1f
-
         val prev = IntArray(b.length + 1) { it }
         val curr = IntArray(b.length + 1)
-
         for (i in a.indices) {
             curr[0] = i + 1
             for (j in b.indices) {
                 val cost = if (a[i] == b[j]) 0 else 1
-                curr[j + 1] = minOf(
-                    curr[j] + 1,
-                    prev[j + 1] + 1,
-                    prev[j] + cost
-                )
+                curr[j + 1] = minOf(curr[j] + 1, prev[j + 1] + 1, prev[j] + cost)
             }
             prev.copyInto(curr)
             curr.copyInto(prev)
         }
-
         val distance = prev[b.length]
         return 1f - (distance.toFloat() / maxLen)
-    }
-
-    private fun searchWikipediaImage(playerName: String): String? {
-        try {
-            val searchUrl = "https://en.wikipedia.org/w/api.php?action=opensearch" +
-                "&search=${URLEncoder.encode("$playerName footballer", "UTF-8")}" +
-                "&limit=1&format=json"
-
-            val searchRequest = Request.Builder().url(searchUrl).build()
-            val searchResponse = client.newCall(searchRequest).execute()
-            if (!searchResponse.isSuccessful) return null
-
-            val body = searchResponse.body?.string() ?: return null
-            val arr = org.json.JSONArray(body)
-            if (arr.length() < 2) return null
-
-            val titles = arr.getJSONArray(1)
-            if (titles.length() == 0) {
-                val searchUrl2 = "https://en.wikipedia.org/w/api.php?action=opensearch" +
-                    "&search=${URLEncoder.encode(playerName, "UTF-8")}" +
-                    "&limit=1&format=json"
-                val req2 = Request.Builder().url(searchUrl2).build()
-                val resp2 = client.newCall(req2).execute()
-                if (!resp2.isSuccessful) return null
-                val body2 = resp2.body?.string() ?: return null
-                val arr2 = org.json.JSONArray(body2)
-                if (arr2.length() < 2) return null
-                val titles2 = arr2.getJSONArray(1)
-                if (titles2.length() == 0) return null
-                val pageTitle = titles2.getString(0)
-                return fetchImageUrl(pageTitle)
-            }
-
-            val pageTitle = titles.getString(0)
-            return fetchImageUrl(pageTitle)
-        } catch (e: Exception) {
-            Log.e("PhotoDownloader", "Search failed: ${e.message}")
-            return null
-        }
-    }
-
-    private fun fetchImageUrl(pageTitle: String): String? {
-        try {
-            val imageUrl = "https://en.wikipedia.org/w/api.php?action=query" +
-                "&prop=pageimages&format=json&piprop=original" +
-                "&titles=${URLEncoder.encode(pageTitle, "UTF-8")}"
-
-            val request = Request.Builder().url(imageUrl).build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return null
-
-            val body = response.body?.string() ?: return null
-            val json = JSONObject(body)
-            val pages = json.getJSONObject("query").getJSONObject("pages")
-            val firstPage = pages.keys().next()
-            val page = pages.getJSONObject(firstPage)
-
-            val original = page.optString("original", "")
-            if (original.isNotBlank()) return original
-
-            val thumbnail = page.optJSONObject("thumbnail")
-            return thumbnail?.optString("source", "")?.takeIf { it.isNotBlank() }
-        } catch (e: Exception) {
-            Log.e("PhotoDownloader", "Image fetch failed: ${e.message}")
-            return null
-        }
     }
 }

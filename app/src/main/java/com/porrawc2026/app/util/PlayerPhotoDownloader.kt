@@ -88,7 +88,7 @@ object PlayerPhotoDownloader {
 
                 val imgRequest = Request.Builder()
                     .url(imageUrl)
-                    .header("Referer", wikiUrl)
+                    .header("Referer", "https://en.wikipedia.org/wiki/")
                     .build()
                 client.newCall(imgRequest).execute().use { imgResponse ->
                     if (!imgResponse.isSuccessful) {

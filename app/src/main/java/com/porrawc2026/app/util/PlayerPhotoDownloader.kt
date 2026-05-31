@@ -84,16 +84,24 @@ object PlayerPhotoDownloader {
                 val canonical = bestMatchTopScorer(resolved) ?: resolved.trim().lowercase()
                 val fileName = sanitizeForFile(canonical) + ".jpg"
                 val destFile = File(cacheDir, fileName)
+                Log.d("PhotoDownloader", "Downloading $imageUrl → ${destFile.name}...")
 
                 client.newCall(Request.Builder().url(imageUrl).build()).execute().use { imgResponse ->
-                    if (!imgResponse.isSuccessful) return@withContext null
-                    imgResponse.body?.byteStream()?.use { input ->
+                    if (!imgResponse.isSuccessful) {
+                        Log.d("PhotoDownloader", "Image download failed: HTTP ${imgResponse.code}")
+                        return@withContext null
+                    }
+                    val body = imgResponse.body ?: run {
+                        Log.d("PhotoDownloader", "Image download: null body")
+                        return@withContext null
+                    }
+                    body.byteStream().use { input ->
                         destFile.outputStream().use { output ->
                             input.copyTo(output)
                         }
                     }
+                    Log.d("PhotoDownloader", "Downloaded photo for '$resolved' (${body.contentLength()} bytes) → ${destFile.absolutePath}")
                 }
-                Log.d("PhotoDownloader", "Downloaded photo for '$resolved' → ${destFile.absolutePath}")
                 destFile.absolutePath
             } catch (e: Exception) {
                 Log.e("PhotoDownloader", "Failed for '$playerName': ${e.message}")
@@ -266,8 +274,8 @@ object PlayerPhotoDownloader {
 
     private fun sanitizeForFile(s: String): String {
         return s.trim().lowercase()
-            .replace(" ", "_")
-            .replace(Regex("[^a-z0-9_]"), "")
+            .replace(" ", "-")
+            .replace(Regex("[^a-z0-9-]"), "")
     }
 
     private fun similarity(a: String, b: String): Float {

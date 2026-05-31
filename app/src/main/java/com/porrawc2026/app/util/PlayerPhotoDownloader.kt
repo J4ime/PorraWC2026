@@ -119,20 +119,16 @@ object PlayerPhotoDownloader {
                 r.body?.string() ?: return null
             }
 
-            val commonsRegex = Regex(
-                """src\s*=\s*"(https://upload\.wikimedia\.org/wikipedia/commons/[^"]+\.(?:jpg|jpeg|png))"""",
+            val ogRegex = Regex(
+                """<meta\s[^>]*property\s*=\s*"og:image"\s[^>]*content\s*=\s*"([^"]+)"""",
                 RegexOption.IGNORE_CASE
             )
-            commonsRegex.find(html)?.groupValues?.get(1)?.let { return it }
-
-            val thumbRegex = Regex(
-                """src\s*=\s*"(//upload\.wikimedia\.org/wikipedia/commons/thumb/[^"]+\.(?:jpg|jpeg|png))"""",
-                RegexOption.IGNORE_CASE
-            )
-            thumbRegex.find(html)?.groupValues?.get(1)?.let { thumb ->
-                return "https:$thumb".replace(Regex("""/thumb/.*?/(\d+px-)"""), "/")
+            val ogImage = ogRegex.find(html)?.groupValues?.get(1)
+            if (ogImage != null && ogImage.startsWith("https://upload.wikimedia.org")) {
+                return ogImage
             }
 
+            Log.d("PhotoDownloader", "No og:image found in $wikiUrl")
             return null
         } catch (e: Exception) {
             Log.e("PhotoDownloader", "HTML fetch failed: ${e.message}")

@@ -93,9 +93,7 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // Apache POI for Excel parsing
-    implementation("org.apache.poi:poi-ooxml:5.2.5") {
-        exclude(group = "org.apache.logging.log4j")
-    }
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

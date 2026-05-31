@@ -115,20 +115,26 @@ object PlayerPhotoDownloader {
         try {
             val request = Request.Builder().url(wikiUrl).build()
             val html = client.newCall(request).execute().use { r ->
-                if (!r.isSuccessful) return null
+                if (!r.isSuccessful) {
+                    Log.d("PhotoDownloader", "HTTP ${r.code} for $wikiUrl")
+                    return null
+                }
                 r.body?.string() ?: return null
             }
 
+            Log.d("PhotoDownloader", "Fetched ${html.length} bytes from $wikiUrl")
+
             val ogRegex = Regex(
-                """<meta\s[^>]*property\s*=\s*"og:image"\s[^>]*content\s*=\s*"([^"]+)"""",
+                """property\s*=\s*"og:image"\s*content\s*=\s*"([^"]+)"""",
                 RegexOption.IGNORE_CASE
             )
             val ogImage = ogRegex.find(html)?.groupValues?.get(1)
             if (ogImage != null && ogImage.startsWith("https://upload.wikimedia.org")) {
+                Log.d("PhotoDownloader", "Found og:image → $ogImage")
                 return ogImage
             }
 
-            Log.d("PhotoDownloader", "No og:image found in $wikiUrl")
+            Log.d("PhotoDownloader", "No og:image in HTML, first 200 chars: ${html.take(200)}")
             return null
         } catch (e: Exception) {
             Log.e("PhotoDownloader", "HTML fetch failed: ${e.message}")

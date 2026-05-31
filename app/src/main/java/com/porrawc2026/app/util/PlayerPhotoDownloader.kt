@@ -16,7 +16,7 @@ object PlayerPhotoDownloader {
     private val client = OkHttpClient.Builder()
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
-                .header("User-Agent", "PorraWC2026/1.0 (Android; porrawc2026@example.com)")
+                .header("User-Agent", "Mozilla/5.0 (compatible; PorraWC2026/1.0)")
                 .build()
             chain.proceed(req)
         }
@@ -86,7 +86,11 @@ object PlayerPhotoDownloader {
                 val destFile = File(cacheDir, fileName)
                 Log.d("PhotoDownloader", "Downloading $imageUrl → ${destFile.name}...")
 
-                client.newCall(Request.Builder().url(imageUrl).build()).execute().use { imgResponse ->
+                val imgRequest = Request.Builder()
+                    .url(imageUrl)
+                    .header("Referer", wikiUrl)
+                    .build()
+                client.newCall(imgRequest).execute().use { imgResponse ->
                     if (!imgResponse.isSuccessful) {
                         Log.d("PhotoDownloader", "Image download failed: HTTP ${imgResponse.code}")
                         return@withContext null

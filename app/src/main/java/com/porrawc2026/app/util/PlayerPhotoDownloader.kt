@@ -172,24 +172,30 @@ object PlayerPhotoDownloader {
 
     private fun fetchSummaryImage(pageTitle: String): String? {
         try {
-            val encoded = pageTitle.replace(" ", "_")
-            val url = "https://en.wikipedia.org/api/rest_v1/page/summary/$encoded"
+            val encoded = URLEncoder.encode(pageTitle, "UTF-8")
+            val url = "https://en.wikipedia.org/w/api.php?action=query" +
+                "&prop=pageimages&format=json&piprop=original" +
+                "&titles=$encoded"
+
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) return null
 
             val body = response.body?.string() ?: return null
             val json = JSONObject(body)
+            val pages = json.getJSONObject("query").getJSONObject("pages")
+            val firstPage = pages.keys().next()
+            val page = pages.getJSONObject(firstPage)
 
-            val original = json.optJSONObject("originalimage")?.optString("source", "") ?: ""
+            val original = page.optString("original", "")
             if (original.isNotBlank()) return original
 
-            val thumb = json.optJSONObject("thumbnail")?.optString("source", "") ?: ""
+            val thumb = page.optJSONObject("thumbnail")?.optString("source", "") ?: ""
             if (thumb.isNotBlank()) return thumb
 
             return null
         } catch (e: Exception) {
-            Log.e("PhotoDownloader", "REST summary failed for '$pageTitle': ${e.message}")
+            Log.e("PhotoDownloader", "Image fetch failed for '$pageTitle': ${e.message}")
             return null
         }
     }

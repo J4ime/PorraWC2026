@@ -129,12 +129,10 @@ fun HomeScreen(
 @Composable
 private fun PlayerRow(p: PlayerPredictionEntity) {
     val context = LocalContext.current
-    val photoFile = remember(p.predictedName, p.photoPath) {
-        p.photoPath?.let { File(it) }?.takeIf { it.exists() }
-            ?: p.predictedName?.let { name ->
-                PlayerPhotoDownloader.lookupCache(context, name)?.let { File(it) }
-            }
-    }
+    val photoPath = p.photoPath?.takeIf { File(it).exists() }
+        ?: p.predictedName?.let { name -> PlayerPhotoDownloader.lookupCache(context, name) }
+    val photoFile = photoPath?.let { File(it) }
+
     Row(Modifier.fillMaxWidth().background(Color(0xFF222222), RoundedCornerShape(8.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
             if (photoFile != null) {

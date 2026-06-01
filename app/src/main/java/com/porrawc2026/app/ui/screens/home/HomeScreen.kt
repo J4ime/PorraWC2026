@@ -29,6 +29,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.porrawc2026.app.R
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.ValidationResult
@@ -55,9 +58,32 @@ fun HomeScreen(
         ValidationDialog(result = result, onDismiss = { viewModel.dismissValidation() })
     }
 
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Borrar datos", color = Color.White) },
+            text = { Text("Se eliminarán todos los datos importados del Excel. ¿Estás seguro?", color = Color(0xFF999999)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteAllData(); showDeleteDialog = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE53935))) {
+                    Text("BORRAR")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF777777))) {
+                    Text("Cancelar")
+                }
+            },
+            containerColor = Color(0xFF1E1E1E)
+        )
+    }
+
     Scaffold(
         topBar = {
-            Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().padding(horizontal = 20.dp, vertical = 18.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Image(painter = painterResource(R.drawable.logo), contentDescription = "Logo", modifier = Modifier.size(36.dp).align(Alignment.CenterStart))
                 Text("PORRA MUNDIAL 26", Modifier.fillMaxWidth(), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF333333)).align(Alignment.CenterEnd), contentAlignment = Alignment.Center) {
                     Text("$totalPoints", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
@@ -66,17 +92,29 @@ fun HomeScreen(
         },
         bottomBar = {
             Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding(), color = Color(0xFF1A1A1A)) {
-                Button(
-                    onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (hasData) "Actualizar Excel" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (hasData) "Actualizar" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
+                    if (hasData) {
+                        Button(
+                            onClick = { showDeleteDialog = true },
+                            modifier = Modifier.size(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Filled.Delete, null, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
             }

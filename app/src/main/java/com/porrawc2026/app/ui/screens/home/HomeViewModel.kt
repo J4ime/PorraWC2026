@@ -79,6 +79,40 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun preloadSchedule() {
+        loadHardcodedMatches()
+        viewModelScope.launch(Dispatchers.IO) {
+            val dbMatches = repository.getAllMatches().first()
+            if (dbMatches.isNotEmpty()) {
+                cachedMatches = dbMatches
+                _hasData.value = true
+                enrichScheduleFromApi()
+                recalcAllPoints()
+                refreshPoints()
+                loadPlayers()
+                downloadPlayerPhotos()
+                startAutoRefresh()
+                refreshUpcomingMatches()
+            }
+        }
+    }
+
+    private fun loadHardcodedMatches() {
+        val scheduleDates = hardcodedMatchDates()
+        val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
+        cachedMatches = scheduleDates.map { (id, pair) ->
+            val (date, tv) = pair
+            val groupIndex = (id - 1) / 6
+            MatchEntity(
+                id = id, groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
+                matchday = "J${(id - 1) % 6 + 1}", dateTime = date,
+                homeTeam = "Local", awayTeam = "Visitante",
+                tvChannel = tv, isKnockout = false
+            )
+        }
+        refreshUpcomingMatches()
+    }
+
     fun importExcel(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
@@ -113,6 +147,17 @@ class HomeViewModel @Inject constructor(
 
     fun dismissValidation() { _validationResult.value = null }
 
+    fun deleteAllData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.insertAllData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+            cachedMatches = emptyList()
+            _hasData.value = false
+            _totalPoints.value = 0
+            _players.value = emptyList()
+            refreshUpcomingMatches()
+        }
+    }
+
     fun refreshPoints() {
         viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
     }
@@ -136,36 +181,6 @@ class HomeViewModel @Inject constructor(
                 }
             }
             loadPlayers()
-        }
-    }
-
-    private fun preloadSchedule() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val dbMatches = repository.getAllMatches().first()
-            if (dbMatches.isNotEmpty()) {
-                cachedMatches = dbMatches
-                _hasData.value = true
-                enrichScheduleFromApi()
-                recalcAllPoints()
-                refreshPoints()
-                loadPlayers()
-                downloadPlayerPhotos()
-                startAutoRefresh()
-            } else {
-                val scheduleDates = hardcodedMatchDates()
-                val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
-                cachedMatches = scheduleDates.map { (id, pair) ->
-                    val (date, tv) = pair
-                    val groupIndex = (id - 1) / 6
-                    MatchEntity(
-                        id = id, groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
-                        matchday = "J${(id - 1) % 6 + 1}", dateTime = date,
-                        homeTeam = "Local", awayTeam = "Visitante",
-                        tvChannel = tv, isKnockout = false
-                    )
-                }
-            }
-            refreshUpcomingMatches()
         }
     }
 

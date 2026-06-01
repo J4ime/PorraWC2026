@@ -184,9 +184,11 @@ fun HomeScreen(
         Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 val inf = rememberInfiniteTransition("busy")
-                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1000, easing = LinearEasing)))
-                Image(painter = painterResource(R.drawable.logo), contentDescription = null,
-                    modifier = Modifier.size(72.dp).graphicsLayer { rotationZ = rot })
+                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
+                val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
+                Text("\u26BD",
+                    fontSize = 64.sp,
+                    modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
                 Spacer(Modifier.height(16.dp))
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
             }

@@ -287,7 +287,7 @@ private fun ResultRow(match: MatchEntity) {
         Spacer(Modifier.width(8.dp))
         Text(match.awayTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary)
         if (match.pointsEarned > 0) {
-            Text(" +${match.pointsEarned}", style = MaterialTheme.typography.labelSmall, color = AccentGreen, fontWeight = FontWeight.Bold)
+            Text(" ${match.pointsEarned}", style = MaterialTheme.typography.labelSmall, color = AccentGreen, fontWeight = FontWeight.Bold)
         }
     }
 }

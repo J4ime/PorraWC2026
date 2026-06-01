@@ -139,8 +139,8 @@ object ExcelParser {
         }
 
         if (agValidationRegions.isEmpty()) {
-            warnings.add("No se encontraron validaciones en la columna AG")
-            return AgValidationResult(false, 0, 0, 0, listOf("El Excel no tiene validaciones de datos en la columna AG. Está incompleto."), warnings)
+            Log.d("ExcelParser", "AG validate: no validations cover column AG (32)")
+            return AgValidationResult(true, 0, 0, 0, emptyList(), warnings)
         }
 
         for (rowIdx in 4..208) {
@@ -163,30 +163,25 @@ object ExcelParser {
                     in 10..17 -> "Grupo B, fila $rowIdx"
                     in 18..25 -> "Grupo C, fila $rowIdx"
                     in 26..33 -> "Grupo D, fila $rowIdx"
-                    in 34..41 -> "Grupo E, fila $rowIdx"
-                    in 42..49 -> "Grupo F, fila $rowIdx"
-                    in 50..57 -> "Grupo G, fila $rowIdx"
-                    in 58..65 -> "Grupo H, fila $rowIdx"
-                    in 66..73 -> "Grupo I, fila $rowIdx"
-                    in 74..81 -> "Grupo J, fila $rowIdx"
-                    in 82..89 -> "Grupo K, fila $rowIdx"
-                    in 90..97 -> "Grupo L, fila $rowIdx"
-                    in 98..147 -> "Eliminatorias, fila $rowIdx"
-                    in 148..157 -> "Goleadores, fila $rowIdx"
-                    in 158..208 -> "Preguntas, fila $rowIdx"
+                    in 34..45 -> "Grupo E, fila $rowIdx"
+                    in 46..57 -> "Grupo F, fila $rowIdx"
+                    in 58..69 -> "Grupo G, fila $rowIdx"
+                    in 70..81 -> "Grupo H, fila $rowIdx"
+                    in 82..93 -> "Grupo I, fila $rowIdx"
+                    in 94..105 -> "Grupo J, fila $rowIdx"
+                    in 106..117 -> "Grupo K, fila $rowIdx"
+                    in 118..129 -> "Grupo L, fila $rowIdx"
                     else -> "Fila $rowIdx"
                 }
-                if (red <= 10) {
+                if (cellValue.isBlank()) {
+                    errors.add("$rowLabel — vacío")
+                } else {
                     errors.add("$rowLabel — valor: '$cellValue'")
                 }
             }
         }
 
-        if (total > 0 && red == 0) {
-            warnings.add("Columna AG validada: $green celdas OK")
-        }
-
-        Log.d("ExcelParser", "AG validate: total=$total green=$green red=$red (only cells with validation)")
+        Log.d("ExcelParser", "AG validate: total=$total \u2705=$green \u274C=$red")
         return AgValidationResult(
             isValid = red == 0 && total > 0,
             totalRows = total,

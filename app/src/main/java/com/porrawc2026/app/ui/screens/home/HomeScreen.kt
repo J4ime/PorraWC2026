@@ -181,12 +181,14 @@ fun HomeScreen(
     }
 
     if (isBusy) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            Box(modifier = Modifier.padding(bottom = 80.dp).size(44.dp).clip(CircleShape).background(Color(0xFF1E1E1E)), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 val inf = rememberInfiniteTransition("busy")
-                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(800, easing = LinearEasing)))
+                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1000, easing = LinearEasing)))
                 Image(painter = painterResource(R.drawable.logo), contentDescription = null,
-                    modifier = Modifier.size(32.dp).graphicsLayer { rotationZ = rot })
+                    modifier = Modifier.size(72.dp).graphicsLayer { rotationZ = rot })
+                Spacer(Modifier.height(16.dp))
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
             }
         }
     }

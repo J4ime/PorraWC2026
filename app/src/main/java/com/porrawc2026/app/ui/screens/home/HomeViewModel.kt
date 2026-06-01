@@ -135,6 +135,7 @@ class HomeViewModel @Inject constructor(
                 val data = ExcelParser.parse(context, uri)
                 val validation = ExcelParser.validate()
                 _validationResult.value = validation
+                Log.w("HomeVM", "===== IMPORT: isValid=${validation.isValid} errors=[${validation.errors.joinToString("; ")}] =====")
                 if (validation.isValid) {
                     repository.insertAllData(
                         data.teams, data.matches, data.questions,
@@ -143,17 +144,17 @@ class HomeViewModel @Inject constructor(
                     _hasData.value = true
                     cachedMatches = data.matches
                     lastWrittenScores.clear()
-                    Log.d("HomeVM", "Imported ${cachedMatches.size} matches, enriching schedule...")
+                    Log.w("HomeVM", "===== IMPORT: data inserted, hasData=true, ${cachedMatches.size} matches =====")
                     enrichScheduleFromApi()
                     recalcAllPoints()
                     refreshPoints()
                     refreshUpcomingMatches()
-                    Log.d("HomeVM", "After enrich: match1 tv='${cachedMatches.firstOrNull()?.tvChannel}' dt='${cachedMatches.firstOrNull()?.dateTime}'")
                     loadPlayers()
                     downloadPlayerPhotos()
                     startAutoRefresh()
                 }
             } catch (e: Exception) {
+                Log.w("HomeVM", "===== IMPORT ERROR: ${e.message} =====", e)
                 _errorMessage.emit("Error al cargar el Excel: ${e.message}")
             } finally {
                 _isLoading.value = false

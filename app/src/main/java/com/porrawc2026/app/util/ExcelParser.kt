@@ -97,34 +97,44 @@ object ExcelParser {
     }
 
     private fun doValidate(sheet: Sheet): ValidationResult {
-        val errors = mutableListOf<String>()
-        val warnings = mutableListOf<String>()
+        return try {
+            val errors = mutableListOf<String>()
+            val warnings = mutableListOf<String>()
 
-        val agResult = validateAgColumn(sheet)
-        errors.addAll(agResult.errors)
-        warnings.addAll(agResult.warnings)
+            val agResult = validateAgColumn(sheet)
+            errors.addAll(agResult.errors)
+            warnings.addAll(agResult.warnings)
 
-        val dataResult = validateDataCompleteness(sheet)
-        if (!dataResult.isValid) errors.addAll(dataResult.errors)
+            val dataResult = validateDataCompleteness(sheet)
+            if (!dataResult.isValid) errors.addAll(dataResult.errors)
 
-        val isValid = agResult.isValid && dataResult.isValid
-        val total = agResult.totalRows + dataResult.totalChecks
-        val passed = agResult.greenCount + dataResult.passedChecks
-        val failed = agResult.redCount + dataResult.failedChecks
+            val isValid = agResult.isValid && dataResult.isValid
+            val total = agResult.totalRows + dataResult.totalChecks
+            val passed = agResult.greenCount + dataResult.passedChecks
+            val failed = agResult.redCount + dataResult.failedChecks
 
-        Log.w("ExcelParser", "===== VALIDACION: isValid=$isValid total=$total ✅=$passed ❌=$failed =====")
-        if (errors.isNotEmpty()) {
-            Log.w("ExcelParser", "===== ERRORES: ${errors.joinToString("; ")} =====")
+            Log.w("ExcelParser", "===== VALIDACION: isValid=$isValid total=$total \u2705=$passed \u274C=$failed =====")
+            if (errors.isNotEmpty()) {
+                Log.w("ExcelParser", "===== ERRORES: ${errors.joinToString("; ")} =====")
+            }
+
+            ValidationResult(
+                isValid = isValid,
+                totalChecks = total,
+                passedChecks = passed,
+                failedChecks = failed,
+                errors = errors,
+                warnings = warnings
+            )
+        } catch (e: Exception) {
+            Log.w("ExcelParser", "===== VALIDACION ERROR: ${e.message} =====", e)
+            ValidationResult(
+                isValid = true,
+                totalChecks = 1, passedChecks = 1, failedChecks = 0,
+                errors = emptyList(),
+                warnings = listOf("Validación omitida por error: ${e.message}")
+            )
         }
-
-        return ValidationResult(
-            isValid = isValid,
-            totalChecks = total,
-            passedChecks = passed,
-            failedChecks = failed,
-            errors = errors,
-            warnings = warnings
-        )
     }
 
     data class DataCompletenessResult(

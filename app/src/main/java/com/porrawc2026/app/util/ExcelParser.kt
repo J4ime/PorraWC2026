@@ -66,6 +66,8 @@ object ExcelParser {
             ?: workbook.getSheetAt(1)
 
         Log.d("ExcelParser", "WORLDCUP sheet: rows=${sheet.lastRowNum + 1}, protected=${sheet.protect}")
+        try { sheet.protectSheet(null) } catch (_: Exception) {}
+        Log.d("ExcelParser", "Sheet unprotected: ${!sheet.protect}")
 
         val teams = parseTeams(workbook)
         val matches = parseMatches(sheet)
@@ -174,20 +176,30 @@ object ExcelParser {
         if (isEmpty) return dv.emptyCellAllowed
 
         val constraint = dv.validationConstraint
-        return when (constraint.validationType) {
+        val result = when (constraint.validationType) {
             DataValidationConstraint.ValidationType.LIST -> {
                 val allowed = constraint.explicitListValues
-                allowed.any { it.equals(cellValue, ignoreCase = true) }
+                val match = allowed.any { it.equals(cellValue, ignoreCase = true) }
+                Log.d("ExcelParser", "  Validate LIST '$cellValue' in [${allowed.joinToString()}] → $match")
+                match
             }
             DataValidationConstraint.ValidationType.INTEGER,
             DataValidationConstraint.ValidationType.DECIMAL -> {
                 val v = cellValue.replace(',', '.').toDoubleOrNull() ?: return false
-                val min = constraint.formula1.replace(",", ".").toDoubleOrNull() ?: Double.MIN_VALUE
-                val max = constraint.formula2.replace(",", ".").toDoubleOrNull() ?: Double.MAX_VALUE
-                v in min..max
+                val f1 = constraint.formula1
+                val f2 = constraint.formula2
+                val min = f1.replace(",", ".").toDoubleOrNull() ?: Double.MIN_VALUE
+                val max = f2.replace(",", ".").toDoubleOrNull() ?: Double.MAX_VALUE
+                val match = v in min..max
+                Log.d("ExcelParser", "  Validate NUM '$cellValue' in $f1..$f2 → $match")
+                match
             }
             else -> true
         }
+        if (!result) {
+            Log.d("ExcelParser", "  INVALID cell at (${cell.rowIndex},${cell.columnIndex}): '$cellValue' type=${constraint.validationType} emptyAllowed=${dv.emptyCellAllowed}")
+        }
+        return result
     }
 
     private fun parseTeams(workbook: Workbook): List<TeamEntity> {

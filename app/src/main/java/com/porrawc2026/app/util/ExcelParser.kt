@@ -140,7 +140,7 @@ object ExcelParser {
 
         if (agValidationRegions.isEmpty()) {
             warnings.add("No se encontraron validaciones en la columna AG")
-            return AgValidationResult(true, 0, 0, 0, emptyList(), warnings)
+            return AgValidationResult(false, 0, 0, 0, listOf("El Excel no tiene validaciones de datos en la columna AG. Está incompleto."), warnings)
         }
 
         for (rowIdx in 4..208) {

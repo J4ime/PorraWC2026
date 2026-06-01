@@ -105,15 +105,10 @@ private fun MatchRow(match: MatchEntity) {
             style = MaterialTheme.typography.bodySmall, color = if (hasResult) AccentOrange else if (hasPred) TextPrimary else TextMuted, textAlign = TextAlign.Center, fontWeight = if (hasResult) FontWeight.Bold else FontWeight.Normal
         )
 
-        val ptsColor = when {
-            isLive -> WCGold
-            hasResult && match.pointsEarned > 0 -> AccentGreen
-            else -> TextMuted
-        }
         Text(
-            if (hasResult || isLive) "${match.pointsEarned}" else "",
+            if (hasResult) "${match.pointsEarned}" else "",
             Modifier.width(42.dp),
-            style = MaterialTheme.typography.bodySmall, color = if (hasResult && match.pointsEarned == 0) TextMuted else ptsColor,
+            style = MaterialTheme.typography.bodySmall, color = if (hasResult && match.pointsEarned > 0) AccentGreen else TextMuted,
             fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
         )
     }

@@ -193,7 +193,7 @@ private fun MatchPredictionCard(match: MatchEntity) {
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
-                        if (hasRealResult && match.pointsEarned > 0) "${match.pointsEarned} pts" else "",
+                        if (hasRealResult) "${match.pointsEarned} pts" else "",
                         style = MaterialTheme.typography.labelSmall,
                         color = if (match.pointsEarned > 0) AccentGreen else TextMuted,
                         fontWeight = FontWeight.Bold

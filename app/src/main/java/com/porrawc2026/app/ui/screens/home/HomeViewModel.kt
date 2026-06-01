@@ -135,22 +135,24 @@ class HomeViewModel @Inject constructor(
                 val data = ExcelParser.parse(context, uri)
                 val validation = ExcelParser.validate()
                 _validationResult.value = validation
-                repository.insertAllData(
-                    data.teams, data.matches, data.questions,
-                    data.playerPredictions, data.knockoutPredictions, data.standings
-                )
-                _hasData.value = true
-                cachedMatches = data.matches
-                lastWrittenScores.clear()
-                Log.d("HomeVM", "Imported ${cachedMatches.size} matches, enriching schedule...")
-                enrichScheduleFromApi()
-                recalcAllPoints()
-                refreshPoints()
-                refreshUpcomingMatches()
-                Log.d("HomeVM", "After enrich: match1 tv='${cachedMatches.firstOrNull()?.tvChannel}' dt='${cachedMatches.firstOrNull()?.dateTime}'")
-                loadPlayers()
-                downloadPlayerPhotos()
-                startAutoRefresh()
+                if (validation.isValid) {
+                    repository.insertAllData(
+                        data.teams, data.matches, data.questions,
+                        data.playerPredictions, data.knockoutPredictions, data.standings
+                    )
+                    _hasData.value = true
+                    cachedMatches = data.matches
+                    lastWrittenScores.clear()
+                    Log.d("HomeVM", "Imported ${cachedMatches.size} matches, enriching schedule...")
+                    enrichScheduleFromApi()
+                    recalcAllPoints()
+                    refreshPoints()
+                    refreshUpcomingMatches()
+                    Log.d("HomeVM", "After enrich: match1 tv='${cachedMatches.firstOrNull()?.tvChannel}' dt='${cachedMatches.firstOrNull()?.dateTime}'")
+                    loadPlayers()
+                    downloadPlayerPhotos()
+                    startAutoRefresh()
+                }
             } catch (e: Exception) {
                 _errorMessage.emit("Error al cargar el Excel: ${e.message}")
             } finally {

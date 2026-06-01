@@ -218,48 +218,39 @@ object ExcelParser {
 
     private fun validateAgColumn(sheet: Sheet): AgValidationResult {
         val errors = mutableListOf<String>()
-        val warnings = mutableListOf<String>()
 
         val dataValidations = sheet.dataValidations
-        Log.d("ExcelParser", "AG validate: found ${dataValidations.size} data validations")
+        Log.w("ExcelParser", "AG validate: found ${dataValidations.size} data validations")
 
-        var bestColumn = -1
-        var bestRed = 0
-        var bestGreen = 0
-        var bestTotal = 0
-        val bestErrors = mutableListOf<String>()
+        var green = 0
+        var red = 0
 
-        for (colIdx in 0..50) {
-            var green = 0
-            var red = 0
-            for (dv in dataValidations) {
-                for (region in dv.regions.cellRangeAddresses) {
-                    if (colIdx < region.firstColumn || colIdx > region.lastColumn) continue
+        for (dv in dataValidations) {
+            for (region in dv.regions.cellRangeAddresses) {
+                for (colIdx in region.firstColumn..region.lastColumn) {
                     for (rowIdx in region.firstRow..region.lastRow) {
                         val row = sheet.getRow(rowIdx) ?: continue
                         val cell = row.getCell(colIdx) ?: continue
-                        if (isAgCellValid(cell, dv)) green++ else {
+                        if (isAgCellValid(cell, dv)) green++
+                        else {
                             red++
                             val cellValue = try { formatter.formatCellValue(cell).trim() } catch (e: Exception) { "" }
-                            bestErrors.add("Fila $rowIdx, col $colIdx — '$cellValue'")
+                            errors.add("Fila $rowIdx, col $colIdx — '$cellValue'")
                         }
                     }
                 }
             }
-            if (green + red > bestTotal) {
-                bestTotal = green + red; bestGreen = green; bestRed = red; bestColumn = colIdx
-            }
         }
 
-        Log.d("ExcelParser", "AG validate: column=$bestColumn total=$bestTotal \u2705=$bestGreen \u274C=$bestRed")
+        Log.w("ExcelParser", "AG validate: total=${green + red} \u2705=$green \u274C=$red errors=${errors.size}")
 
         return AgValidationResult(
-            isValid = bestRed == 0 && bestTotal > 0,
-            totalRows = bestTotal,
-            greenCount = bestGreen,
-            redCount = bestRed,
-            errors = if (bestRed > 0) bestErrors else emptyList(),
-            warnings = warnings
+            isValid = red == 0 && (green + red) > 0,
+            totalRows = green + red,
+            greenCount = green,
+            redCount = red,
+            errors = errors.take(20),
+            warnings = emptyList()
         )
     }
 

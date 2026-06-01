@@ -84,7 +84,7 @@ fun HomeScreen(
     if (!isReady) {
         Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(painter = painterResource(R.drawable.logo), contentDescription = null, modifier = Modifier.size(80.dp).clip(CircleShape))
+                Image(painter = painterResource(R.drawable.logo), contentDescription = null, modifier = Modifier.size(80.dp))
                 Spacer(Modifier.height(16.dp))
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             }
@@ -291,7 +291,7 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
         Card(modifier = Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)), shape = RoundedCornerShape(20.dp)) {
             Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(if (result.isValid) Icons.Filled.CheckCircle else Icons.Filled.Warning, null,
-                    tint = if (result.isValid) Color(0xFF666666) else Color(0xFF888888), modifier = Modifier.size(40.dp))
+                    tint = if (result.isValid) Color(0xFF4CAF50) else Color(0xFF888888), modifier = Modifier.size(40.dp))
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(if (result.isValid) "EXCEL V\u00C1LIDO" else "EXCEL INCOMPLETO",
                     style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)

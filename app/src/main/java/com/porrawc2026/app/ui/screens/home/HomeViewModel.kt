@@ -95,6 +95,9 @@ class HomeViewModel @Inject constructor(
                 downloadPlayerPhotos()
                 startAutoRefresh()
                 refreshUpcomingMatches()
+            } else {
+                enrichScheduleFromApi()
+                refreshUpcomingMatches()
             }
         }
     }
@@ -214,18 +217,14 @@ class HomeViewModel @Inject constructor(
         try {
             val response = apiService.getWorldCupMatches()
             Log.d("HomeVM", "API schedule: ${response.matches.size} matches, overlaying dates")
-            response.matches.forEach { fm ->
-                val entities = cachedMatches.filter {
-                    fm.homeTeam?.name?.contains(it.homeTeam, ignoreCase = true) == true ||
-                    it.homeTeam.contains(fm.homeTeam?.name ?: "", ignoreCase = true) ||
-                    it.homeTeam.contains(fm.homeTeam?.shortName ?: "", ignoreCase = true)
-                }
-                if (entities.size == 1) {
-                    val entity = entities.first()
-                    cachedMatches = cachedMatches.map {
-                        if (it.id == entity.id) it.copy(dateTime = fm.utcDate) else it
-                    }
-                }
+            val sortedApi = response.matches.sortedBy { it.utcDate }
+            cachedMatches = cachedMatches.map { match ->
+                val apiMatch = sortedApi.getOrNull(match.id - 1)
+                if (apiMatch != null) {
+                    val home = apiMatch.homeTeam?.name ?: match.homeTeam
+                    val away = apiMatch.awayTeam?.name ?: match.awayTeam
+                    match.copy(dateTime = apiMatch.utcDate, homeTeam = home, awayTeam = away)
+                } else match
             }
         } catch (e: Exception) {
             Log.d("HomeVM", "API schedule failed: ${e.message}")

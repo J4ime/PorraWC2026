@@ -67,6 +67,8 @@ class HomeViewModel @Inject constructor(
     val errorMessage: SharedFlow<String> = _errorMessage.asSharedFlow()
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
+    private val _isBusy = MutableStateFlow(false)
+    val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
@@ -77,7 +79,9 @@ class HomeViewModel @Inject constructor(
 
     private fun precachePhotos() {
         viewModelScope.launch(Dispatchers.IO) {
+            _isBusy.value = true
             PlayerPhotoDownloader.precacheTopPlayers(context)
+            _isBusy.value = false
         }
     }
 
@@ -125,6 +129,7 @@ class HomeViewModel @Inject constructor(
     fun importExcel(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
+            _isBusy.value = true
             _validationResult.value = null
             try {
                 val data = ExcelParser.parse(context, uri)
@@ -150,6 +155,7 @@ class HomeViewModel @Inject constructor(
                 _errorMessage.emit("Error al cargar el Excel: ${e.message}")
             } finally {
                 _isLoading.value = false
+                _isBusy.value = false
             }
         }
     }
@@ -158,12 +164,14 @@ class HomeViewModel @Inject constructor(
 
     fun deleteAllData() {
         viewModelScope.launch(Dispatchers.IO) {
+            _isBusy.value = true
             repository.insertAllData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
             cachedMatches = emptyList()
             _hasData.value = false
             _totalPoints.value = 0
             _players.value = emptyList()
             loadHardcodedMatches()
+            _isBusy.value = false
         }
     }
 
@@ -179,6 +187,7 @@ class HomeViewModel @Inject constructor(
 
     private fun downloadPlayerPhotos() {
         viewModelScope.launch(Dispatchers.IO) {
+            _isBusy.value = true
             val predictions = repository.getPlayerPredictionsList()
             for (p in predictions) {
                 val name = p.predictedName ?: continue
@@ -190,6 +199,7 @@ class HomeViewModel @Inject constructor(
                 }
             }
             loadPlayers()
+            _isBusy.value = false
         }
     }
 
@@ -218,6 +228,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun enrichScheduleFromApi() {
         enrichScheduleFallback()
         try {
+            _isBusy.value = true
             val response = apiService.getWorldCupMatches()
             Log.d("HomeVM", "API schedule: ${response.matches.size} matches, overlaying dates")
             val sortedApi = response.matches.sortedBy { it.utcDate }
@@ -231,6 +242,8 @@ class HomeViewModel @Inject constructor(
             }
         } catch (e: Exception) {
             Log.d("HomeVM", "API schedule failed: ${e.message}")
+        } finally {
+            _isBusy.value = false
         }
     }
 

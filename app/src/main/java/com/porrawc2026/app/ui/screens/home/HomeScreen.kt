@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -50,6 +51,7 @@ fun HomeScreen(
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
     val players by viewModel.players.collectAsState()
     val isReady by viewModel.isReady.collectAsState()
+    val isBusy by viewModel.isBusy.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -92,6 +94,7 @@ fun HomeScreen(
         return
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -175,6 +178,18 @@ fun HomeScreen(
             }
             item { Spacer(Modifier.height(16.dp)) }
         }
+    }
+
+    if (isBusy) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            Box(modifier = Modifier.padding(bottom = 80.dp).size(44.dp).clip(CircleShape).background(Color(0xFF1E1E1E)), contentAlignment = Alignment.Center) {
+                val inf = rememberInfiniteTransition("busy")
+                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(800, easing = LinearEasing)))
+                Image(painter = painterResource(R.drawable.logo), contentDescription = null,
+                    modifier = Modifier.size(32.dp).graphicsLayer { rotationZ = rot })
+            }
+        }
+    }
     }
 }
 

@@ -537,11 +537,7 @@ class HomeViewModel @Inject constructor(
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
             val date = fb?.getOrNull(0) ?: match.dateTime
-            val tv = if (match.tvChannel.isNotBlank() && match.tvChannel.all { !it.isDigit() }) {
-                match.tvChannel
-            } else {
-                TvScraper.lookupTv(match.homeTeam, match.awayTeam, context.filesDir)
-            }
+            val tv = TvScraper.lookupTv(match.homeTeam, match.awayTeam, context.filesDir)
             match.copy(dateTime = date, tvChannel = tv)
         }
         val withRtv = cachedMatches.count { it.tvChannel.contains("RTVE") }

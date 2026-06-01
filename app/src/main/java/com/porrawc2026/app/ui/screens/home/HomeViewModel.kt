@@ -65,6 +65,8 @@ class HomeViewModel @Inject constructor(
     val players: StateFlow<List<PlayerPredictionEntity>> = _players.asStateFlow()
     private val _errorMessage = MutableSharedFlow<String>()
     val errorMessage: SharedFlow<String> = _errorMessage.asSharedFlow()
+    private val _isReady = MutableStateFlow(false)
+    val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
@@ -111,6 +113,7 @@ class HomeViewModel @Inject constructor(
             )
         }
         refreshUpcomingMatches()
+        _isReady.value = true
     }
 
     fun importExcel(uri: Uri) {
@@ -154,7 +157,7 @@ class HomeViewModel @Inject constructor(
             _hasData.value = false
             _totalPoints.value = 0
             _players.value = emptyList()
-            refreshUpcomingMatches()
+            loadHardcodedMatches()
         }
     }
 

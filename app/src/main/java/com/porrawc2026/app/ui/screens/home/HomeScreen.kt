@@ -49,6 +49,7 @@ fun HomeScreen(
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
     val players by viewModel.players.collectAsState()
+    val isReady by viewModel.isReady.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -80,6 +81,17 @@ fun HomeScreen(
         )
     }
 
+    if (!isReady) {
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E)), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(painter = painterResource(R.drawable.logo), contentDescription = null, modifier = Modifier.size(80.dp).clip(CircleShape))
+                Spacer(Modifier.height(16.dp))
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+            }
+        }
+        return
+    }
+
     Scaffold(
         topBar = {
             Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -109,11 +121,13 @@ fun HomeScreen(
                     if (hasData) {
                         Button(
                             onClick = { showDeleteDialog = true },
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.height(48.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Filled.Delete, null, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935))
                         }
                     }
                 }

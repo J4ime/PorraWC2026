@@ -105,13 +105,16 @@ class HomeViewModel @Inject constructor(
     private fun loadHardcodedMatches() {
         val scheduleDates = hardcodedMatchDates()
         val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
-        cachedMatches = scheduleDates.map { (id, pair) ->
-            val (date, tv) = pair
+        cachedMatches = scheduleDates.map { (id, list) ->
+            val date = list[0]
+            val tv = list[1]
+            val home = list[2]
+            val away = list[3]
             val groupIndex = (id - 1) / 6
             MatchEntity(
                 id = id, groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
                 matchday = "J${(id - 1) % 6 + 1}", dateTime = date,
-                homeTeam = "Local", awayTeam = "Visitante",
+                homeTeam = home, awayTeam = away,
                 tvChannel = tv, isKnockout = false
             )
         }
@@ -397,108 +400,114 @@ class HomeViewModel @Inject constructor(
         return if (now.after(start) && now.before(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
     }
 
-    private fun hardcodedMatchDates(): Map<Int, Pair<String, String>> {
+    private fun hardcodedMatchDates(): Map<Int, List<String>> {
         val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
         fmt.timeZone = madridTZ
 
-        data class Md(val date: String, val tv: String)
+        data class Md(val date: String, val tv: String, val home: String, val away: String)
         val data = mutableMapOf<Int, Md>()
 
-        // Jornada 1 - Thu 11 Jun
-        data[1] = Md("2026-06-11T21:00:00", "RTVE")
-        // Fri 12 Jun
-        data[2] = Md("2026-06-12T04:00:00", "DAZN")
-        data[7] = Md("2026-06-12T21:00:00", "RTVE")
-        // Sat 13 Jun
-        data[8] = Md("2026-06-13T03:00:00", "DAZN")
-        data[13] = Md("2026-06-13T21:00:00", "DAZN")
-        // Sun 14 Jun
-        data[19] = Md("2026-06-14T00:00:00", "RTVE")
-        data[20] = Md("2026-06-14T03:00:00", "DAZN")
-        data[21] = Md("2026-06-14T06:00:00", "DAZN")
-        data[25] = Md("2026-06-14T19:00:00", "RTVE")
-        data[26] = Md("2026-06-14T22:00:00", "DAZN")
-        // Mon 15 Jun
-        data[31] = Md("2026-06-15T01:00:00", "DAZN")
-        data[32] = Md("2026-06-15T04:00:00", "DAZN")
-        data[37] = Md("2026-06-15T18:00:00", "RTVE")
-        data[38] = Md("2026-06-15T21:00:00", "DAZN")
-        // Tue 16 Jun
-        data[43] = Md("2026-06-16T00:00:00", "DAZN")
-        data[44] = Md("2026-06-16T03:00:00", "DAZN")
-        data[49] = Md("2026-06-16T21:00:00", "RTVE")
-        // Wed 17 Jun
-        data[50] = Md("2026-06-17T00:00:00", "DAZN")
-        data[51] = Md("2026-06-17T03:00:00", "DAZN")
-        data[52] = Md("2026-06-17T06:00:00", "DAZN")
-        data[61] = Md("2026-06-17T19:00:00", "DAZN")
-        data[62] = Md("2026-06-17T22:00:00", "RTVE")
-        // Thu 18 Jun
-        data[63] = Md("2026-06-18T01:00:00", "DAZN")
-        data[64] = Md("2026-06-18T04:00:00", "DAZN")
-        data[3] = Md("2026-06-18T18:00:00", "DAZN")
-        data[9] = Md("2026-06-18T21:00:00", "RTVE")
-        // Fri 19 Jun
-        data[10] = Md("2026-06-19T00:00:00", "DAZN")
-        data[4] = Md("2026-06-19T03:00:00", "DAZN")
-        data[14] = Md("2026-06-19T21:00:00", "RTVE")
-        // Sat 20 Jun
-        data[15] = Md("2026-06-20T00:00:00", "DAZN")
-        data[16] = Md("2026-06-20T03:00:00", "DAZN")
-        data[17] = Md("2026-06-20T06:00:00", "DAZN")
-        data[27] = Md("2026-06-20T19:00:00", "RTVE")
-        data[28] = Md("2026-06-20T22:00:00", "DAZN")
-        // Sun 21 Jun
-        data[29] = Md("2026-06-21T02:00:00", "DAZN")
-        data[30] = Md("2026-06-21T06:00:00", "DAZN")
-        data[39] = Md("2026-06-21T18:00:00", "RTVE")
-        data[40] = Md("2026-06-21T21:00:00", "DAZN")
-        // Mon 22 Jun
-        data[45] = Md("2026-06-22T00:00:00", "DAZN")
-        data[46] = Md("2026-06-22T03:00:00", "DAZN")
-        data[55] = Md("2026-06-22T19:00:00", "RTVE")
-        data[53] = Md("2026-06-22T23:00:00", "DAZN")
-        // Tue 23 Jun
-        data[54] = Md("2026-06-23T02:00:00", "DAZN")
-        data[56] = Md("2026-06-23T05:00:00", "DAZN")
-        data[65] = Md("2026-06-23T19:00:00", "DAZN")
-        data[67] = Md("2026-06-23T22:00:00", "RTVE")
-        // Wed 24 Jun
-        data[68] = Md("2026-06-24T01:00:00", "DAZN")
-        data[69] = Md("2026-06-24T04:00:00", "DAZN")
-        data[5] = Md("2026-06-24T21:00:00", "DAZN")
-        data[6] = Md("2026-06-24T21:00:00", "DAZN")
-        // Thu 25 Jun
-        data[22] = Md("2026-06-25T00:00:00", "DAZN")
-        data[23] = Md("2026-06-25T00:00:00", "RTVE")
-        data[11] = Md("2026-06-25T03:00:00", "DAZN")
-        data[12] = Md("2026-06-25T03:00:00", "DAZN")
-        data[33] = Md("2026-06-25T22:00:00", "RTVE")
-        data[34] = Md("2026-06-25T22:00:00", "DAZN")
-        // Fri 26 Jun
-        data[35] = Md("2026-06-26T01:00:00", "DAZN")
-        data[36] = Md("2026-06-26T01:00:00", "DAZN")
-        data[18] = Md("2026-06-26T04:00:00", "DAZN")
-        data[24] = Md("2026-06-26T04:00:00", "DAZN")
-        data[47] = Md("2026-06-26T21:00:00", "DAZN")
-        data[48] = Md("2026-06-26T21:00:00", "RTVE")
-        // Sat 27 Jun
-        data[41] = Md("2026-06-27T02:00:00", "DAZN")
-        data[42] = Md("2026-06-27T02:00:00", "DAZN")
-        data[57] = Md("2026-06-27T05:00:00", "DAZN")
-        data[58] = Md("2026-06-27T05:00:00", "DAZN")
-        data[70] = Md("2026-06-27T23:00:00", "DAZN")
-        data[71] = Md("2026-06-27T23:00:00", "RTVE")
-        // Sun 28 Jun
-        data[66] = Md("2026-06-28T01:30:00", "DAZN")
-        data[72] = Md("2026-06-28T01:30:00", "DAZN")
-        data[59] = Md("2026-06-28T04:00:00", "DAZN")
-        data[60] = Md("2026-06-28T04:00:00", "RTVE")
+        // Group A: Mexico (A), South Korea (A), South Africa (A), Czech Republic (A)
+        // Group B: Canada (B), Switzerland (B), Qatar (B), Bosnia-Herzegovina (B)
+        // Group C: Brazil (C), Scotland (C), Morocco (C), Haiti (C)
+        // Group D: United States (D), Paraguay (D), Turkey (D), Australia (D)
+        // Group E: Germany (E), Curacao (E), Ivory Coast (E), Ecuador (E)
+        // Group F: Netherlands (F), Japan (F), Sweden (F), Tunisia (F)
+        // Group G: Belgium (G), Egypt (G), Iran (G), New Zealand (G)
+        // Group H: Spain (H), Cape Verde (H), Saudi Arabia (H), Uruguay (H)
+        // Group I: France (I), Senegal (I), Norway (I), Iraq (I)
+        // Group J: Argentina (J), Jordan (J), Austria (J), Algeria (J)
+        // Group K: Portugal (K), Uzbekistan (K), Colombia (K), Congo DR (K)
+        // Group L: England (L), Croatia (L), Panama (L), Ghana (L)
 
-        val result = mutableMapOf<Int, Pair<String, String>>()
+        data[1] = Md("2026-06-11T21:00:00", "RTVE", "México", "Sudáfrica")
+        data[2] = Md("2026-06-12T04:00:00", "DAZN", "Corea del Sur", "República Checa")
+        data[3] = Md("2026-06-18T18:00:00", "DAZN", "República Checa", "Sudáfrica")
+        data[4] = Md("2026-06-19T03:00:00", "DAZN", "México", "Corea del Sur")
+        data[5] = Md("2026-06-24T21:00:00", "DAZN", "República Checa", "México")
+        data[6] = Md("2026-06-24T21:00:00", "DAZN", "Sudáfrica", "Corea del Sur")
+
+        data[7] = Md("2026-06-12T21:00:00", "RTVE", "Canadá", "Bosnia y Herzegovina")
+        data[8] = Md("2026-06-13T03:00:00", "DAZN", "Catar", "Suiza")
+        data[9] = Md("2026-06-18T21:00:00", "RTVE", "Suiza", "Bosnia y Herzegovina")
+        data[10] = Md("2026-06-19T00:00:00", "DAZN", "Canadá", "Catar")
+        data[11] = Md("2026-06-25T03:00:00", "DAZN", "Suiza", "Canadá")
+        data[12] = Md("2026-06-25T03:00:00", "DAZN", "Bosnia y Herzegovina", "Catar")
+
+        data[13] = Md("2026-06-13T21:00:00", "DAZN", "Brasil", "Marruecos")
+        data[14] = Md("2026-06-19T21:00:00", "RTVE", "Escocia", "Marruecos")
+        data[15] = Md("2026-06-20T00:00:00", "DAZN", "Brasil", "Haití")
+        data[16] = Md("2026-06-20T03:00:00", "DAZN", "Haití", "Escocia")
+        data[17] = Md("2026-06-20T06:00:00", "DAZN", "Escocia", "Brasil")
+        data[18] = Md("2026-06-25T03:00:00", "DAZN", "Marruecos", "Haití")
+
+        data[19] = Md("2026-06-14T00:00:00", "RTVE", "Estados Unidos", "Paraguay")
+        data[20] = Md("2026-06-14T03:00:00", "DAZN", "Australia", "Turquía")
+        data[21] = Md("2026-06-14T06:00:00", "DAZN", "Estados Unidos", "Australia")
+        data[22] = Md("2026-06-20T19:00:00", "RTVE", "Turquía", "Paraguay")
+        data[23] = Md("2026-06-20T22:00:00", "DAZN", "Turquía", "Estados Unidos")
+        data[24] = Md("2026-06-25T03:00:00", "RTVE", "Paraguay", "Australia")
+
+        data[25] = Md("2026-06-14T19:00:00", "RTVE", "Alemania", "Curazao")
+        data[26] = Md("2026-06-14T22:00:00", "DAZN", "Costa de Marfil", "Ecuador")
+        data[27] = Md("2026-06-20T19:00:00", "RTVE", "Alemania", "Costa de Marfil")
+        data[28] = Md("2026-06-20T22:00:00", "DAZN", "Ecuador", "Curazao")
+        data[29] = Md("2026-06-21T02:00:00", "DAZN", "Curazao", "Costa de Marfil")
+        data[30] = Md("2026-06-21T06:00:00", "DAZN", "Ecuador", "Alemania")
+
+        data[31] = Md("2026-06-15T01:00:00", "DAZN", "Países Bajos", "Japón")
+        data[32] = Md("2026-06-15T04:00:00", "DAZN", "Suecia", "Túnez")
+        data[33] = Md("2026-06-20T19:00:00", "RTVE", "Países Bajos", "Suecia")
+        data[34] = Md("2026-06-20T22:00:00", "DAZN", "Túnez", "Japón")
+        data[35] = Md("2026-06-25T23:00:00", "DAZN", "Japón", "Suecia")
+        data[36] = Md("2026-06-25T23:00:00", "DAZN", "Túnez", "Países Bajos")
+
+        data[37] = Md("2026-06-15T18:00:00", "RTVE", "Bélgica", "Egipto")
+        data[38] = Md("2026-06-15T21:00:00", "DAZN", "Irán", "Nueva Zelanda")
+        data[39] = Md("2026-06-21T18:00:00", "RTVE", "Bélgica", "Irán")
+        data[40] = Md("2026-06-21T21:00:00", "DAZN", "Nueva Zelanda", "Egipto")
+        data[41] = Md("2026-06-27T02:00:00", "DAZN", "Egipto", "Irán")
+        data[42] = Md("2026-06-27T02:00:00", "DAZN", "Nueva Zelanda", "Bélgica")
+
+        data[43] = Md("2026-06-16T00:00:00", "DAZN", "España", "Cabo Verde")
+        data[44] = Md("2026-06-16T03:00:00", "DAZN", "Arabia Saudita", "Uruguay")
+        data[45] = Md("2026-06-21T18:00:00", "RTVE", "España", "Arabia Saudita")
+        data[46] = Md("2026-06-21T21:00:00", "DAZN", "Uruguay", "Cabo Verde")
+        data[47] = Md("2026-06-26T21:00:00", "DAZN", "Cabo Verde", "Arabia Saudita")
+        data[48] = Md("2026-06-26T21:00:00", "RTVE", "Uruguay", "España")
+
+        data[49] = Md("2026-06-16T21:00:00", "RTVE", "Francia", "Senegal")
+        data[50] = Md("2026-06-17T00:00:00", "DAZN", "Irak", "Noruega")
+        data[51] = Md("2026-06-22T21:00:00", "RTVE", "Francia", "Irak")
+        data[52] = Md("2026-06-22T23:00:00", "DAZN", "Noruega", "Senegal")
+        data[53] = Md("2026-06-26T19:00:00", "DAZN", "Noruega", "Francia")
+        data[54] = Md("2026-06-26T19:00:00", "DAZN", "Senegal", "Irak")
+
+        data[55] = Md("2026-06-17T01:00:00", "RTVE", "Argentina", "Argelia")
+        data[56] = Md("2026-06-17T04:00:00", "DAZN", "Austria", "Jordania")
+        data[57] = Md("2026-06-22T17:00:00", "RTVE", "Argentina", "Austria")
+        data[58] = Md("2026-06-22T20:00:00", "DAZN", "Jordania", "Argelia")
+        data[59] = Md("2026-06-27T23:30:00", "DAZN", "Argelia", "Austria")
+        data[60] = Md("2026-06-27T23:30:00", "RTVE", "Jordania", "Argentina")
+
+        data[61] = Md("2026-06-17T19:00:00", "DAZN", "Portugal", "RD Congo")
+        data[62] = Md("2026-06-17T22:00:00", "RTVE", "Uzbekistán", "Colombia")
+        data[63] = Md("2026-06-23T17:00:00", "RTVE", "Portugal", "Uzbekistán")
+        data[64] = Md("2026-06-23T20:00:00", "DAZN", "Colombia", "RD Congo")
+        data[65] = Md("2026-06-27T23:30:00", "DAZN", "Colombia", "Portugal")
+        data[66] = Md("2026-06-27T23:30:00", "RTVE", "RD Congo", "Uzbekistán")
+
+        data[67] = Md("2026-06-17T20:00:00", "RTVE", "Inglaterra", "Croacia")
+        data[68] = Md("2026-06-17T23:00:00", "DAZN", "Ghana", "Panamá")
+        data[69] = Md("2026-06-23T20:00:00", "RTVE", "Inglaterra", "Ghana")
+        data[70] = Md("2026-06-23T23:00:00", "DAZN", "Panamá", "Croacia")
+        data[71] = Md("2026-06-27T21:00:00", "RTVE", "Panamá", "Inglaterra")
+        data[72] = Md("2026-06-27T21:00:00", "DAZN", "Croacia", "Ghana")
+
+        val result = mutableMapOf<Int, List<String>>()
         for (id in 1..72) {
             val md = data[id]
-            if (md != null) result[id] = Pair(md.date, md.tv)
+            if (md != null) result[id] = listOf(md.date, md.tv, md.home, md.away)
         }
         return result
     }
@@ -509,7 +518,7 @@ class HomeViewModel @Inject constructor(
 
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
-            val date = fb?.first ?: match.dateTime
+            val date = fb?.getOrNull(0) ?: match.dateTime
             val tv = if (match.tvChannel.isNotBlank() && match.tvChannel.all { !it.isDigit() }) {
                 match.tvChannel
             } else {

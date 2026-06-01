@@ -166,11 +166,14 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             repository.insertAllData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
-            cachedMatches = emptyList()
+            cachedMatches = cachedMatches.map { match ->
+                match.copy(predictedHomeGoals = null, predictedAwayGoals = null, pointsEarned = 0, homeGoals = null, awayGoals = null)
+            }
+            lastWrittenScores.clear()
             _hasData.value = false
             _totalPoints.value = 0
             _players.value = emptyList()
-            loadHardcodedMatches()
+            refreshUpcomingMatches()
             _isBusy.value = false
         }
     }
@@ -535,7 +538,7 @@ class HomeViewModel @Inject constructor(
             val tv = if (match.tvChannel.isNotBlank() && match.tvChannel.all { !it.isDigit() }) {
                 match.tvChannel
             } else {
-                TvScraper.lookupTv(match.homeTeam, match.awayTeam)
+                TvScraper.lookupTv(match.homeTeam, match.awayTeam, context.filesDir)
             }
             match.copy(dateTime = date, tvChannel = tv)
         }

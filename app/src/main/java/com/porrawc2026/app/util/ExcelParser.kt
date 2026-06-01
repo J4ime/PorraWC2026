@@ -130,53 +130,22 @@ object ExcelParser {
         val dataValidations = sheet.dataValidations
         Log.d("ExcelParser", "AG validate: found ${dataValidations.size} data validations on sheet")
 
-        val agValidationRegions = dataValidations.mapNotNull { dv ->
-            val regions = dv.regions.cellRangeAddresses
-            val ag32 = regions.filter { addr ->
-                addr.firstColumn <= 32 && addr.lastColumn >= 32
-            }
-            if (ag32.isNotEmpty()) dv to ag32 else null
-        }
-
-        if (agValidationRegions.isEmpty()) {
-            Log.d("ExcelParser", "AG validate: no validations cover column AG (32)")
-            return AgValidationResult(true, 0, 0, 0, emptyList(), warnings)
-        }
-
-        for (rowIdx in 4..208) {
-            val row = sheet.getRow(rowIdx) ?: continue
-            val agCell = row.getCell(32) ?: continue
-
-            val matched = agValidationRegions.firstOrNull { (_, regions) ->
-                regions.any { it.isInRange(rowIdx, 32) }
-            } ?: continue
-
-            total++
-            val cellValue = try { formatter.formatCellValue(agCell).trim() } catch (e: Exception) { "" }
-
-            if (isAgCellValid(agCell, matched.first)) {
-                green++
-            } else {
-                red++
-                val rowLabel = when (rowIdx) {
-                    in 4..9 -> "Grupo A, fila $rowIdx"
-                    in 10..17 -> "Grupo B, fila $rowIdx"
-                    in 18..25 -> "Grupo C, fila $rowIdx"
-                    in 26..33 -> "Grupo D, fila $rowIdx"
-                    in 34..45 -> "Grupo E, fila $rowIdx"
-                    in 46..57 -> "Grupo F, fila $rowIdx"
-                    in 58..69 -> "Grupo G, fila $rowIdx"
-                    in 70..81 -> "Grupo H, fila $rowIdx"
-                    in 82..93 -> "Grupo I, fila $rowIdx"
-                    in 94..105 -> "Grupo J, fila $rowIdx"
-                    in 106..117 -> "Grupo K, fila $rowIdx"
-                    in 118..129 -> "Grupo L, fila $rowIdx"
-                    else -> "Fila $rowIdx"
-                }
-                if (cellValue.isBlank()) {
-                    errors.add("$rowLabel — vacío")
-                } else {
-                    errors.add("$rowLabel — valor: '$cellValue'")
+        for (dv in dataValidations) {
+            for (region in dv.regions.cellRangeAddresses) {
+                Log.d("ExcelParser", "  Validation range: rows ${region.firstRow}-${region.lastRow}, cols ${region.firstColumn}-${region.lastColumn}")
+                for (rowIdx in region.firstRow..region.lastRow) {
+                    val row = sheet.getRow(rowIdx) ?: continue
+                    for (colIdx in region.firstColumn..region.lastColumn) {
+                        val cell = row.getCell(colIdx) ?: continue
+                        total++
+                        if (isAgCellValid(cell, dv)) {
+                            green++
+                        } else {
+                            red++
+                            val cellValue = try { formatter.formatCellValue(cell).trim() } catch (e: Exception) { "" }
+                            errors.add("Fila $rowIdx, col $colIdx — valor: '$cellValue'")
+                        }
+                    }
                 }
             }
         }

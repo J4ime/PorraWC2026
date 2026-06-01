@@ -55,6 +55,7 @@ object ExcelParser {
 
     private lateinit var formatter: DataFormatter
     private var cachedSheet: Sheet? = null
+    private var cachedValidation: ValidationResult? = null
 
     fun parse(context: Context, uri: Uri): ExcelData {
         val inputStream: InputStream = context.contentResolver.openInputStream(uri)
@@ -78,7 +79,8 @@ object ExcelParser {
 
         Log.d("ExcelParser", "Parsed: teams=${teams.size}, matches=${matches.size} (group=${matches.count { !it.isKnockout }}, ko=${matches.count { it.isKnockout }}), questions=${questions.size} (answered=${questions.count { it.predictedAnswer != null }}), players=${playerPredictions.size} (named=${playerPredictions.count { !it.predictedName.isNullOrBlank() }}), knockoutPred=${knockoutPredictions.size} (picked=${knockoutPredictions.count { it.winner != null }})")
 
-        cachedSheet = sheet
+        cachedValidation = doValidate(sheet)
+
         workbook.close()
         inputStream.close()
 
@@ -86,31 +88,123 @@ object ExcelParser {
     }
 
     fun validate(): ValidationResult {
+        return cachedValidation ?: ValidationResult(
+            isValid = false,
+            totalChecks = 0, passedChecks = 0, failedChecks = 0,
+            errors = listOf("No se pudo validar. Revisa el archivo Excel."),
+            warnings = emptyList()
+        )
+    }
+
+    private fun doValidate(sheet: Sheet): ValidationResult {
         val errors = mutableListOf<String>()
         val warnings = mutableListOf<String>()
 
-        val sheet = cachedSheet
-        if (sheet != null) {
-            val agResult = validateAgColumn(sheet)
-            errors.addAll(agResult.errors)
-            warnings.addAll(agResult.warnings)
+        val agResult = validateAgColumn(sheet)
+        errors.addAll(agResult.errors)
+        warnings.addAll(agResult.warnings)
 
-            return ValidationResult(
-                isValid = agResult.isValid,
-                totalChecks = agResult.totalRows,
-                passedChecks = agResult.greenCount,
-                failedChecks = agResult.redCount,
-                errors = errors,
-                warnings = warnings
-            )
+        val dataResult = validateDataCompleteness(sheet)
+        if (!dataResult.isValid) errors.addAll(dataResult.errors)
+
+        val isValid = agResult.isValid && dataResult.isValid
+        val total = agResult.totalRows + dataResult.totalChecks
+        val passed = agResult.greenCount + dataResult.passedChecks
+        val failed = agResult.redCount + dataResult.failedChecks
+
+        Log.w("ExcelParser", "===== VALIDACION: isValid=$isValid total=$total ✅=$passed ❌=$failed =====")
+        if (errors.isNotEmpty()) {
+            Log.w("ExcelParser", "===== ERRORES: ${errors.joinToString("; ")} =====")
         }
 
         return ValidationResult(
-            isValid = false,
-            totalChecks = 0, passedChecks = 0, failedChecks = 0,
-            errors = listOf("No se pudo validar la columna AG. Revisa el archivo Excel."),
+            isValid = isValid,
+            totalChecks = total,
+            passedChecks = passed,
+            failedChecks = failed,
+            errors = errors,
             warnings = warnings
         )
+    }
+
+    data class DataCompletenessResult(
+        val isValid: Boolean,
+        val totalChecks: Int,
+        val passedChecks: Int,
+        val failedChecks: Int,
+        val errors: List<String>
+    )
+
+    private fun validateDataCompleteness(sheet: Sheet): DataCompletenessResult {
+        val errors = mutableListOf<String>()
+        var total = 0
+        var failed = 0
+
+        var questionsAnswered = 0
+        var questionsEmpty = 0
+        for (rowIdx in 158..207) {
+            val row = sheet.getRow(rowIdx) ?: continue
+            val cellValue = try { formatter.formatCellValue(row.getCell(31)).trim() } catch (e: Exception) { "" }
+            total++
+            if (cellValue.isBlank() || cellValue == "0" || cellValue == "0.0") {
+                questionsEmpty++
+                failed++
+            } else {
+                questionsAnswered++
+            }
+        }
+        if (questionsEmpty > 0) {
+            errors.add("$questionsEmpty preguntas sin responder (V/F)")
+        }
+
+        var playersNamed = 0
+        var playersEmpty = 0
+        for (rowIdx in 153..155) {
+            val row = sheet.getRow(rowIdx) ?: continue
+            val name = cellText(row, COL_PLAYER_NAME)?.trim()?.takeIf { it.isNotEmpty() && it != "null" }
+            total++
+            if (name == null) {
+                playersEmpty++
+                failed++
+            } else {
+                playersNamed++
+            }
+        }
+        if (playersEmpty > 0) {
+            errors.add("$playersEmpty goleadores sin nombre")
+        }
+
+        var knockoutPicked = 0
+        var knockoutEmpty = 0
+        for (rowIdx in 100..131) {
+            val row = sheet.getRow(rowIdx) ?: continue
+            total++
+            val wh = getCellValue(row, COL_KNOCKOUT_WINNER_HOME)?.toString()?.trim()?.toDoubleOrNull()
+            val wa = getCellValue(row, COL_KNOCKOUT_WINNER_AWAY)?.toString()?.trim()?.toDoubleOrNull()
+            if (wh != null && wa != null && (wh > 0 || wa > 0)) knockoutPicked++
+            else knockoutEmpty++
+        }
+        if (knockoutPicked == 0) {
+            errors.add("Eliminatorias sin predicciones")
+            failed += knockoutEmpty
+        }
+
+        var matchesWithGoals = 0
+        for (rowIdx in 3..74) {
+            val row = sheet.getRow(rowIdx) ?: continue
+            val gH = cellInt(row, COL_GOAL_HOME)
+            val gA = cellInt(row, COL_GOAL_AWAY)
+            if (gH != null && gA != null) matchesWithGoals++
+        }
+        total += 72
+        if (matchesWithGoals == 0) {
+            errors.add("Partidos sin predicciones de goles")
+            failed += 72
+        }
+
+        Log.d("ExcelParser", "Data completeness: Q=$questionsAnswered/$questionsEmpty P=$playersNamed/$playersEmpty K=$knockoutPicked/$knockoutEmpty M=$matchesWithGoals")
+        val passed = total - failed
+        return DataCompletenessResult(failed == 0, total, passed, failed, errors)
     }
 
     data class AgValidationResult(
@@ -190,9 +284,7 @@ object ExcelParser {
                 val f2 = constraint.formula2
                 val min = f1.replace(",", ".").toDoubleOrNull() ?: Double.MIN_VALUE
                 val max = f2.replace(",", ".").toDoubleOrNull() ?: Double.MAX_VALUE
-                val match = v in min..max
-                Log.d("ExcelParser", "  Validate NUM '$cellValue' in $f1..$f2 → $match")
-                match
+                v in min..max
             }
             else -> true
         }

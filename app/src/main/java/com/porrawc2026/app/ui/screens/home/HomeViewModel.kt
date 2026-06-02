@@ -100,6 +100,7 @@ class HomeViewModel @Inject constructor(
     private var liveMatchApiId: Int? = null
     private var liveMinuteStr: String? = null
     private val testScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
+    private val testLiveMinutes = mutableMapOf<Int, Int>()
     private val testPlayers = listOf(
         PlayerPredictionEntity(rank = 1, playerName = "Romelu Lukaku", predictedName = "Lukaku", pointsPerGoal = 50),
         PlayerPredictionEntity(rank = 2, playerName = "Luka Modric", predictedName = "Modric", pointsPerGoal = 30),
@@ -144,6 +145,8 @@ class HomeViewModel @Inject constructor(
         liveMatchApiId = null
         liveMinuteStr = null
         testScorers.clear()
+        testLiveMinutes.clear()
+        sofascoreEventIds.clear()
         lastWrittenScores.clear()
         if (newMode) {
             enterTestMode()
@@ -550,6 +553,7 @@ class HomeViewModel @Inject constructor(
         val entities = raw.mapIndexed { idx, m ->
             val matchId = 900 + idx
             if (m.eventId > 0) sofascoreEventIds[matchId] = m.eventId
+            if (m.liveMinute > 0) testLiveMinutes[matchId] = m.liveMinute
             MatchEntity(
                 id = 900 + idx, groupName = "Amistoso",
                 matchday = "Amistoso", dateTime = m.utcDate.ifBlank { now },
@@ -579,39 +583,25 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveFriendly() {
-        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        var all: List<ScrapedMatch> = emptyList()
-        try {
-            val resp = apiService.getMatches(dateFrom = dateStr, dateTo = dateStr)
-            all = resp.matches.map { m ->
-                ScrapedMatch(
-                    homeTeam = m.homeTeam?.name ?: "", awayTeam = m.awayTeam?.name ?: "",
-                    utcDate = m.utcDate, status = m.status ?: "TIMED",
-                    homeGoals = m.score?.fullTime?.home,
-                    awayGoals = m.score?.fullTime?.away
-                )
-            }
-        } catch (_: Exception) {}
-        if (all.isEmpty()) {
-            all = withContext(Dispatchers.IO) { LiveScoreScraper.fetchMatches() }
-        }
-        if (all.isEmpty()) return
+        val scraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchMatches() }
+        if (scraped.isEmpty()) return
 
         var changed = false
-        cachedMatches = cachedMatches.map { cm ->
-            val fm = all.firstOrNull { m ->
-                cm.homeTeam.contains(m.homeTeam, true) || m.homeTeam.contains(cm.homeTeam, true) ||
-                cm.awayTeam.contains(m.awayTeam, true) || m.awayTeam.contains(cm.awayTeam, true)
+        scraped.forEach { sm ->
+            val cm = cachedMatches.firstOrNull {
+                it.homeTeam.contains(sm.homeTeam, true) || sm.homeTeam.contains(it.homeTeam, true)
+            } ?: return@forEach
+            if (sm.liveMinute > 0) testLiveMinutes[cm.id] = sm.liveMinute
+            val hg = sm.homeGoals; val ag = sm.awayGoals
+            val prev = lastWrittenScores[cm.id]
+            if (hg != null && ag != null && (prev == null || prev.first != hg || prev.second != ag)) {
+                lastWrittenScores[cm.id] = hg to ag
+                val idx = cachedMatches.indexOf(cm)
+                if (idx >= 0) {
+                    cachedMatches = cachedMatches.toMutableList().also { it[idx] = cm.copy(homeGoals = hg, awayGoals = ag) }
+                }
+                changed = true
             }
-            if (fm != null && fm.status != "TIMED") {
-                val hg = fm.homeGoals; val ag = fm.awayGoals
-                val prev = lastWrittenScores[cm.id]
-                if (hg != null && ag != null && (prev == null || prev.first != hg || prev.second != ag)) {
-                    lastWrittenScores[cm.id] = hg to ag
-                    changed = true
-                    cm.copy(homeGoals = hg, awayGoals = ag)
-                } else cm
-            } else cm
         }
         if (changed) {
             cachedMatches.forEach { cm ->
@@ -778,7 +768,7 @@ class HomeViewModel @Inject constructor(
         if (_isTestMode.value && match.id >= 900) {
             liveMin = when (status) {
                 MatchStatus.FINISHED -> "FINAL"
-                MatchStatus.LIVE -> "?"
+                MatchStatus.LIVE -> testLiveMinutes[match.id]?.let { "${it}'" } ?: "?"
                 else -> null
             }
             val s = testScorers[match.id]

@@ -97,8 +97,6 @@ class HomeViewModel @Inject constructor(
     private var testPollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
     private val sofascoreEventIds = mutableMapOf<Int, Long>()
-    private var liveMatchApiId: Int? = null
-    private var liveMinuteStr: String? = null
     private val testScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val testLiveMinutes = mutableMapOf<Int, Int>()
     private val testPlayers = listOf(
@@ -107,7 +105,6 @@ class HomeViewModel @Inject constructor(
         PlayerPredictionEntity(rank = 3, playerName = "Kevin De Bruyne", predictedName = "De Bruyne", pointsPerGoal = 10)
     )
     companion object {
-        const val MATCH_ID_AMISTOSO = 999
         private const val PREFS = "porra_prefs"
         private const val KEY_TEST = "test_mode"
         val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
@@ -142,8 +139,6 @@ class HomeViewModel @Inject constructor(
         livePollJob?.cancel()
         testPollJob?.cancel()
         refreshJob?.cancel()
-        liveMatchApiId = null
-        liveMinuteStr = null
         testScorers.clear()
         testLiveMinutes.clear()
         sofascoreEventIds.clear()
@@ -195,7 +190,6 @@ class HomeViewModel @Inject constructor(
             val dbMatches = repository.getAllMatches().first()
             if (dbMatches.isNotEmpty()) {
                 cachedMatches = dbMatches
-                ensureTestMatch()
                 _hasData.value = true
                 enrichScheduleFromApi()
                 recalcAllPoints()
@@ -229,20 +223,7 @@ class HomeViewModel @Inject constructor(
                 tvChannel = tv, isKnockout = false
             )
         }
-        ensureTestMatch()
         loadTestPlayers()
-    }
-
-    private fun ensureTestMatch() {
-        if (cachedMatches.none { it.id == MATCH_ID_AMISTOSO }) {
-            cachedMatches = cachedMatches + MatchEntity(
-                id = MATCH_ID_AMISTOSO, groupName = "Amistoso",
-                matchday = "Amistoso", dateTime = "2026-06-02T18:00:00",
-                homeTeam = "Croacia", awayTeam = "Bélgica",
-                tvChannel = "", isKnockout = false,
-                predictedHomeGoals = 1, predictedAwayGoals = 2, pointsEarned = 0
-            )
-        }
     }
 
     private fun loadTestPlayers() {
@@ -275,7 +256,6 @@ class HomeViewModel @Inject constructor(
                     )
                     _hasData.value = true
                     cachedMatches = data.matches
-                    ensureTestMatch()
                     lastWrittenScores.clear()
                     Log.w("HomeVM", "===== IMPORT: data inserted, hasData=true, ${cachedMatches.size} matches =====")
                     enrichScheduleFromApi()
@@ -340,13 +320,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshPoints() {
-        if (_isTestMode.value) {
-            val matchPts = cachedMatches.sumOf { it.pointsEarned }
-            val playerPts = _players.value.sumOf { it.pointsEarned }
-            _totalPoints.value = matchPts + playerPts
-        } else {
-            viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
-        }
+        viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
     }
 
     private fun downloadPlayerPhotos() {
@@ -516,12 +490,21 @@ class HomeViewModel @Inject constructor(
                     lastWrittenScores[entity.id] = home to away
                     repository.updateMatchResults(entity.id, home, away)
                     cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
+                    try {
+                        val detail = apiService.getMatchDetail(matchId = fm.id)
+                        val homeScr = detail.goals?.filter { g -> val t = g.team?.name; t == detail.homeTeam?.name || (t != null && detail.homeTeam?.name?.contains(t, true) == true) }
+                            ?.mapNotNull { g -> val n = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: 0; GoalEvent(n, m) } ?: emptyList()
+                        val awayScr = detail.goals?.filter { g -> val t = g.team?.name; t == detail.awayTeam?.name || (t != null && detail.awayTeam?.name?.contains(t, true) == true) }
+                            ?.mapNotNull { g -> val n = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: 0; GoalEvent(n, m) } ?: emptyList()
+                        if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
+                            testScorers[entity.id] = Pair(homeScr.reversed(), awayScr.reversed())
+                        }
+                    } catch (_: Exception) {}
                     refreshPoints()
                     refreshUpcomingMatches()
                 }
             }
         }
-        fetchLiveAmistoso()
     }
 
     private suspend fun fetchFriendlyMatches() {
@@ -649,75 +632,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchLiveAmistoso() {
-        if (_isTestMode.value) fetchLiveFriendly()
-        val amistoso = cachedMatches.firstOrNull { it.id == MATCH_ID_AMISTOSO } ?: return
-        val start = parseMadridDate(amistoso.dateTime) ?: return
-        val now = Date()
-        val end = Date(start.time + 150L * 60 * 1000)
-        if (now.before(start) || now.after(end)) return
-
-        try {
-            val detail: LiveMatchDetail
-            if (liveMatchApiId != null) {
-                detail = apiService.getMatchDetail(matchId = liveMatchApiId!!)
-            } else {
-                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-                val allMatches = apiService.getMatches(dateFrom = dateStr, dateTo = dateStr)
-                val found = allMatches.matches.firstOrNull {
-                    val h = it.homeTeam?.name ?: ""
-                    val a = it.awayTeam?.name ?: ""
-                    (h.contains("Croatia", true) || h.contains("Croacia", true)) &&
-                    (a.contains("Belgium", true) || a.contains("Bélgica", true))
-                }
-                if (found == null) {
-                    Log.d("HomeVM", "Live amistoso: match not found in API")
-                    return
-                }
-                liveMatchApiId = found.id
-                Log.d("HomeVM", "Live amistoso: found API id=$liveMatchApiId")
-                detail = apiService.getMatchDetail(matchId = liveMatchApiId!!)
-            }
-
-            val homeGoals = detail.score?.fullTime?.home
-            val awayGoals = detail.score?.fullTime?.away
-            val minute = detail.minute
-            val status = detail.status
-
-            val isFinished = status == "FINISHED"
-            val prev = lastWrittenScores[MATCH_ID_AMISTOSO]
-            val needsUpdate = (homeGoals != null && awayGoals != null) &&
-                (prev == null || prev.first != homeGoals || prev.second != awayGoals)
-
-            if (needsUpdate || isFinished) {
-                if (homeGoals != null && awayGoals != null) {
-                    lastWrittenScores[MATCH_ID_AMISTOSO] = homeGoals to awayGoals
-                }
-                val homeScr = detail.goals?.filter { it.team?.name?.contains("Croatia", true) == true || it.team?.name?.contains("Croacia", true) == true || (it.team?.name == null && detail.homeTeam?.name?.contains("Croatia", true) == true) }
-                    ?.mapNotNull { g -> val name = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: return@mapNotNull null; GoalEvent(name, m) } ?: emptyList()
-                val awayScr = detail.goals?.filter { it.team?.name?.contains("Belgium", true) == true || it.team?.name?.contains("Bélgica", true) == true || (it.team?.name == null && detail.awayTeam?.name?.contains("Belgium", true) == true) }
-                    ?.mapNotNull { g -> val name = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: return@mapNotNull null; GoalEvent(name, m) } ?: emptyList()
-
-                liveMinuteStr = if (isFinished) "FINAL" else minute
-                testScorers[MATCH_ID_AMISTOSO] = Pair(homeScr, awayScr)
-
-                cachedMatches = cachedMatches.map {
-                    if (it.id == MATCH_ID_AMISTOSO) it.copy(
-                        homeGoals = homeGoals ?: it.homeGoals,
-                        awayGoals = awayGoals ?: it.awayGoals
-                    ) else it
-                }
-                recalcAllPoints()
-                recalcPlayerPoints()
-                refreshPoints()
-                refreshUpcomingMatches()
-                Log.d("HomeVM", "Live amistoso: min=$minute status=$status H=$homeGoals A=$awayGoals scorers H=$homeScr A=$awayScr")
-            }
-        } catch (e: Exception) {
-            Log.d("HomeVM", "Live amistoso error: ${e.message}")
-        }
-    }
-
     private fun refreshUpcomingMatches() {
         if (_isTestMode.value) {
             val allDisplay = cachedMatches.filter { !it.isKnockout }
@@ -788,19 +702,16 @@ class HomeViewModel @Inject constructor(
                 MatchStatus.LIVE -> testLiveMinutes[match.id]?.let { "${it}'" } ?: "?"
                 else -> null
             }
-            val s = testScorers[match.id]
-            homeScr = s?.first ?: emptyList()
-            awayScr = s?.second ?: emptyList()
-        } else if (match.id == MATCH_ID_AMISTOSO) {
-            liveMin = liveMinuteStr
-            val s = testScorers[MATCH_ID_AMISTOSO]
-            homeScr = s?.first ?: emptyList()
-            awayScr = s?.second ?: emptyList()
         } else {
-            liveMin = null
-            homeScr = emptyList()
-            awayScr = emptyList()
+            liveMin = when (status) {
+                MatchStatus.FINISHED -> "FINAL"
+                MatchStatus.LIVE -> null
+                else -> null
+            }
         }
+        val s = testScorers[match.id]
+        homeScr = s?.first ?: emptyList()
+        awayScr = s?.second ?: emptyList()
 
         return MatchDisplay(
             id = match.id, dateLabel = dateLabel, time = time,

@@ -54,6 +54,8 @@ fun HomeScreen(
     val isBusy by viewModel.isBusy.collectAsState()
     val isTestMode by viewModel.isTestMode.collectAsState()
     val testModeTitle by viewModel.testModeTitle.collectAsState()
+    val updateAvailable by viewModel.updateAvailable.collectAsState()
+    val isUpdating by viewModel.isUpdating.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -85,19 +87,6 @@ fun HomeScreen(
         )
     }
 
-    if (!isReady) {
-        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E)), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(painter = painterResource(R.drawable.logo), contentDescription = null, modifier = Modifier.size(80.dp))
-                Spacer(Modifier.height(16.dp))
-                Text("Buscando partidos...", style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777))
-                Spacer(Modifier.height(8.dp))
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-            }
-        }
-        return
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
@@ -123,6 +112,23 @@ fun HomeScreen(
                         Text(if (isTestMode) "MODO TEST ACTIVADO" else "MODO TEST", style = MaterialTheme.typography.titleSmall)
                     }
                     Spacer(Modifier.height(6.dp))
+                    if (updateAvailable) {
+                        Button(
+                            onClick = { viewModel.installUpdate() },
+                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0), contentColor = Color.White),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            if (isUpdating) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(6.dp))
+                                Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall)
+                            } else {
+                                Text("ACTUALIZAR APP", style = MaterialTheme.typography.titleSmall)
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                    }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (!isTestMode) {
                             Button(
@@ -204,7 +210,7 @@ fun HomeScreen(
         }
     }
 
-    if (isBusy && isReady) {
+    if (isBusy) {
         Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 val inf = rememberInfiniteTransition("busy")

@@ -14,6 +14,9 @@ import com.porrawc2026.app.util.TvScraper
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.ValidationResult
+import com.porrawc2026.app.util.LiveScoreScraper
+import com.porrawc2026.app.util.ScrapedMatch
+import com.porrawc2026.app.util.UpdateManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -79,6 +82,10 @@ class HomeViewModel @Inject constructor(
     val isTestMode: StateFlow<Boolean> = _isTestMode.asStateFlow()
     private val _testModeTitle = MutableStateFlow("")
     val testModeTitle: StateFlow<String> = _testModeTitle.asStateFlow()
+    private val _updateAvailable = MutableStateFlow(false)
+    val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
+    private val _isUpdating = MutableStateFlow(false)
+    val isUpdating: StateFlow<Boolean> = _isUpdating.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var wcCachedMatches: List<MatchEntity> = emptyList()
@@ -107,6 +114,7 @@ class HomeViewModel @Inject constructor(
         } else {
             refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
         }
+        checkForUpdate()
     }
 
     private fun saveTestMode(enabled: Boolean) {
@@ -272,6 +280,27 @@ class HomeViewModel @Inject constructor(
     }
 
     fun dismissValidation() { _validationResult.value = null }
+
+    private fun checkForUpdate() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val info = UpdateManager.checkForUpdate(context)
+            _updateAvailable.value = info?.isNewer == true
+        }
+    }
+
+    fun installUpdate() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isUpdating.value = true
+            try {
+                val info = UpdateManager.checkForUpdate(context) ?: throw Exception("No update info")
+                UpdateManager.downloadAndInstall(context, info.downloadUrl)
+            } catch (e: Exception) {
+                _errorMessage.emit("Error al actualizar: ${e.message}")
+            } finally {
+                _isUpdating.value = false
+            }
+        }
+    }
 
     fun deleteAllData() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -469,37 +498,50 @@ class HomeViewModel @Inject constructor(
     private suspend fun fetchFriendlyMatches() {
         val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val all = try { apiService.getMatches(dateFrom = dateStr, dateTo = dateStr) } catch (_: Exception) { null }
+        val apiMatches = all?.matches?.filter { m ->
+            val stage = m.stage ?: ""
+            stage.isBlank() || stage == "FRIENDLY" || stage.contains("FRIEND", true)
+        }?.take(5) ?: emptyList()
+
+        if (apiMatches.isNotEmpty()) {
+            buildAndShowMatches(apiMatches.map { m ->
+                ScrapedMatch(
+                    homeTeam = m.homeTeam?.name ?: "?", awayTeam = m.awayTeam?.name ?: "?",
+                    utcDate = m.utcDate, status = m.status ?: "TIMED",
+                    homeGoals = if (m.status == "FINISHED") m.score?.fullTime?.home else null,
+                    awayGoals = if (m.status == "FINISHED") m.score?.fullTime?.away else null
+                )
+            })
+        } else {
+            val scraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchMatches() }
+            if (scraped.isNotEmpty()) {
+                Log.d("HomeVM", "LiveScore fallback: ${scraped.size} matches")
+                buildAndShowMatches(scraped)
+            } else {
+                _testModeTitle.value = "SIN AMISTOSOS HOY"
+                cachedMatches = emptyList()
+                refreshUpcomingMatches()
+            }
+        }
+    }
+
+    private fun buildAndShowMatches(raw: List<ScrapedMatch>) {
+        val rng = java.util.Random()
         val nationalTeams = setOf("Croatia", "Belgium", "France", "Germany", "Spain", "England", "Italy", "Portugal",
             "Netherlands", "Argentina", "Brazil", "Uruguay", "Mexico", "Sweden", "Norway", "Denmark", "Poland",
             "Switzerland", "Austria", "Czechia", "Turkey", "Scotland", "Wales", "Ukraine", "Serbia", "Japan",
             "South Korea", "Australia", "USA", "Canada", "Morocco", "Senegal", "Egypt", "Nigeria", "Ghana",
             "Ivory Coast", "Cameroon", "Algeria", "Tunisia", "Iran", "Saudi Arabia", "Qatar", "Ecuador",
             "Colombia", "Chile", "Peru", "Paraguay", "Costa Rica", "Panama")
-        val friendlies = all?.matches?.filter { m ->
-            val h = m.homeTeam?.name ?: ""
-            val a = m.awayTeam?.name ?: ""
-            val stage = m.stage ?: ""
-            stage.isBlank() || stage == "FRIENDLY" || stage.contains("FRIEND", true)
-        }?.take(5) ?: emptyList()
-
-        if (friendlies.isEmpty()) {
-            _testModeTitle.value = "SIN AMISTOSOS HOY"
-            cachedMatches = emptyList()
-            refreshUpcomingMatches()
-            return
-        }
-        val rng = java.util.Random()
-        cachedMatches = friendlies.mapIndexed { idx, m ->
-            val home = m.homeTeam?.name?.takeIf { nationalTeams.any { nt -> it.contains(nt, true) || nt.contains(it, true) } } ?: m.homeTeam?.name ?: "?"
-            val away = m.awayTeam?.name?.takeIf { nationalTeams.any { nt -> it.contains(nt, true) || nt.contains(it, true) } } ?: m.awayTeam?.name ?: "?"
+        val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
+        cachedMatches = raw.mapIndexed { idx, m ->
             MatchEntity(
                 id = 900 + idx, groupName = "Amistoso",
-                matchday = "Amistoso", dateTime = m.utcDate,
-                homeTeam = home, awayTeam = away,
+                matchday = "Amistoso", dateTime = m.utcDate.ifBlank { now },
+                homeTeam = m.homeTeam, awayTeam = m.awayTeam,
                 tvChannel = "", isKnockout = false,
                 predictedHomeGoals = rng.nextInt(3), predictedAwayGoals = rng.nextInt(3),
-                pointsEarned = 0, homeGoals = if (m.status == "FINISHED") m.score?.fullTime?.home else null,
-                awayGoals = if (m.status == "FINISHED") m.score?.fullTime?.away else null
+                pointsEarned = 0, homeGoals = m.homeGoals, awayGoals = m.awayGoals
             )
         }
         _testModeTitle.value = "AMISTOSOS HOY"

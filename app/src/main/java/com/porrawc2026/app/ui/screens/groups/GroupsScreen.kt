@@ -31,7 +31,7 @@ fun MatchesScreen(
 
     Column(Modifier.fillMaxSize().background(SurfaceDark)) {
         TopAppBar(
-            title = { Text("PARTIDOS", style = MaterialTheme.typography.titleLarge, color = WCGold, fontWeight = FontWeight.Bold) },
+            title = { Text("PREDICCIONES", style = MaterialTheme.typography.titleLarge, color = WCGold, fontWeight = FontWeight.Bold) },
             navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = TextPrimary) } },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = WCDarkBlue)
         )

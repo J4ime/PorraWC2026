@@ -204,7 +204,7 @@ fun HomeScreen(
         }
     }
 
-    if (isBusy) {
+    if (isBusy && isReady) {
         Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 val inf = rememberInfiniteTransition("busy")

@@ -54,33 +54,44 @@ object LiveScoreScraper {
     }
 
     fun fetchGoalDetails(eventId: Long): Pair<List<GoalDetail>, List<GoalDetail>> {
+        val home = mutableListOf<GoalDetail>()
+        val away = mutableListOf<GoalDetail>()
         try {
-            val url = URL("https://api.sofascore.com/api/v1/event/$eventId")
+            val url = URL("https://api.sofascore.com/api/v1/event/$eventId/incidents")
             val conn = url.openConnection() as HttpURLConnection
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
             conn.connectTimeout = 8000; conn.readTimeout = 8000
             val json = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
-            val event = JSONObject(json).optJSONObject("event") ?: return Pair(emptyList(), emptyList())
-            val incidents = event.optJSONArray("incidents") ?: return Pair(emptyList(), emptyList())
-            val homeName = event.optJSONObject("homeTeam")?.optString("name") ?: ""
-            val home = mutableListOf<GoalDetail>()
-            val away = mutableListOf<GoalDetail>()
-            for (i in 0 until incidents.length()) {
-                val inc = incidents.getJSONObject(i)
-                val type = inc.optString("incidentType", "")
-                if (type != "goal") continue
-                val player = inc.optJSONObject("player")?.optString("name") ?: continue
-                var min = inc.optInt("time", 0)
-                if (inc.has("addedTime")) min += inc.optInt("addedTime", 0)
-                val isHome = inc.optBoolean("isHome", false)
-                val detail = GoalDetail(player, min.coerceAtLeast(1))
-                if (isHome) home.add(detail) else away.add(detail)
+            val root = JSONObject(json)
+            val incidents = root.optJSONArray("incidents")
+            if (incidents == null) {
+                val event = root.optJSONObject("event")
+                if (event != null) {
+                    val eventIncidents = event.optJSONArray("incidents")
+                    if (eventIncidents != null) parseGoals(eventIncidents, home, away)
+                }
+            } else {
+                parseGoals(incidents, home, away)
             }
             Log.w(TAG, "Goal details for $eventId: H=${home} A=${away}")
             return Pair(home, away)
         } catch (e: Exception) {
             Log.w(TAG, "Goal details failed for $eventId: ${e.message}")
             return Pair(emptyList(), emptyList())
+        }
+    }
+
+    private fun parseGoals(incidents: org.json.JSONArray, home: MutableList<GoalDetail>, away: MutableList<GoalDetail>) {
+        for (i in 0 until incidents.length()) {
+            val inc = incidents.getJSONObject(i)
+            val type = inc.optString("incidentType", "")
+            if (type != "goal") continue
+            val player = inc.optJSONObject("player")?.optString("name") ?: continue
+            var min = inc.optInt("time", 0)
+            if (inc.has("addedTime")) min += inc.optInt("addedTime", 0)
+            val isHome = inc.optBoolean("isHome", false)
+            val detail = GoalDetail(player, min.coerceAtLeast(1))
+            if (isHome) home.add(detail) else away.add(detail)
         }
     }
 

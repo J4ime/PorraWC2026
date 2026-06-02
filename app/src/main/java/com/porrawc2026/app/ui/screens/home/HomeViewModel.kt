@@ -617,6 +617,9 @@ class HomeViewModel @Inject constructor(
                         h.map { GoalEvent(it.playerName, it.minute) },
                         a.map { GoalEvent(it.playerName, it.minute) }
                     )
+                    Log.w("HomeVM", "===== stored scorers for match ${cm.id}: H=$h A=$a =====")
+                } else {
+                    Log.w("HomeVM", "===== no scorers for match ${cm.id} (H=$h A=$a) =====")
                 }
             }
             cachedMatches = cachedMatches.map { m ->

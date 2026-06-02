@@ -84,6 +84,11 @@ class HomeViewModel @Inject constructor(
     private var liveMinuteStr: String? = null
     private var liveHomeScorers: List<GoalEvent> = emptyList()
     private var liveAwayScorers: List<GoalEvent> = emptyList()
+    private val testPlayers = listOf(
+        PlayerPredictionEntity(rank = 1, playerName = "Romelu Lukaku", predictedName = "Lukaku", pointsPerGoal = 50),
+        PlayerPredictionEntity(rank = 2, playerName = "Luka Modric", predictedName = "Modric", pointsPerGoal = 30),
+        PlayerPredictionEntity(rank = 3, playerName = "Kevin De Bruyne", predictedName = "De Bruyne", pointsPerGoal = 10)
+    )
     companion object { const val MATCH_ID_AMISTOSO = 999 }
 
     init { refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos() }
@@ -137,10 +142,25 @@ class HomeViewModel @Inject constructor(
             id = MATCH_ID_AMISTOSO, groupName = "Amistoso",
             matchday = "Amistoso", dateTime = "2026-06-02T18:00:00",
             homeTeam = "Croacia", awayTeam = "Bélgica",
-            tvChannel = "", isKnockout = false
+            tvChannel = "", isKnockout = false,
+            predictedHomeGoals = 1, predictedAwayGoals = 2, pointsEarned = 0
         )
+        loadTestPlayers()
         refreshUpcomingMatches()
         _isReady.value = true
+    }
+
+    private fun loadTestPlayers() {
+        _players.value = testPlayers
+    }
+
+    private fun loadPlayers() {
+        viewModelScope.launch {
+            repository.getPlayerPredictions().collect { dbPlayers ->
+                _players.value = (testPlayers + dbPlayers).distinctBy { it.playerName }
+                    .sortedBy { it.rank }
+            }
+        }
     }
 
     fun importExcel(uri: Uri) {
@@ -202,12 +222,6 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
     }
 
-    private fun loadPlayers() {
-        viewModelScope.launch {
-            repository.getPlayerPredictions().collect { _players.value = it.sortedBy { p -> p.rank } }
-        }
-    }
-
     private fun downloadPlayerPhotos() {
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
@@ -246,6 +260,21 @@ class HomeViewModel @Inject constructor(
                 updated
             } else match
         }
+    }
+
+    private fun recalcPlayerPoints(scorers: List<GoalEvent>) {
+        val updated = _players.value.map { player ->
+            val matchingScorers = scorers.count { scorer ->
+                val pName = player.predictedName ?: player.playerName
+                scorer.playerName.contains(pName, ignoreCase = true) ||
+                pName.contains(scorer.playerName, ignoreCase = true)
+            }
+            if (matchingScorers > 0) {
+                val newGoals = player.goalsScored + matchingScorers
+                player.copy(goalsScored = newGoals, pointsEarned = newGoals * player.pointsPerGoal)
+            } else player
+        }
+        _players.value = updated
     }
 
     private suspend fun enrichScheduleFromApi() {
@@ -423,6 +452,9 @@ class HomeViewModel @Inject constructor(
                         awayGoals = awayGoals ?: it.awayGoals
                     ) else it
                 }
+                recalcAllPoints()
+                recalcPlayerPoints(homeScr + awayScr)
+                refreshPoints()
                 refreshUpcomingMatches()
                 Log.d("HomeVM", "Live amistoso: min=$minute status=$status H=$homeGoals A=$awayGoals scorers H=$homeScr A=$awayScr")
             }

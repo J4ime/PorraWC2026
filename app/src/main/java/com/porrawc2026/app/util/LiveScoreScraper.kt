@@ -32,8 +32,10 @@ object LiveScoreScraper {
             try {
                 val m = source()
                 if (m.isNotEmpty()) {
-                    Log.d(TAG, "Found ${m.size} matches via ${source.name}")
-                    return m.take(5)
+                    val sorted = m.sortedByDescending { it.utcDate }
+                    val last5 = sorted.take(5).sortedBy { it.utcDate }
+                    Log.d(TAG, "Found ${m.size} matches via ${source.name}, showing last ${last5.size}")
+                    return last5
                 }
             } catch (_: Exception) {}
         }

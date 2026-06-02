@@ -250,7 +250,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             repository.getPlayerPredictions().collect { dbPlayers ->
                 _players.value = if (_isTestMode.value) testPlayers
-                    else (testPlayers + dbPlayers).distinctBy { it.playerName }.sortedBy { it.rank }
+                    else dbPlayers.sortedBy { it.rank }
             }
         }
     }

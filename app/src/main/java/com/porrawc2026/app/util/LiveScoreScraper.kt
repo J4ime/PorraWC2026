@@ -15,8 +15,13 @@ data class ScrapedMatch(
     val utcDate: String,
     val status: String,
     val homeGoals: Int?,
-    val awayGoals: Int?
+    val awayGoals: Int?,
+    val eventId: Long = 0,
+    val homeScorers: List<GoalDetail> = emptyList(),
+    val awayScorers: List<GoalDetail> = emptyList()
 )
+
+data class GoalDetail(val playerName: String, val minute: Int)
 
 object LiveScoreScraper {
 
@@ -34,6 +39,32 @@ object LiveScoreScraper {
         }
         Log.d(TAG, "No matches from any source")
         return emptyList()
+    }
+
+    fun fetchGoalDetails(eventId: Long): Pair<List<GoalDetail>, List<GoalDetail>> {
+        try {
+            val url = URL("https://api.sofascore.com/api/v1/event/$eventId")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+            conn.connectTimeout = 8000; conn.readTimeout = 8000
+            val json = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
+            val event = JSONObject(json).optJSONObject("event") ?: return Pair(emptyList(), emptyList())
+            val incidents = event.optJSONArray("incidents") ?: return Pair(emptyList(), emptyList())
+            val home = mutableListOf<GoalDetail>()
+            val away = mutableListOf<GoalDetail>()
+            for (i in 0 until incidents.length()) {
+                val inc = incidents.getJSONObject(i)
+                val type = inc.optString("incidentType", "")
+                if (type != "goal") continue
+                val player = inc.optJSONObject("player")?.optString("name") ?: continue
+                val minute = inc.optInt("time", inc.optInt("addedTime", 0) + (inc.optInt("time", 0)))
+                val isHome = inc.optString("scoringTeam", "") == "home" ||
+                    inc.optString("isHome", "") == "true"
+                val detail = GoalDetail(player, minute.coerceAtLeast(0))
+                if (isHome) home.add(detail) else away.add(detail)
+            }
+            return Pair(home, away)
+        } catch (_: Exception) { return Pair(emptyList(), emptyList()) }
     }
 
     private fun fetchSofaScore(): List<ScrapedMatch> {
@@ -80,7 +111,14 @@ object LiveScoreScraper {
                     val utc = if (ts > 0) {
                         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date(ts * 1000))
                     } else ""
-                    matches.add(ScrapedMatch(home, away, utc, statusStr, hg, ag))
+                    val eId = e.optLong("id", 0)
+                    val isWcTeam = com.porrawc2026.app.ui.screens.home.HomeViewModel.WC_TEAMS.any {
+                        home.contains(it, true) || it.contains(home, true)
+                    } || com.porrawc2026.app.ui.screens.home.HomeViewModel.WC_TEAMS.any {
+                        away.contains(it, true) || it.contains(away, true)
+                    }
+                    if (!isWcTeam) continue
+                    matches.add(ScrapedMatch(home, away, utc, statusStr, hg, ag, eventId = eId))
                 }
                 Log.d(TAG, "SofaScore: ${matches.size} national team matches from $urlStr")
                 if (matches.isNotEmpty()) return matches

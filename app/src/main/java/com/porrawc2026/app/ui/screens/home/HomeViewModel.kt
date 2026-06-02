@@ -96,6 +96,7 @@ class HomeViewModel @Inject constructor(
     private var livePollJob: Job? = null
     private var testPollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
+    private val sofascoreEventIds = mutableMapOf<Int, Long>()
     private var liveMatchApiId: Int? = null
     private var liveMinuteStr: String? = null
     private var liveHomeScorers: List<GoalEvent> = emptyList()
@@ -105,7 +106,18 @@ class HomeViewModel @Inject constructor(
         PlayerPredictionEntity(rank = 2, playerName = "Luka Modric", predictedName = "Modric", pointsPerGoal = 30),
         PlayerPredictionEntity(rank = 3, playerName = "Kevin De Bruyne", predictedName = "De Bruyne", pointsPerGoal = 10)
     )
-    companion object { const val MATCH_ID_AMISTOSO = 999; private const val PREFS = "porra_prefs"; private const val KEY_TEST = "test_mode" }
+    companion object {
+        const val MATCH_ID_AMISTOSO = 999
+        private const val PREFS = "porra_prefs"
+        private const val KEY_TEST = "test_mode"
+        val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
+            "Switzerland", "Qatar", "Bosnia-Herzegovina", "Brazil", "Morocco", "Haiti", "Scotland",
+            "United States", "Paraguay", "Turkey", "Australia", "Germany", "Curacao", "Ivory Coast",
+            "Ecuador", "Netherlands", "Japan", "Sweden", "Tunisia", "Belgium", "Egypt", "Iran",
+            "New Zealand", "Spain", "Cape Verde", "Saudi Arabia", "Uruguay", "France", "Senegal",
+            "Norway", "Iraq", "Argentina", "Jordan", "Austria", "Algeria", "Portugal", "Uzbekistan",
+            "Colombia", "Congo DR", "England", "Croatia", "Panama", "Ghana")
+    }
 
     init {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -231,14 +243,14 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun loadTestPlayers() {
-        _players.value = testPlayers
+        if (_isTestMode.value) _players.value = testPlayers
     }
 
     private fun loadPlayers() {
         viewModelScope.launch {
             repository.getPlayerPredictions().collect { dbPlayers ->
-                _players.value = (testPlayers + dbPlayers).distinctBy { it.playerName }
-                    .sortedBy { it.rank }
+                _players.value = if (_isTestMode.value) testPlayers
+                    else (testPlayers + dbPlayers).distinctBy { it.playerName }.sortedBy { it.rank }
             }
         }
     }
@@ -538,6 +550,8 @@ class HomeViewModel @Inject constructor(
             return
         }
         val entities = raw.mapIndexed { idx, m ->
+            val matchId = 900 + idx
+            if (m.eventId > 0) sofascoreEventIds[matchId] = m.eventId
             MatchEntity(
                 id = 900 + idx, groupName = "Amistoso",
                 matchday = "Amistoso", dateTime = m.utcDate.ifBlank { now },
@@ -602,6 +616,16 @@ class HomeViewModel @Inject constructor(
             } else cm
         }
         if (changed) {
+            liveHomeScorers = emptyList()
+            liveAwayScorers = emptyList()
+            cachedMatches.forEach { cm ->
+                val eId = sofascoreEventIds[cm.id] ?: return@forEach
+                val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
+                if (h.isNotEmpty() || a.isNotEmpty()) {
+                    liveHomeScorers = h.map { GoalEvent(it.playerName, it.minute) }
+                    liveAwayScorers = a.map { GoalEvent(it.playerName, it.minute) }
+                }
+            }
             cachedMatches = cachedMatches.map { m ->
                 val realHome = m.homeGoals; val realAway = m.awayGoals
                 if (realHome != null && realAway != null) {
@@ -754,7 +778,15 @@ class HomeViewModel @Inject constructor(
         val liveMin: String?
         val homeScr: List<GoalEvent>
         val awayScr: List<GoalEvent>
-        if (match.id == MATCH_ID_AMISTOSO) {
+        if (_isTestMode.value && match.id >= 900) {
+            liveMin = when (status) {
+                MatchStatus.FINISHED -> "FINAL"
+                MatchStatus.LIVE -> "?"
+                else -> null
+            }
+            homeScr = liveHomeScorers
+            awayScr = liveAwayScorers
+        } else if (match.id == MATCH_ID_AMISTOSO) {
             liveMin = liveMinuteStr
             homeScr = liveHomeScorers
             awayScr = liveAwayScorers

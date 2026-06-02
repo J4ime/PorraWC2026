@@ -531,7 +531,29 @@ class HomeViewModel @Inject constructor(
     private fun buildAndShowMatches(raw: List<ScrapedMatch>) {
         val rng = java.util.Random()
         val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
-        val entities = raw.mapIndexed { idx, m ->
+        val nationalTeams = setOf("Croatia", "Belgium", "France", "Germany", "Spain", "England", "Italy",
+            "Portugal", "Netherlands", "Argentina", "Brazil", "Uruguay", "Mexico", "Sweden", "Norway",
+            "Denmark", "Poland", "Switzerland", "Austria", "Czechia", "Turkey", "Scotland", "Wales",
+            "Ukraine", "Serbia", "Japan", "South Korea", "Australia", "USA", "Canada", "Morocco",
+            "Senegal", "Egypt", "Nigeria", "Ghana", "Ivory Coast", "Cameroon", "Algeria", "Tunisia",
+            "Iran", "Saudi Arabia", "Qatar", "Ecuador", "Colombia", "Chile", "Peru", "Paraguay",
+            "Costa Rica", "Panama", "South Africa", "Russia", "Greece", "Ireland", "Finland",
+            "Iceland", "Hungary", "Romania", "Bulgaria", "Slovakia", "Slovenia", "Venezuela",
+            "Bolivia", "Honduras", "El Salvador", "Jamaica", "New Zealand", "China PR", "India",
+            "Iraq", "Jordan", "Kuwait", "Oman", "UAE", "Bahrain", "Lebanon", "Syria", "Palestine",
+            "Sudan", "Libya", "Mali", "Burkina Faso", "Zambia", "Angola", "Mozambique", "Guinea",
+            "Togo", "Benin", "Cape Verde", "Gabon", "Congo", "DR Congo", "Curaçao", "Haiti")
+        val filtered = raw.filter { m ->
+            nationalTeams.any { m.homeTeam.contains(it, true) || it.contains(m.homeTeam, true) } &&
+            nationalTeams.any { m.awayTeam.contains(it, true) || it.contains(m.awayTeam, true) }
+        }
+        if (filtered.isEmpty()) {
+            _testModeTitle.value = "SIN AMISTOSOS HOY"
+            cachedMatches = emptyList()
+            refreshUpcomingMatches()
+            return
+        }
+        val entities = filtered.mapIndexed { idx, m ->
             MatchEntity(
                 id = 900 + idx, groupName = "Amistoso",
                 matchday = "Amistoso", dateTime = m.utcDate.ifBlank { now },
@@ -698,7 +720,7 @@ class HomeViewModel @Inject constructor(
         val today = cal.get(Calendar.DAY_OF_YEAR)
         val year = cal.get(Calendar.YEAR)
 
-        val groupMatches = cachedMatches.filter { !it.isKnockout && it.id != MATCH_ID_AMISTOSO }
+        val groupMatches = cachedMatches.filter { !it.isKnockout && it.id < 900 }
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = groupMatches.map { match -> toDisplay(match) }
 

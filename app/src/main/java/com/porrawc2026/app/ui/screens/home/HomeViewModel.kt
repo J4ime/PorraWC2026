@@ -505,6 +505,22 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+        val wcScraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchWcMatches() }
+        wcScraped.forEach { sm ->
+            val cm = cachedMatches.firstOrNull {
+                it.homeTeam.contains(sm.homeTeam, true) || sm.homeTeam.contains(it.homeTeam, true)
+            } ?: return@forEach
+            val eId = sm.eventId
+            if (eId > 0) {
+                val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
+                if (h.isNotEmpty() || a.isNotEmpty()) {
+                    testScorers[cm.id] = Pair(
+                        h.map { GoalEvent(it.playerName, it.minute) },
+                        a.map { GoalEvent(it.playerName, it.minute) }
+                    )
+                }
+            }
+        }
     }
 
     private suspend fun fetchFriendlyMatches() {

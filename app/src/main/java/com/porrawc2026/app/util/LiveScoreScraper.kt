@@ -16,7 +16,8 @@ data class ScrapedMatch(
     val homeGoals: Int?,
     val awayGoals: Int?,
     val eventId: Long = 0,
-    val liveMinute: Int = 0
+    val liveMinute: Int = 0,
+    val tournamentName: String = ""
 )
 
 data class GoalDetail(val playerName: String, val minute: Int)
@@ -26,19 +27,31 @@ object LiveScoreScraper {
     private const val TAG = "LiveScoreScraper"
 
     fun fetchMatches(): List<ScrapedMatch> {
+        return fetchWithFilter { match ->
+            val wcTeams = com.porrawc2026.app.ui.screens.home.HomeViewModel.WC_TEAMS
+            (wcTeams.any { match.homeTeam.contains(it, true) || it.contains(match.homeTeam, true) } ||
+             wcTeams.any { match.awayTeam.contains(it, true) || it.contains(match.awayTeam, true) }) &&
+            isSeniorNational(match.homeTeam) && isSeniorNational(match.awayTeam)
+        }
+    }
+
+    fun fetchWcMatches(): List<ScrapedMatch> {
+        return fetchWithFilter { match ->
+            val tn = match.tournamentName
+            tn.contains("World Cup", true) || tn.contains("FIFA", true) ||
+            tn.contains("Mundial", true) || tn.contains("WM", true)
+        }
+    }
+
+    private fun fetchWithFilter(filter: (ScrapedMatch) -> Boolean): List<ScrapedMatch> {
         for (source in listOf(::fetchSofaScore, ::fetchFotmob, ::fetchEspn)) {
             try {
                 val m = source()
                 if (m.isNotEmpty()) {
-                    val wcFiltered = m.filter { match ->
-                        val wcTeams = com.porrawc2026.app.ui.screens.home.HomeViewModel.WC_TEAMS
-                        (wcTeams.any { match.homeTeam.contains(it, true) || it.contains(match.homeTeam, true) } ||
-                         wcTeams.any { match.awayTeam.contains(it, true) || it.contains(match.awayTeam, true) }) &&
-                        isSeniorNational(match.homeTeam) && isSeniorNational(match.awayTeam)
-                    }
-                    val sorted = wcFiltered.sortedByDescending { it.utcDate }
+                    val filtered = m.filter(filter)
+                    val sorted = filtered.sortedByDescending { it.utcDate }
                     val last5 = sorted.take(5).sortedBy { it.utcDate }
-                    Log.d(TAG, "Found ${m.size} matches, ${wcFiltered.size} senior WC-related, showing last ${last5.size}")
+                    Log.d(TAG, "Found ${m.size} matches, ${filtered.size} after filter, showing last ${last5.size}")
                     return last5
                 }
             } catch (_: Exception) {}
@@ -155,13 +168,14 @@ object LiveScoreScraper {
                         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date(ts * 1000))
                     } else ""
                     val eId = e.optLong("id", 0)
+                    val tournament = e.optJSONObject("tournament")?.optString("name", "") ?: ""
                     val liveMin = if (statusStr == "IN_PLAY") {
                         val st = e.optJSONObject("statusTime")
                         val stTs = st?.optInt("timestamp", 0) ?: 0
                         val stInit = st?.optInt("initial", 0) ?: 0
                         if (stTs > 0) ((now - stTs + stInit) / 60).toInt().coerceAtLeast(1) else 0
                     } else 0
-                    matches.add(ScrapedMatch(home, away, utc, statusStr, hg, ag, eventId = eId, liveMinute = liveMin))
+                    matches.add(ScrapedMatch(home, away, utc, statusStr, hg, ag, eventId = eId, liveMinute = liveMin, tournamentName = tournament))
                 }
                 Log.d(TAG, "SofaScore: ${matches.size} national matches from $urlStr")
                 if (matches.isNotEmpty()) return matches

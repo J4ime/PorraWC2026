@@ -72,8 +72,7 @@ object LiveScoreScraper {
                 val player = inc.optJSONObject("player")?.optString("name") ?: continue
                 var min = inc.optInt("time", 0)
                 if (inc.has("addedTime")) min += inc.optInt("addedTime", 0)
-                val isHome = inc.optString("scoringTeam", "") == "home" ||
-                    (inc.optJSONObject("team")?.optString("name") == homeName)
+                val isHome = inc.optBoolean("isHome", false)
                 val detail = GoalDetail(player, min.coerceAtLeast(1))
                 if (isHome) home.add(detail) else away.add(detail)
             }

@@ -802,6 +802,8 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun matchStatus(match: MatchEntity): MatchStatus {
+        val hasLiveMin = testLiveMinutes[match.id]?.let { it > 0 } == true
+        if (hasLiveMin) return MatchStatus.LIVE
         if (match.homeGoals != null && match.awayGoals != null) return MatchStatus.FINISHED
         val start = parseMadridDate(match.dateTime) ?: return MatchStatus.UPCOMING
         val now = Date()

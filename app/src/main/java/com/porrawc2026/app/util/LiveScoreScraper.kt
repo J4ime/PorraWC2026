@@ -40,32 +40,43 @@ object LiveScoreScraper {
         val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         dateFmt.timeZone = TimeZone.getTimeZone("UTC")
         val date = dateFmt.format(java.util.Date())
-        val url = URL("https://api.sofascore.com/api/v1/sport/football/events/date/$date")
-        val conn = url.openConnection() as HttpURLConnection
-        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-        conn.setRequestProperty("Accept", "application/json")
-        conn.connectTimeout = 10000; conn.readTimeout = 10000
-        val json = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
-        val obj = JSONObject(json)
-        val events = obj.optJSONArray("events") ?: return emptyList()
-        val matches = mutableListOf<ScrapedMatch>()
-        for (i in 0 until events.length()) {
-            val e = events.getJSONObject(i)
-            val home = e.optJSONObject("homeTeam")?.optString("name") ?: ""
-            val away = e.optJSONObject("awayTeam")?.optString("name") ?: ""
-            if (home.length < 3 || away.length < 3) continue
-            val statusCode = e.optJSONObject("status")?.optString("type") ?: ""
-            val statusStr = when {
-                statusCode == "finished" || statusCode == "after_pen" || statusCode == "after_et" -> "FINISHED"
-                statusCode == "inprogress" || statusCode == "halftime" -> "IN_PLAY"
-                else -> "TIMED"
-            }
-            val hg = e.optInt("homeScore", -1).takeIf { it >= 0 && statusStr != "TIMED" }
-            val ag = e.optInt("awayScore", -1).takeIf { it >= 0 && statusStr != "TIMED" }
-            val utc = e.optString("startTimestamp", "")
-            matches.add(ScrapedMatch(home, away, utc, statusStr, hg, ag))
+        val urls = listOf(
+            "https://api.sofascore.com/api/v1/sport/football/scheduled-events/$date",
+            "https://api.sofascore.com/api/v1/sport/football/events/live"
+        )
+        for (urlStr in urls) {
+            try {
+                val url = URL(urlStr)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+                conn.setRequestProperty("Accept", "*/*")
+                conn.connectTimeout = 12000; conn.readTimeout = 12000
+                val json = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
+                val obj = JSONObject(json)
+                val events = obj.optJSONArray("events") ?: continue
+                val matches = mutableListOf<ScrapedMatch>()
+                for (i in 0 until events.length()) {
+                    val e = events.getJSONObject(i)
+                    val home = e.optJSONObject("homeTeam")?.optString("name") ?: ""
+                    val away = e.optJSONObject("awayTeam")?.optString("name") ?: ""
+                    if (home.length < 3 || away.length < 3) continue
+                    val statusCode = e.optJSONObject("status")?.optString("type") ?: ""
+                    val statusStr = when {
+                        statusCode == "finished" || statusCode == "after_pen" || statusCode == "after_et" -> "FINISHED"
+                        statusCode == "inprogress" || statusCode == "halftime" -> "IN_PLAY"
+                        else -> "TIMED"
+                    }
+                    val hg = e.optInt("homeScore", -1).takeIf { it >= 0 && statusStr != "TIMED" }
+                    val ag = e.optInt("awayScore", -1).takeIf { it >= 0 && statusStr != "TIMED" }
+                    val utc = e.optLong("startTimestamp", 0).takeIf { it > 0 }?.let {
+                        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date(it * 1000))
+                    } ?: ""
+                    matches.add(ScrapedMatch(home, away, utc, statusStr, hg, ag))
+                }
+                if (matches.isNotEmpty()) return matches
+            } catch (_: Exception) {}
         }
-        return matches
+        return emptyList()
     }
 
     private fun fetchFotmob(): List<ScrapedMatch> {

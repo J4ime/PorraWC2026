@@ -99,8 +99,7 @@ class HomeViewModel @Inject constructor(
     private val sofascoreEventIds = mutableMapOf<Int, Long>()
     private var liveMatchApiId: Int? = null
     private var liveMinuteStr: String? = null
-    private var liveHomeScorers: List<GoalEvent> = emptyList()
-    private var liveAwayScorers: List<GoalEvent> = emptyList()
+    private val testScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val testPlayers = listOf(
         PlayerPredictionEntity(rank = 1, playerName = "Romelu Lukaku", predictedName = "Lukaku", pointsPerGoal = 50),
         PlayerPredictionEntity(rank = 2, playerName = "Luka Modric", predictedName = "Modric", pointsPerGoal = 30),
@@ -144,8 +143,7 @@ class HomeViewModel @Inject constructor(
         refreshJob?.cancel()
         liveMatchApiId = null
         liveMinuteStr = null
-        liveHomeScorers = emptyList()
-        liveAwayScorers = emptyList()
+        testScorers.clear()
         lastWrittenScores.clear()
         if (newMode) {
             enterTestMode()
@@ -616,14 +614,14 @@ class HomeViewModel @Inject constructor(
             } else cm
         }
         if (changed) {
-            liveHomeScorers = emptyList()
-            liveAwayScorers = emptyList()
             cachedMatches.forEach { cm ->
                 val eId = sofascoreEventIds[cm.id] ?: return@forEach
                 val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
                 if (h.isNotEmpty() || a.isNotEmpty()) {
-                    liveHomeScorers = h.map { GoalEvent(it.playerName, it.minute) }
-                    liveAwayScorers = a.map { GoalEvent(it.playerName, it.minute) }
+                    testScorers[cm.id] = Pair(
+                        h.map { GoalEvent(it.playerName, it.minute) },
+                        a.map { GoalEvent(it.playerName, it.minute) }
+                    )
                 }
             }
             cachedMatches = cachedMatches.map { m ->
@@ -695,8 +693,7 @@ class HomeViewModel @Inject constructor(
                     ?.mapNotNull { g -> val name = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: return@mapNotNull null; GoalEvent(name, m) } ?: emptyList()
 
                 liveMinuteStr = if (isFinished) "FINAL" else minute
-                liveHomeScorers = homeScr
-                liveAwayScorers = awayScr
+                testScorers[MATCH_ID_AMISTOSO] = Pair(homeScr, awayScr)
 
                 cachedMatches = cachedMatches.map {
                     if (it.id == MATCH_ID_AMISTOSO) it.copy(
@@ -784,12 +781,14 @@ class HomeViewModel @Inject constructor(
                 MatchStatus.LIVE -> "?"
                 else -> null
             }
-            homeScr = liveHomeScorers
-            awayScr = liveAwayScorers
+            val s = testScorers[match.id]
+            homeScr = s?.first ?: emptyList()
+            awayScr = s?.second ?: emptyList()
         } else if (match.id == MATCH_ID_AMISTOSO) {
             liveMin = liveMinuteStr
-            homeScr = liveHomeScorers
-            awayScr = liveAwayScorers
+            val s = testScorers[MATCH_ID_AMISTOSO]
+            homeScr = s?.first ?: emptyList()
+            awayScr = s?.second ?: emptyList()
         } else {
             liveMin = null
             homeScr = emptyList()

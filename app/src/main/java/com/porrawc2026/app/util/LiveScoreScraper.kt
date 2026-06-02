@@ -32,9 +32,14 @@ object LiveScoreScraper {
             try {
                 val m = source()
                 if (m.isNotEmpty()) {
-                    val sorted = m.sortedByDescending { it.utcDate }
+                    val wcFiltered = m.filter { match ->
+                        val wcTeams = com.porrawc2026.app.ui.screens.home.HomeViewModel.WC_TEAMS
+                        wcTeams.any { match.homeTeam.contains(it, true) || it.contains(match.homeTeam, true) } ||
+                        wcTeams.any { match.awayTeam.contains(it, true) || it.contains(match.awayTeam, true) }
+                    }
+                    val sorted = wcFiltered.sortedByDescending { it.utcDate }
                     val last5 = sorted.take(5).sortedBy { it.utcDate }
-                    Log.d(TAG, "Found ${m.size} matches via ${source.name}, showing last ${last5.size}")
+                    Log.d(TAG, "Found ${m.size} matches, ${wcFiltered.size} WC-related, showing last ${last5.size}")
                     return last5
                 }
             } catch (_: Exception) {}
@@ -114,12 +119,6 @@ object LiveScoreScraper {
                         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date(ts * 1000))
                     } else ""
                     val eId = e.optLong("id", 0)
-                    val isWcTeam = com.porrawc2026.app.ui.screens.home.HomeViewModel.WC_TEAMS.any {
-                        home.contains(it, true) || it.contains(home, true)
-                    } || com.porrawc2026.app.ui.screens.home.HomeViewModel.WC_TEAMS.any {
-                        away.contains(it, true) || it.contains(away, true)
-                    }
-                    if (!isWcTeam) continue
                     matches.add(ScrapedMatch(home, away, utc, statusStr, hg, ag, eventId = eId))
                 }
                 Log.d(TAG, "SofaScore: ${matches.size} national team matches from $urlStr")

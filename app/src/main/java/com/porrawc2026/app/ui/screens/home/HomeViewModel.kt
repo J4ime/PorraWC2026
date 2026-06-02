@@ -498,10 +498,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun fetchFriendlyMatches() {
         val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val all = try { apiService.getMatches(dateFrom = dateStr, dateTo = dateStr) } catch (_: Exception) { null }
-        val apiMatches = all?.matches?.filter { m ->
-            val stage = m.stage ?: ""
-            stage.isBlank() || stage == "FRIENDLY" || stage.contains("FRIEND", true)
-        }?.take(5) ?: emptyList()
+        val apiMatches = all?.matches?.take(5) ?: emptyList()
 
         if (apiMatches.isNotEmpty()) {
             buildAndShowMatches(apiMatches.map { m ->
@@ -518,23 +515,15 @@ class HomeViewModel @Inject constructor(
                 Log.d("HomeVM", "LiveScore fallback: ${scraped.size} matches")
                 buildAndShowMatches(scraped)
             } else {
-                val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-                buildAndShowMatches(listOf(
-                    ScrapedMatch("Croacia", "Bélgica", "${today}T18:00:00Z", "TIMED", null, null)
-                ))
-                _testModeTitle.value = "AMISTOSO TEST"
+                _testModeTitle.value = "SIN AMISTOSOS HOY"
+                cachedMatches = emptyList()
+                refreshUpcomingMatches()
             }
         }
     }
 
     private fun buildAndShowMatches(raw: List<ScrapedMatch>) {
         val rng = java.util.Random()
-        val nationalTeams = setOf("Croatia", "Belgium", "France", "Germany", "Spain", "England", "Italy", "Portugal",
-            "Netherlands", "Argentina", "Brazil", "Uruguay", "Mexico", "Sweden", "Norway", "Denmark", "Poland",
-            "Switzerland", "Austria", "Czechia", "Turkey", "Scotland", "Wales", "Ukraine", "Serbia", "Japan",
-            "South Korea", "Australia", "USA", "Canada", "Morocco", "Senegal", "Egypt", "Nigeria", "Ghana",
-            "Ivory Coast", "Cameroon", "Algeria", "Tunisia", "Iran", "Saudi Arabia", "Qatar", "Ecuador",
-            "Colombia", "Chile", "Peru", "Paraguay", "Costa Rica", "Panama")
         val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
         cachedMatches = raw.mapIndexed { idx, m ->
             MatchEntity(
@@ -563,23 +552,38 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun fetchLiveFriendly() {
         val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        val all = try { apiService.getMatches(dateFrom = dateStr, dateTo = dateStr) } catch (_: Exception) { return }
+        var all: List<ScrapedMatch> = emptyList()
+        try {
+            val resp = apiService.getMatches(dateFrom = dateStr, dateTo = dateStr)
+            all = resp.matches.map { m ->
+                ScrapedMatch(
+                    homeTeam = m.homeTeam?.name ?: "", awayTeam = m.awayTeam?.name ?: "",
+                    utcDate = m.utcDate, status = m.status ?: "TIMED",
+                    homeGoals = m.score?.fullTime?.home,
+                    awayGoals = m.score?.fullTime?.away
+                )
+            }
+        } catch (_: Exception) {}
+        if (all.isEmpty()) {
+            all = withContext(Dispatchers.IO) { LiveScoreScraper.fetchMatches() }
+        }
+        if (all.isEmpty()) return
+
         var changed = false
-        cachedMatches.forEachIndexed { index, cm ->
-            val fm = all.matches.firstOrNull {
-                it.homeTeam?.name == cm.homeTeam && it.awayTeam?.name == cm.awayTeam
+        cachedMatches = cachedMatches.map { cm ->
+            val fm = all.firstOrNull { m ->
+                cm.homeTeam.contains(m.homeTeam, true) || m.homeTeam.contains(cm.homeTeam, true) ||
+                cm.awayTeam.contains(m.awayTeam, true) || m.awayTeam.contains(cm.awayTeam, true)
             }
             if (fm != null && fm.status != "TIMED") {
-                val hg = fm.score?.fullTime?.home
-                val ag = fm.score?.fullTime?.away
-                val min = fm.status == "FINISHED"
+                val hg = fm.homeGoals; val ag = fm.awayGoals
                 val prev = lastWrittenScores[cm.id]
                 if (hg != null && ag != null && (prev == null || prev.first != hg || prev.second != ag)) {
                     lastWrittenScores[cm.id] = hg to ag
-                    cachedMatches = cachedMatches.toMutableList().also { it[index] = cm.copy(homeGoals = hg, awayGoals = ag) }
                     changed = true
-                }
-            }
+                    cm.copy(homeGoals = hg, awayGoals = ag)
+                } else cm
+            } else cm
         }
         if (changed) {
             cachedMatches = cachedMatches.map { m ->

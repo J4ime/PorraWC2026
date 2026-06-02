@@ -21,159 +21,113 @@ data class ScrapedMatch(
 object LiveScoreScraper {
 
     private const val TAG = "LiveScoreScraper"
-    private const val URL_LIVESCORE = "https://www.livescore.com/en/football/international-friendlies/friendlies/"
-
-    private val nationalTeams = setOf(
-        "Croatia", "Belgium", "France", "Germany", "Spain", "England", "Italy", "Portugal",
-        "Netherlands", "Argentina", "Brazil", "Uruguay", "Mexico", "Sweden", "Norway", "Denmark",
-        "Poland", "Switzerland", "Austria", "Czechia", "Turkey", "Scotland", "Wales", "Ukraine",
-        "Serbia", "Japan", "South Korea", "Australia", "USA", "Canada", "Morocco", "Senegal",
-        "Egypt", "Nigeria", "Ghana", "Ivory Coast", "Cameroon", "Algeria", "Tunisia", "Iran",
-        "Saudi Arabia", "Qatar", "Ecuador", "Colombia", "Chile", "Peru", "Paraguay", "Costa Rica",
-        "Panama", "Slovenia", "Slovakia", "Romania", "Bulgaria", "Hungary", "Finland", "Iceland",
-        "Ireland", "Northern Ireland", "Greece", "South Africa", "Russia", "Czech Republic",
-        "Bosnia", "Congo", "New Zealand", "China", "India", "Jamaica", "Honduras", "El Salvador",
-        "Venezuela", "Bolivia", "United Arab Emirates", "Kuwait", "Oman", "Bahrain", "Iraq",
-        "Jordan", "Lebanon", "Syria", "Palestine", "Libya", "Sudan", "Mali", "Burkina Faso",
-        "Zambia", "Angola", "Mozambique", "Guinea", "Togo", "Benin", "Cape Verde", "Gabon"
-    )
 
     fun fetchMatches(): List<ScrapedMatch> {
-        try {
-            val html = fetchHtml()
-            val matches = parseMatches(html)
-            Log.d(TAG, "Scraped ${matches.size} matches from LiveScore")
+        val matches = fetchEspn()
+        if (matches.isNotEmpty()) {
+            Log.d(TAG, "ESPN: ${matches.size} friendlies found")
             return matches.take(5)
+        }
+        val livescore = fetchLiveScore()
+        if (livescore.isNotEmpty()) {
+            Log.d(TAG, "LiveScore: ${livescore.size} friendlies found")
+            return livescore.take(5)
+        }
+        Log.d(TAG, "No friendlies found from any source")
+        return emptyList()
+    }
+
+    private fun fetchEspn(): List<ScrapedMatch> {
+        try {
+            val dateFmt = SimpleDateFormat("yyyyMMdd", Locale.US)
+            dateFmt.timeZone = TimeZone.getTimeZone("UTC")
+            val dates = dateFmt.format(java.util.Date())
+            val url = URL("https://site.api.espn.com/apis/site/v2/sports/soccer/scoreboard?dates=$dates&limit=50")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 10000; conn.readTimeout = 10000
+            val json = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
+            val obj = JSONObject(json)
+            val events = obj.optJSONArray("events") ?: return emptyList()
+            val matches = mutableListOf<ScrapedMatch>()
+            for (i in 0 until events.length()) {
+                val event = events.getJSONObject(i)
+                val comps = event.optJSONArray("competitions") ?: continue
+                val comp = comps.getJSONObject(0)
+                val compName = comp.optString("displayName", "")
+                if (compName.isBlank()) continue
+                val competitors = comp.optJSONArray("competitors") ?: continue
+                if (competitors.length() < 2) continue
+                val home = competitors.getJSONObject(0)
+                val away = competitors.getJSONObject(1)
+                val homeTeam = home.optJSONObject("team")?.optString("displayName") ?: home.optString("homeAway", "")
+                val awayTeam = away.optJSONObject("team")?.optString("displayName") ?: away.optString("homeAway", "")
+                val homeScore = if (home.has("score")) home.optString("score") else null
+                val awayScore = if (away.has("score")) away.optString("score") else null
+                val hg = homeScore?.toIntOrNull()
+                val ag = awayScore?.toIntOrNull()
+                val status = event.optJSONObject("status")?.optJSONObject("type")?.optString("description", "TIMED") ?: "TIMED"
+                val utc = event.optString("date", "")
+                if (homeTeam.isNotBlank() && awayTeam.isNotBlank() && homeTeam.length > 2 && awayTeam.length > 2) {
+                    matches.add(ScrapedMatch(homeTeam, awayTeam, utc, status, hg, ag))
+                }
+            }
+            return matches
         } catch (e: Exception) {
-            Log.d(TAG, "LiveScore scrape failed: ${e.message}")
+            Log.d(TAG, "ESPN failed: ${e.message}")
             return emptyList()
         }
     }
 
-    private fun fetchHtml(): String {
-        val url = URL(URL_LIVESCORE)
-        val conn = url.openConnection() as HttpURLConnection
-        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-        conn.connectTimeout = 15000
-        conn.readTimeout = 15000
-        conn.instanceFollowRedirects = true
-        return conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
-    }
-
-    private fun parseMatches(html: String): List<ScrapedMatch> {
-        val matches = mutableListOf<ScrapedMatch>()
-        val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        dateFmt.timeZone = TimeZone.getTimeZone("UTC")
-        val today = dateFmt.format(java.util.Date())
-
-        val scripts = Regex("""<script[^>]*type="application/json"[^>]*>(.*?)</script>""", RegexOption.DOT_MATCHES_ALL)
-            .findAll(html).toList()
-
-        for (script in scripts) {
-            val json = script.groupValues[1]
-            if (!json.contains("\"homeTeam\"") && !json.contains("\"Eid\"")) continue
-            try {
-                extractFromJson(json, matches)
-            } catch (_: Exception) {}
-        }
-
-        if (matches.isEmpty()) {
-            titleBodyPattern(html, matches)
-        }
-
-        if (matches.isEmpty()) {
-            searchScriptsPattern(html, matches)
-        }
-
-        return matches.filter { m ->
-            nationalTeams.any { m.homeTeam.contains(it, true) || it.contains(m.homeTeam, true) } &&
-            nationalTeams.any { m.awayTeam.contains(it, true) || it.contains(m.awayTeam, true) }
-        }
-    }
-
-    private fun extractFromJson(json: String, matches: MutableList<ScrapedMatch>) {
+    private fun fetchLiveScore(): List<ScrapedMatch> {
         try {
-            val obj = JSONObject(json)
-            findMatches(obj, matches)
-        } catch (_: Exception) {
-            try {
-                val arr = JSONArray(json)
-                for (i in 0 until arr.length()) {
-                    try { findMatches(arr.getJSONObject(i), matches) } catch (_: Exception) {}
-                }
-            } catch (_: Exception) {}
+            val url = URL("https://www.livescore.com/en/football/international-friendlies/friendlies/")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+            conn.connectTimeout = 15000; conn.readTimeout = 15000
+            val html = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
+            return parseLiveScoreHtml(html)
+        } catch (e: Exception) {
+            Log.d(TAG, "LiveScore HTML failed: ${e.message}")
+            return emptyList()
         }
     }
 
-    private fun findMatches(obj: JSONObject, matches: MutableList<ScrapedMatch>, depth: Int = 0) {
-        if (depth > 8 || matches.size >= 5) return
-        if (obj.has("homeTeam") && obj.has("awayTeam")) {
-            val home = obj.optJSONObject("homeTeam")?.optString("name", "")
-                ?: obj.optString("Hn", "")
-            val away = obj.optJSONObject("awayTeam")?.optString("name", "")
-                ?: obj.optString("An", "")
-            val hg = obj.optJSONObject("homeTeam")?.optJSONObject("score")?.optInt("total")
-                ?: if (obj.has("Hs")) obj.optInt("Hs", -1) else null
-            val ag = obj.optJSONObject("awayTeam")?.optJSONObject("score")?.optInt("total")
-                ?: if (obj.has("As")) obj.optInt("As", -1) else null
-            val status = obj.optString("status", obj.optString("Eps", "TIMED"))
-            val utc = obj.optString("utcDate", obj.optString("Esd", ""))
-            if (home.isNotBlank() && away.isNotBlank() && home.length > 2 && away.length > 2) {
-                matches.add(ScrapedMatch(home, away, utc, status,
-                    if (hg != null && hg >= 0) hg else null,
-                    if (ag != null && ag >= 0) ag else null))
+    private fun parseLiveScoreHtml(html: String): List<ScrapedMatch> {
+        val matches = mutableListOf<ScrapedMatch>()
+        val jsonBlocks = Regex("""window\.__INITIAL_STATE__\s*=\s*(\{.*?\})\s*;""", setOf(RegexOption.DOT_MATCHES_ALL)).findAll(html).toList()
+        if (jsonBlocks.isEmpty()) {
+            val jsonScripts = Regex("""<script[^>]*type="application/json"[^>]*>(.*?)</script>""", setOf(RegexOption.DOT_MATCHES_ALL)).findAll(html).toList()
+            for (script in jsonScripts) {
+                try {
+                    val obj = JSONObject(script.groupValues[1])
+                    findMatchesInJson(obj, matches)
+                } catch (_: Exception) {}
             }
+        }
+        for (block in jsonBlocks) {
+            try {
+                val obj = JSONObject(block.groupValues[1])
+                findMatchesInJson(obj, matches)
+            } catch (_: Exception) {}
+        }
+        return matches.distinctBy { "${it.homeTeam}${it.awayTeam}" }
+    }
+
+    private fun findMatchesInJson(obj: JSONObject, matches: MutableList<ScrapedMatch>, depth: Int = 0) {
+        if (depth > 10 || matches.size >= 10) return
+        if (obj.has("Hn") && obj.has("An")) {
+            matches.add(ScrapedMatch(
+                obj.optString("Hn"), obj.optString("An"),
+                obj.optString("Esd", ""), obj.optString("Eps", "TIMED"),
+                if (obj.has("Hs")) obj.optInt("Hs", -1).takeIf { it >= 0 } else null,
+                if (obj.has("As")) obj.optInt("As", -1).takeIf { it >= 0 } else null
+            ))
         }
         val keys = obj.keys()
         while (keys.hasNext()) {
             val key = keys.next()
-            try {
-                val child = obj.optJSONObject(key)
-                if (child != null) findMatches(child, matches, depth + 1)
-            } catch (_: Exception) {}
-            try {
-                val arr = obj.optJSONArray(key)
-                for (i in 0 until arr.length()) {
-                    try { findMatches(arr.getJSONObject(i), matches, depth + 1) } catch (_: Exception) {}
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    private fun titleBodyPattern(html: String, matches: MutableList<ScrapedMatch>) {
-        val blockRegex = Regex("""<span[^>]*class="[^"]*title[^"]*"[^>]*>(.*?)</span>.*?<span[^>]*class="[^"]*body[^"]*"[^>]*>(.*?)</span>""", RegexOption.DOT_MATCHES_ALL)
-        blockRegex.findAll(html).forEach { match ->
-            val title = match.groupValues[1].replace(Regex("<[^>]*>"), "").trim()
-            val body = match.groupValues[2].replace(Regex("<[^>]*>"), "").trim()
-            val teams = title.split("vs", "v", "-", "–").map { it.trim() }
-            if (teams.size == 2) {
-                val score = Regex("""(\d+)\s*-\s*(\d+)""").find(body)
-                val hg = score?.groupValues?.get(1)?.toIntOrNull()
-                val ag = score?.groupValues?.get(2)?.toIntOrNull()
-                val isFinished = body.contains("FT", true)
-                val isLive = body.contains("'", true)
-                val status = when { isFinished -> "FINISHED"; isLive -> "IN_PLAY"; else -> "TIMED" }
-                matches.add(ScrapedMatch(teams[0], teams[1], "", status, hg, ag))
-            }
-        }
-    }
-
-    private fun searchScriptsPattern(html: String, matches: MutableList<ScrapedMatch>) {
-        val allScripts = Regex("""<script[^>]*>(.*?)</script>""", RegexOption.DOT_MATCHES_ALL)
-            .findAll(html).toList()
-        val teamRegex = Regex(""""name"\s*:\s*"([^"]+)"""")
-        val scoreRegex = Regex("""(\d+)\s*-\s*(\d+)""")
-        for (script in allScripts) {
-            val content = script.groupValues[1]
-            val names = teamRegex.findAll(content).map { it.groupValues[1] }.filter { it.length > 2 }.toList()
-            if (names.size >= 2) {
-                for (i in 0 until names.size - 1 step 2) {
-                    val h = names[i]; val a = names[i + 1]
-                    if (nationalTeams.any { h.contains(it, true) } && nationalTeams.any { a.contains(it, true) }) {
-                        matches.add(ScrapedMatch(h, a, "", "TIMED", null, null))
-                    }
-                }
-            }
+            try { obj.optJSONObject(key)?.let { findMatchesInJson(it, matches, depth + 1) } } catch (_: Exception) {}
+            try { obj.optJSONArray(key)?.let { for (i in 0 until it.length()) { try { findMatchesInJson(it.getJSONObject(i), matches, depth + 1) } catch (_: Exception) {} } } } catch (_: Exception) {}
         }
     }
 }

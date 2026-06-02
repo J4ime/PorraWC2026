@@ -518,9 +518,11 @@ class HomeViewModel @Inject constructor(
                 Log.d("HomeVM", "LiveScore fallback: ${scraped.size} matches")
                 buildAndShowMatches(scraped)
             } else {
-                _testModeTitle.value = "SIN AMISTOSOS HOY"
-                cachedMatches = emptyList()
-                refreshUpcomingMatches()
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                buildAndShowMatches(listOf(
+                    ScrapedMatch("Croacia", "Bélgica", "${today}T18:00:00Z", "TIMED", null, null)
+                ))
+                _testModeTitle.value = "AMISTOSO TEST"
             }
         }
     }

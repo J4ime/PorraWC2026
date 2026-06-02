@@ -112,23 +112,23 @@ fun HomeScreen(
                         Text(if (isTestMode) "MODO TEST ACTIVADO" else "MODO TEST", style = MaterialTheme.typography.titleSmall)
                     }
                     Spacer(Modifier.height(6.dp))
-                    if (updateAvailable) {
-                        Button(
-                            onClick = { viewModel.installUpdate() },
-                            modifier = Modifier.fillMaxWidth().height(40.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0), contentColor = Color.White),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            if (isUpdating) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(6.dp))
-                                Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall)
-                            } else {
-                                Text("ACTUALIZAR APP", style = MaterialTheme.typography.titleSmall)
-                            }
+                    Button(
+                        onClick = { if (updateAvailable) viewModel.installUpdate() },
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (updateAvailable) Color(0xFF1565C0) else Color(0xFF333333),
+                            contentColor = Color.White
+                        ), shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (isUpdating) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(6.dp))
+                            Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall)
+                        } else {
+                            Text(if (updateAvailable) "ACTUALIZAR APP" else "APP ACTUALIZADA", style = MaterialTheme.typography.titleSmall)
                         }
-                        Spacer(Modifier.height(6.dp))
                     }
+                    Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (!isTestMode) {
                             Button(

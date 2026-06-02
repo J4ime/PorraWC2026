@@ -81,6 +81,28 @@ data class FootballTeamDetail(
     val crest: String?
 )
 
+data class FootballPlayer(
+    val id: Int?,
+    val name: String?
+)
+
+data class GoalDetail(
+    val minute: Int?,
+    val team: FootballTeam?,
+    val scorer: FootballPlayer?
+)
+
+data class LiveMatchDetail(
+    val id: Int,
+    val utcDate: String?,
+    val status: String?,
+    val minute: String?,
+    val homeTeam: FootballTeam?,
+    val awayTeam: FootballTeam?,
+    val score: FootballScore?,
+    val goals: List<GoalDetail>?
+)
+
 interface ApiService {
 
     @GET("competitions/WC/matches")
@@ -106,7 +128,15 @@ interface ApiService {
     suspend fun getMatchDetail(
         @Header("X-Auth-Token") apiKey: String = "2a91da71f2384b659a3bf57e444eacd8",
         @Path("id") matchId: Int
-    ): FootballMatch
+    ): LiveMatchDetail
+
+    @GET("matches")
+    suspend fun getMatches(
+        @Header("X-Auth-Token") apiKey: String = "2a91da71f2384b659a3bf57e444eacd8",
+        @Query("dateFrom") dateFrom: String,
+        @Query("dateTo") dateTo: String,
+        @Query("status") status: String? = null
+    ): MatchesResponse
 }
 
 object ApiConfig {

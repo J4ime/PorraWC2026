@@ -228,6 +228,7 @@ private fun MatchRow(match: MatchDisplay) {
     val hasPred = match.predictedHomeGoals != null && match.predictedAwayGoals != null
     val hasResult = match.homeGoals != null && match.awayGoals != null
     val isLive = match.status == MatchStatus.LIVE
+    val hasLiveMinute = match.liveMinute != null
 
     val scoreBg = when {
         isLive -> Color(0xFF2E7D32)
@@ -236,15 +237,27 @@ private fun MatchRow(match: MatchDisplay) {
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Text(match.time.ifBlank { "?" }, Modifier.width(36.dp),
-            style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold,
-            maxLines = 1, softWrap = false)
-        Text(match.homeTeam, Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall, color = Color.White,
-            textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        val timeText = if (hasLiveMinute) match.liveMinute ?: "?" else match.time.ifBlank { "?" }
+        val timeColor = if (isLive) Color(0xFF4CAF50) else Color.White
+        Text(timeText, Modifier.width(42.dp).padding(top = 2.dp),
+            style = MaterialTheme.typography.labelMedium, color = timeColor, fontWeight = FontWeight.Bold,
+            maxLines = 1, softWrap = false, textAlign = TextAlign.Center)
+
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+            Text(match.homeTeam,
+                style = MaterialTheme.typography.bodySmall, color = Color.White,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (isLive && match.homeScorers.isNotEmpty()) {
+                match.homeScorers.forEach { scorer ->
+                    Text("\u26BD ${scorer.playerName} ${scorer.minute}'",
+                        style = MaterialTheme.typography.labelSmall, color = Color(0xFF4CAF50),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
 
         Box(
             modifier = Modifier.padding(horizontal = 4.dp).background(scoreBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)
@@ -266,9 +279,18 @@ private fun MatchRow(match: MatchDisplay) {
             }
         }
 
-        Text(match.awayTeam, Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall, color = Color.White,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.weight(1f)) {
+            Text(match.awayTeam,
+                style = MaterialTheme.typography.bodySmall, color = Color.White,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (isLive && match.awayScorers.isNotEmpty()) {
+                match.awayScorers.forEach { scorer ->
+                    Text("\u26BD ${scorer.playerName} ${scorer.minute}'",
+                        style = MaterialTheme.typography.labelSmall, color = Color(0xFF4CAF50),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
 
         Spacer(Modifier.width(4.dp))
         val channels = match.tvChannel.split(",").filter { it.isNotBlank() }

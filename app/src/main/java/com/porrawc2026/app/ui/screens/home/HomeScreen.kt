@@ -290,7 +290,7 @@ private fun MatchRow(match: MatchDisplay) {
             Text(match.homeTeam,
                 style = MaterialTheme.typography.bodySmall, color = Color.White,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (isLive && match.homeScorers.isNotEmpty()) {
+            if (match.homeScorers.isNotEmpty()) {
                 match.homeScorers.forEach { scorer ->
                     Text("\u26BD ${scorer.playerName} ${scorer.minute}'",
                         style = MaterialTheme.typography.labelSmall, color = Color(0xFF4CAF50),
@@ -323,7 +323,7 @@ private fun MatchRow(match: MatchDisplay) {
             Text(match.awayTeam,
                 style = MaterialTheme.typography.bodySmall, color = Color.White,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (isLive && match.awayScorers.isNotEmpty()) {
+            if (match.awayScorers.isNotEmpty()) {
                 match.awayScorers.forEach { scorer ->
                     Text("\u26BD ${scorer.playerName} ${scorer.minute}'",
                         style = MaterialTheme.typography.labelSmall, color = Color(0xFF4CAF50),

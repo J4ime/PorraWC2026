@@ -76,10 +76,10 @@ object LiveScoreScraper {
                 val detail = GoalDetail(player, min.coerceAtLeast(1))
                 if (isHome) home.add(detail) else away.add(detail)
             }
-            Log.d(TAG, "Goal details for $eventId: H=${home} A=${away}")
+            Log.w(TAG, "Goal details for $eventId: H=${home} A=${away}")
             return Pair(home, away)
         } catch (e: Exception) {
-            Log.d(TAG, "Goal details failed for $eventId: ${e.message}")
+            Log.w(TAG, "Goal details failed for $eventId: ${e.message}")
             return Pair(emptyList(), emptyList())
         }
     }

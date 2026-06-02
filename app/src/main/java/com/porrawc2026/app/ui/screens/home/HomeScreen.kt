@@ -340,14 +340,6 @@ private fun MatchRow(match: MatchDisplay) {
                 modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
         }
 
-        if (isLive) {
-            val infiniteTransition = rememberInfiniteTransition("live_${match.id}")
-            val alpha by infiniteTransition.animateFloat(1f, 0.3f, infiniteRepeatable(tween(600), RepeatMode.Reverse))
-            Text("LIVE", color = Color(0xFF888888).copy(alpha = alpha),
-                style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black,
-                modifier = Modifier.padding(start = 2.dp))
-        }
-
         if (hasResult || (hasPred && isLive)) {
             val ptsValue = if (match.pointsEarned > 0) "${match.pointsEarned}" else "0"
             val ptsBg = if (isLive) Color(0xFF2E7D32) else Color.Transparent

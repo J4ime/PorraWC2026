@@ -607,8 +607,10 @@ class HomeViewModel @Inject constructor(
             }
         }
         if (changed) {
+            Log.w("HomeVM", "===== fetchLiveFriendly: changed=true, fetching goal details =====")
             cachedMatches.forEach { cm ->
                 val eId = sofascoreEventIds[cm.id] ?: return@forEach
+                Log.w("HomeVM", "===== fetching goal details for match ${cm.id} eventId=$eId =====")
                 val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
                 if (h.isNotEmpty() || a.isNotEmpty()) {
                     testScorers[cm.id] = Pair(

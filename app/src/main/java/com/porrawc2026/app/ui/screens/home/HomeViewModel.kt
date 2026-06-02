@@ -529,7 +529,9 @@ class HomeViewModel @Inject constructor(
                 )
             })
         } else {
+            Log.w("HomeVM", "===== API returned ${apiMatches.size} matches, trying scraper =====")
             val scraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchMatches() }
+            Log.w("HomeVM", "===== Scraper returned ${scraped.size} matches =====")
             if (scraped.isNotEmpty()) {
                 Log.d("HomeVM", "LiveScore fallback: ${scraped.size} matches")
                 buildAndShowMatches(scraped)

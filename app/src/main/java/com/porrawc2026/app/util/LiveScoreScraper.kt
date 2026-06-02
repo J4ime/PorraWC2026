@@ -96,10 +96,22 @@ object LiveScoreScraper {
             try {
                 val url = URL(urlStr)
                 val conn = url.openConnection() as HttpURLConnection
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
-                conn.setRequestProperty("Accept", "*/*")
-                conn.connectTimeout = 12000; conn.readTimeout = 12000
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/UPB1.230918.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.260 Mobile Safari/537.36")
+                conn.setRequestProperty("Accept", "application/json, text/plain, */*")
+                conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+                conn.setRequestProperty("Referer", "https://www.sofascore.com/")
+                conn.setRequestProperty("Origin", "https://www.sofascore.com")
+                conn.setRequestProperty("Sec-Fetch-Site", "same-site")
+                conn.connectTimeout = 15000; conn.readTimeout = 15000
+                val code = conn.responseCode
+                if (code != 200) {
+                    val err = conn.errorStream?.bufferedReader()?.readText() ?: ""
+                    Log.d(TAG, "SofaScore $urlStr HTTP $code: ${err.take(200)}")
+                    conn.disconnect()
+                    continue
+                }
                 val json = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
+                Log.d(TAG, "SofaScore $urlStr: got ${json.length} bytes")
                 val obj = JSONObject(json)
                 val events = obj.optJSONArray("events") ?: continue
                 val now = System.currentTimeMillis() / 1000

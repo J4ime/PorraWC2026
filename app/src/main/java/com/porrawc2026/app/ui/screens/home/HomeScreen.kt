@@ -113,7 +113,7 @@ fun HomeScreen(
                     }
                     Spacer(Modifier.height(6.dp))
                     Button(
-                        onClick = { if (updateAvailable) viewModel.installUpdate() },
+                        onClick = { viewModel.installUpdate() },
                         modifier = Modifier.fillMaxWidth().height(40.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (updateAvailable) Color(0xFF1565C0) else Color(0xFF333333),
@@ -128,6 +128,7 @@ fun HomeScreen(
                             Text(if (updateAvailable) "ACTUALIZAR APP" else "APP ACTUALIZADA", style = MaterialTheme.typography.titleSmall)
                         }
                     }
+                    Text("v${viewModel.appVersion}", Modifier.fillMaxWidth().padding(end = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), textAlign = TextAlign.End)
                     Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (!isTestMode) {

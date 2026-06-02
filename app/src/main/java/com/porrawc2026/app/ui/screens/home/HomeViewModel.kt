@@ -86,6 +86,7 @@ class HomeViewModel @Inject constructor(
     val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
     private val _isUpdating = MutableStateFlow(false)
     val isUpdating: StateFlow<Boolean> = _isUpdating.asStateFlow()
+    val appVersion: String = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var wcCachedMatches: List<MatchEntity> = emptyList()
@@ -139,6 +140,7 @@ class HomeViewModel @Inject constructor(
         } else {
             exitTestMode()
         }
+        checkForUpdate()
     }
 
     private fun enterTestMode() {
@@ -292,8 +294,12 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isUpdating.value = true
             try {
-                val info = UpdateManager.checkForUpdate(context) ?: throw Exception("No update info")
-                UpdateManager.downloadAndInstall(context, info.downloadUrl)
+                val info = UpdateManager.checkForUpdate(context)
+                if (info?.isNewer == true) {
+                    UpdateManager.downloadAndInstall(context, info.downloadUrl)
+                } else {
+                    _errorMessage.emit("Ya tienes la ultima version")
+                }
             } catch (e: Exception) {
                 _errorMessage.emit("Error al actualizar: ${e.message}")
             } finally {

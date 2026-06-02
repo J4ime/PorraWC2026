@@ -93,6 +93,8 @@ object LiveScoreScraper {
             val detail = GoalDetail(player, min.coerceAtLeast(1))
             if (isHome) home.add(detail) else away.add(detail)
         }
+        home.reverse()
+        away.reverse()
     }
 
     private fun fetchSofaScore(): List<ScrapedMatch> {

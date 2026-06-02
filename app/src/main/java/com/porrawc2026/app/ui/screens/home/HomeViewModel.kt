@@ -340,7 +340,13 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshPoints() {
-        viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
+        if (_isTestMode.value) {
+            val matchPts = cachedMatches.sumOf { it.pointsEarned }
+            val playerPts = _players.value.sumOf { it.pointsEarned }
+            _totalPoints.value = matchPts + playerPts
+        } else {
+            viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
+        }
     }
 
     private fun downloadPlayerPhotos() {

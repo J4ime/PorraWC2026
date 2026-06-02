@@ -52,6 +52,8 @@ fun HomeScreen(
     val players by viewModel.players.collectAsState()
     val isReady by viewModel.isReady.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
+    val isTestMode by viewModel.isTestMode.collectAsState()
+    val testModeTitle by viewModel.testModeTitle.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -109,30 +111,45 @@ fun HomeScreen(
         },
         bottomBar = {
             Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding(), color = Color(0xFF1A1A1A)) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Button(
-                        onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
+                        onClick = { viewModel.toggleTestMode() },
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isTestMode) Color(0xFF2E7D32) else Color(0xFF333333),
+                            contentColor = Color.White
+                        ), shape = RoundedCornerShape(10.dp)
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (hasData) "Actualizar" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
-                        }
+                        Text(if (isTestMode) "MODO TEST ACTIVADO" else "MODO TEST", style = MaterialTheme.typography.titleSmall)
                     }
-                    if (hasData) {
-                        Button(
-                            onClick = { showDeleteDialog = true },
-                            modifier = Modifier.height(48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935))
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!isTestMode) {
+                            Button(
+                                onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(if (hasData) "Actualizar" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
+                                }
+                            }
+                        }
+                        if (hasData && !isTestMode) {
+                            Button(
+                                onClick = { showDeleteDialog = true },
+                                modifier = Modifier.height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935))
+                            }
                         }
                     }
                 }
@@ -175,8 +192,12 @@ fun HomeScreen(
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SectionButton("Partidos", "Resultados de la fase de grupos y eliminatorias", Icons.Filled.EmojiEvents, hasData, onNavigateToMatches)
-                    SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, hasData, onNavigateToQuestions)
+                    if (isTestMode) {
+                        SectionButton("Partidos Test", "Predicciones aleatorias de los amistosos de hoy", Icons.Filled.EmojiEvents, true, onNavigateToMatches)
+                    } else {
+                        SectionButton("Partidos", "Resultados de la fase de grupos y eliminatorias", Icons.Filled.EmojiEvents, hasData, onNavigateToMatches)
+                        SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, hasData, onNavigateToQuestions)
+                    }
                 }
             }
             item { Spacer(Modifier.height(16.dp)) }

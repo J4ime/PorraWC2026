@@ -75,10 +75,18 @@ class HomeViewModel @Inject constructor(
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
+    private val _isTestMode = MutableStateFlow(false)
+    val isTestMode: StateFlow<Boolean> = _isTestMode.asStateFlow()
+    private val _testModeTitle = MutableStateFlow("")
+    val testModeTitle: StateFlow<String> = _testModeTitle.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
+    private var wcCachedMatches: List<MatchEntity> = emptyList()
+    private var wcPlayers: List<PlayerPredictionEntity> = emptyList()
+    private var wcHasData: Boolean = false
     private var refreshJob: Job? = null
     private var livePollJob: Job? = null
+    private var testPollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
     private var liveMatchApiId: Int? = null
     private var liveMinuteStr: String? = null
@@ -89,9 +97,64 @@ class HomeViewModel @Inject constructor(
         PlayerPredictionEntity(rank = 2, playerName = "Luka Modric", predictedName = "Modric", pointsPerGoal = 30),
         PlayerPredictionEntity(rank = 3, playerName = "Kevin De Bruyne", predictedName = "De Bruyne", pointsPerGoal = 10)
     )
-    companion object { const val MATCH_ID_AMISTOSO = 999 }
+    companion object { const val MATCH_ID_AMISTOSO = 999; private const val PREFS = "porra_prefs"; private const val KEY_TEST = "test_mode" }
 
-    init { refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos() }
+    init {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_TEST, false)) {
+            _isTestMode.value = true
+            enterTestMode()
+        } else {
+            refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
+        }
+    }
+
+    private fun saveTestMode(enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_TEST, enabled).apply()
+    }
+
+    fun toggleTestMode() {
+        val newMode = !_isTestMode.value
+        _isTestMode.value = newMode
+        saveTestMode(newMode)
+        _isReady.value = false
+        livePollJob?.cancel()
+        testPollJob?.cancel()
+        refreshJob?.cancel()
+        liveMatchApiId = null
+        liveMinuteStr = null
+        liveHomeScorers = emptyList()
+        liveAwayScorers = emptyList()
+        lastWrittenScores.clear()
+        if (newMode) {
+            enterTestMode()
+        } else {
+            exitTestMode()
+        }
+    }
+
+    private fun enterTestMode() {
+        wcCachedMatches = cachedMatches.toList()
+        wcPlayers = _players.value.toList()
+        wcHasData = _hasData.value
+        _hasData.value = true
+        _players.value = testPlayers
+        _testModeTitle.value = ""
+        viewModelScope.launch(Dispatchers.IO) {
+            _isBusy.value = true
+            fetchFriendlyMatches()
+            _isBusy.value = false
+            _isReady.value = true
+        }
+    }
+
+    private fun exitTestMode() {
+        cachedMatches = wcCachedMatches
+        _players.value = wcPlayers
+        _hasData.value = wcHasData
+        _testModeTitle.value = ""
+        refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
+    }
 
     private fun precachePhotos() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -325,6 +388,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun checkLiveWindow() {
+        if (_isTestMode.value) return
         val todayWithDates = getTodayMatchesWithDates()
         if (todayWithDates.isEmpty()) { livePollJob?.cancel(); return }
         val now = Date()
@@ -402,7 +466,99 @@ class HomeViewModel @Inject constructor(
         fetchLiveAmistoso()
     }
 
+    private suspend fun fetchFriendlyMatches() {
+        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val all = try { apiService.getMatches(dateFrom = dateStr, dateTo = dateStr) } catch (_: Exception) { null }
+        val nationalTeams = setOf("Croatia", "Belgium", "France", "Germany", "Spain", "England", "Italy", "Portugal",
+            "Netherlands", "Argentina", "Brazil", "Uruguay", "Mexico", "Sweden", "Norway", "Denmark", "Poland",
+            "Switzerland", "Austria", "Czechia", "Turkey", "Scotland", "Wales", "Ukraine", "Serbia", "Japan",
+            "South Korea", "Australia", "USA", "Canada", "Morocco", "Senegal", "Egypt", "Nigeria", "Ghana",
+            "Ivory Coast", "Cameroon", "Algeria", "Tunisia", "Iran", "Saudi Arabia", "Qatar", "Ecuador",
+            "Colombia", "Chile", "Peru", "Paraguay", "Costa Rica", "Panama")
+        val friendlies = all?.matches?.filter { m ->
+            val h = m.homeTeam?.name ?: ""
+            val a = m.awayTeam?.name ?: ""
+            val stage = m.stage ?: ""
+            stage.isBlank() || stage == "FRIENDLY" || stage.contains("FRIEND", true)
+        }?.take(5) ?: emptyList()
+
+        if (friendlies.isEmpty()) {
+            _testModeTitle.value = "SIN AMISTOSOS HOY"
+            cachedMatches = emptyList()
+            refreshUpcomingMatches()
+            return
+        }
+        val rng = java.util.Random()
+        cachedMatches = friendlies.mapIndexed { idx, m ->
+            val home = m.homeTeam?.name?.takeIf { nationalTeams.any { nt -> it.contains(nt, true) || nt.contains(it, true) } } ?: m.homeTeam?.name ?: "?"
+            val away = m.awayTeam?.name?.takeIf { nationalTeams.any { nt -> it.contains(nt, true) || nt.contains(it, true) } } ?: m.awayTeam?.name ?: "?"
+            MatchEntity(
+                id = 900 + idx, groupName = "Amistoso",
+                matchday = "Amistoso", dateTime = m.utcDate,
+                homeTeam = home, awayTeam = away,
+                tvChannel = "", isKnockout = false,
+                predictedHomeGoals = rng.nextInt(3), predictedAwayGoals = rng.nextInt(3),
+                pointsEarned = 0, homeGoals = if (m.status == "FINISHED") m.score?.fullTime?.home else null,
+                awayGoals = if (m.status == "FINISHED") m.score?.fullTime?.away else null
+            )
+        }
+        _testModeTitle.value = "AMISTOSOS HOY"
+        refreshUpcomingMatches()
+        startTestPolling()
+    }
+
+    private fun startTestPolling() {
+        testPollJob?.cancel()
+        testPollJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive && _isTestMode.value) {
+                fetchLiveFriendly()
+                delay(5 * 60_000L)
+            }
+        }
+    }
+
+    private suspend fun fetchLiveFriendly() {
+        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val all = try { apiService.getMatches(dateFrom = dateStr, dateTo = dateStr) } catch (_: Exception) { return }
+        var changed = false
+        cachedMatches.forEachIndexed { index, cm ->
+            val fm = all.matches.firstOrNull {
+                it.homeTeam?.name == cm.homeTeam && it.awayTeam?.name == cm.awayTeam
+            }
+            if (fm != null && fm.status != "TIMED") {
+                val hg = fm.score?.fullTime?.home
+                val ag = fm.score?.fullTime?.away
+                val min = fm.status == "FINISHED"
+                val prev = lastWrittenScores[cm.id]
+                if (hg != null && ag != null && (prev == null || prev.first != hg || prev.second != ag)) {
+                    lastWrittenScores[cm.id] = hg to ag
+                    cachedMatches = cachedMatches.toMutableList().also { it[index] = cm.copy(homeGoals = hg, awayGoals = ag) }
+                    changed = true
+                }
+            }
+        }
+        if (changed) {
+            cachedMatches = cachedMatches.map { m ->
+                val realHome = m.homeGoals; val realAway = m.awayGoals
+                if (realHome != null && realAway != null) {
+                    val predHome = m.predictedHomeGoals; val predAway = m.predictedAwayGoals
+                    var pts = 0
+                    if (predHome != null && predAway != null) {
+                        if (predHome == realHome) pts += 10
+                        if (predAway == realAway) pts += 10
+                        val pr = when { predHome > predAway -> "h"; predHome < predAway -> "a"; else -> "d" }
+                        val rr = when { realHome > realAway -> "h"; realHome < realAway -> "a"; else -> "d" }
+                        if (pr == rr) pts += 30
+                    }
+                    m.copy(pointsEarned = pts)
+                } else m
+            }
+            refreshUpcomingMatches()
+        }
+    }
+
     private suspend fun fetchLiveAmistoso() {
+        if (_isTestMode.value) fetchLiveFriendly()
         val amistoso = cachedMatches.firstOrNull { it.id == MATCH_ID_AMISTOSO } ?: return
         val start = parseMadridDate(amistoso.dateTime) ?: return
         val now = Date()
@@ -472,6 +628,14 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun refreshUpcomingMatches() {
+        if (_isTestMode.value) {
+            val allDisplay = cachedMatches.filter { !it.isKnockout }
+                .sortedBy { it.dateTime.ifBlank { "zzz" } }
+                .map { toDisplay(it) }
+            _sectionTitle.value = _testModeTitle.value.ifBlank { "AMISTOSOS HOY" }
+            _upcomingMatches.value = allDisplay
+            return
+        }
         val cal = Calendar.getInstance(madridTZ)
         val today = cal.get(Calendar.DAY_OF_YEAR)
         val year = cal.get(Calendar.YEAR)

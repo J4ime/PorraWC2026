@@ -57,24 +57,36 @@ object LiveScoreScraper {
                 val matches = mutableListOf<ScrapedMatch>()
                 for (i in 0 until events.length()) {
                     val e = events.getJSONObject(i)
-                    val home = e.optJSONObject("homeTeam")?.optString("name") ?: ""
-                    val away = e.optJSONObject("awayTeam")?.optString("name") ?: ""
+                    val homeTeam = e.optJSONObject("homeTeam") ?: continue
+                    val awayTeam = e.optJSONObject("awayTeam") ?: continue
+                    val home = homeTeam.optString("name", "")
+                    val away = awayTeam.optString("name", "")
                     if (home.length < 3 || away.length < 3) continue
-                    val statusCode = e.optJSONObject("status")?.optString("type") ?: ""
+                    val isHomeNational = homeTeam.optBoolean("national", false)
+                    val isAwayNational = awayTeam.optBoolean("national", false)
+                    if (!isHomeNational || !isAwayNational) continue
+                    val statusObj = e.optJSONObject("status") ?: continue
+                    val statusCode = statusObj.optString("type", "")
                     val statusStr = when {
                         statusCode == "finished" || statusCode == "after_pen" || statusCode == "after_et" -> "FINISHED"
                         statusCode == "inprogress" || statusCode == "halftime" -> "IN_PLAY"
                         else -> "TIMED"
                     }
-                    val hg = e.optInt("homeScore", -1).takeIf { it >= 0 && statusStr != "TIMED" }
-                    val ag = e.optInt("awayScore", -1).takeIf { it >= 0 && statusStr != "TIMED" }
-                    val utc = e.optLong("startTimestamp", 0).takeIf { it > 0 }?.let {
-                        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date(it * 1000))
-                    } ?: ""
+                    val homeScore = e.optJSONObject("homeScore")
+                    val awayScore = e.optJSONObject("awayScore")
+                    val hg = homeScore?.optInt("current", -1)?.takeIf { it >= 0 && statusStr != "TIMED" }
+                    val ag = awayScore?.optInt("current", -1)?.takeIf { it >= 0 && statusStr != "TIMED" }
+                    val ts = e.optLong("startTimestamp", 0)
+                    val utc = if (ts > 0) {
+                        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date(ts * 1000))
+                    } else ""
                     matches.add(ScrapedMatch(home, away, utc, statusStr, hg, ag))
                 }
+                Log.d(TAG, "SofaScore: ${matches.size} national team matches from $urlStr")
                 if (matches.isNotEmpty()) return matches
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.d(TAG, "SofaScore $urlStr failed: ${e.message}")
+            }
         }
         return emptyList()
     }

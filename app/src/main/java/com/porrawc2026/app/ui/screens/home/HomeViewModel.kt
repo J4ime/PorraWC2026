@@ -531,29 +531,13 @@ class HomeViewModel @Inject constructor(
     private fun buildAndShowMatches(raw: List<ScrapedMatch>) {
         val rng = java.util.Random()
         val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
-        val nationalTeams = setOf("Croatia", "Belgium", "France", "Germany", "Spain", "England", "Italy",
-            "Portugal", "Netherlands", "Argentina", "Brazil", "Uruguay", "Mexico", "Sweden", "Norway",
-            "Denmark", "Poland", "Switzerland", "Austria", "Czechia", "Turkey", "Scotland", "Wales",
-            "Ukraine", "Serbia", "Japan", "South Korea", "Australia", "USA", "Canada", "Morocco",
-            "Senegal", "Egypt", "Nigeria", "Ghana", "Ivory Coast", "Cameroon", "Algeria", "Tunisia",
-            "Iran", "Saudi Arabia", "Qatar", "Ecuador", "Colombia", "Chile", "Peru", "Paraguay",
-            "Costa Rica", "Panama", "South Africa", "Russia", "Greece", "Ireland", "Finland",
-            "Iceland", "Hungary", "Romania", "Bulgaria", "Slovakia", "Slovenia", "Venezuela",
-            "Bolivia", "Honduras", "El Salvador", "Jamaica", "New Zealand", "China PR", "India",
-            "Iraq", "Jordan", "Kuwait", "Oman", "UAE", "Bahrain", "Lebanon", "Syria", "Palestine",
-            "Sudan", "Libya", "Mali", "Burkina Faso", "Zambia", "Angola", "Mozambique", "Guinea",
-            "Togo", "Benin", "Cape Verde", "Gabon", "Congo", "DR Congo", "Curaçao", "Haiti")
-        val filtered = raw.filter { m ->
-            nationalTeams.any { m.homeTeam.contains(it, true) || it.contains(m.homeTeam, true) } &&
-            nationalTeams.any { m.awayTeam.contains(it, true) || it.contains(m.awayTeam, true) }
-        }
-        if (filtered.isEmpty()) {
+        if (raw.isEmpty()) {
             _testModeTitle.value = "SIN AMISTOSOS HOY"
             cachedMatches = emptyList()
             refreshUpcomingMatches()
             return
         }
-        val entities = filtered.mapIndexed { idx, m ->
+        val entities = raw.mapIndexed { idx, m ->
             MatchEntity(
                 id = 900 + idx, groupName = "Amistoso",
                 matchday = "Amistoso", dateTime = m.utcDate.ifBlank { now },

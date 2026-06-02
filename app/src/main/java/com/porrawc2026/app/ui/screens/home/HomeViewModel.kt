@@ -117,6 +117,7 @@ class HomeViewModel @Inject constructor(
                 startAutoRefresh()
                 refreshUpcomingMatches()
             } else {
+                _hasData.value = true
                 enrichScheduleFromApi()
                 refreshUpcomingMatches()
             }

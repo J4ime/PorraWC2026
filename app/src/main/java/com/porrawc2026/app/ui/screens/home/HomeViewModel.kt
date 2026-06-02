@@ -383,9 +383,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun recalcPlayerPoints(scorers: List<GoalEvent>) {
+    private fun recalcPlayerPoints() {
+        val allScorers = testScorers.values.flatMap { it.first + it.second }
         val updated = _players.value.map { player ->
-            val matchingScorers = scorers.count { scorer ->
+            val matchingScorers = allScorers.count { scorer ->
                 val pName = player.predictedName ?: player.playerName
                 scorer.playerName.contains(pName, ignoreCase = true) ||
                 pName.contains(scorer.playerName, ignoreCase = true)
@@ -396,6 +397,7 @@ class HomeViewModel @Inject constructor(
             } else player
         }
         _players.value = updated
+        refreshPoints()
     }
 
     private suspend fun enrichScheduleFromApi() {
@@ -613,10 +615,9 @@ class HomeViewModel @Inject constructor(
                 Log.w("HomeVM", "===== fetching goal details for match ${cm.id} eventId=$eId =====")
                 val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
                 if (h.isNotEmpty() || a.isNotEmpty()) {
-                    testScorers[cm.id] = Pair(
-                        h.map { GoalEvent(it.playerName, it.minute) },
-                        a.map { GoalEvent(it.playerName, it.minute) }
-                    )
+                    val homeEvents = h.map { GoalEvent(it.playerName, it.minute) }
+                    val awayEvents = a.map { GoalEvent(it.playerName, it.minute) }
+                    testScorers[cm.id] = Pair(homeEvents, awayEvents)
                     Log.w("HomeVM", "===== stored scorers for match ${cm.id}: H=$h A=$a =====")
                 } else {
                     Log.w("HomeVM", "===== no scorers for match ${cm.id} (H=$h A=$a) =====")
@@ -637,6 +638,7 @@ class HomeViewModel @Inject constructor(
                     m.copy(pointsEarned = pts)
                 } else m
             }
+            recalcPlayerPoints()
             refreshUpcomingMatches()
         }
     }
@@ -700,7 +702,7 @@ class HomeViewModel @Inject constructor(
                     ) else it
                 }
                 recalcAllPoints()
-                recalcPlayerPoints(homeScr + awayScr)
+                recalcPlayerPoints()
                 refreshPoints()
                 refreshUpcomingMatches()
                 Log.d("HomeVM", "Live amistoso: min=$minute status=$status H=$homeGoals A=$awayGoals scorers H=$homeScr A=$awayScr")

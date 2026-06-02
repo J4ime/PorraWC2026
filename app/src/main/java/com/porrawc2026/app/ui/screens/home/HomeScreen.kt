@@ -291,10 +291,11 @@ private fun MatchRow(match: MatchDisplay) {
                 style = MaterialTheme.typography.bodySmall, color = Color.White,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (match.homeScorers.isNotEmpty()) {
-                match.homeScorers.forEach { scorer ->
-                    Text("\u26BD ${scorer.playerName} ${scorer.minute}'",
-                        style = MaterialTheme.typography.labelSmall, color = Color(0xFF4CAF50),
+                match.homeScorers.forEachIndexed { idx, scorer ->
+                    Text("\u26BD ${scorer.playerName.split(" ").last()} ${scorer.minute}'",
+                        style = MaterialTheme.typography.labelSmall, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888),
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (idx < match.homeScorers.lastIndex) Spacer(Modifier.height(2.dp))
                 }
             }
         }
@@ -324,10 +325,11 @@ private fun MatchRow(match: MatchDisplay) {
                 style = MaterialTheme.typography.bodySmall, color = Color.White,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (match.awayScorers.isNotEmpty()) {
-                match.awayScorers.forEach { scorer ->
-                    Text("\u26BD ${scorer.playerName} ${scorer.minute}'",
-                        style = MaterialTheme.typography.labelSmall, color = Color(0xFF4CAF50),
+                match.awayScorers.forEachIndexed { idx, scorer ->
+                    Text("\u26BD ${scorer.playerName.split(" ").last()} ${scorer.minute}'",
+                        style = MaterialTheme.typography.labelSmall, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888),
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (idx < match.awayScorers.lastIndex) Spacer(Modifier.height(2.dp))
                 }
             }
         }

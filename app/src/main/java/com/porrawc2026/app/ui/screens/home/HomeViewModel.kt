@@ -107,6 +107,7 @@ class HomeViewModel @Inject constructor(
             val dbMatches = repository.getAllMatches().first()
             if (dbMatches.isNotEmpty()) {
                 cachedMatches = dbMatches
+                ensureTestMatch()
                 _hasData.value = true
                 enrichScheduleFromApi()
                 recalcAllPoints()
@@ -119,6 +120,7 @@ class HomeViewModel @Inject constructor(
                 enrichScheduleFromApi()
                 refreshUpcomingMatches()
             }
+            _isReady.value = true
         }
     }
 
@@ -138,16 +140,20 @@ class HomeViewModel @Inject constructor(
                 tvChannel = tv, isKnockout = false
             )
         }
-        cachedMatches = cachedMatches + MatchEntity(
-            id = MATCH_ID_AMISTOSO, groupName = "Amistoso",
-            matchday = "Amistoso", dateTime = "2026-06-02T18:00:00",
-            homeTeam = "Croacia", awayTeam = "Bélgica",
-            tvChannel = "", isKnockout = false,
-            predictedHomeGoals = 1, predictedAwayGoals = 2, pointsEarned = 0
-        )
+        ensureTestMatch()
         loadTestPlayers()
-        refreshUpcomingMatches()
-        _isReady.value = true
+    }
+
+    private fun ensureTestMatch() {
+        if (cachedMatches.none { it.id == MATCH_ID_AMISTOSO }) {
+            cachedMatches = cachedMatches + MatchEntity(
+                id = MATCH_ID_AMISTOSO, groupName = "Amistoso",
+                matchday = "Amistoso", dateTime = "2026-06-02T18:00:00",
+                homeTeam = "Croacia", awayTeam = "Bélgica",
+                tvChannel = "", isKnockout = false,
+                predictedHomeGoals = 1, predictedAwayGoals = 2, pointsEarned = 0
+            )
+        }
     }
 
     private fun loadTestPlayers() {
@@ -180,6 +186,7 @@ class HomeViewModel @Inject constructor(
                     )
                     _hasData.value = true
                     cachedMatches = data.matches
+                    ensureTestMatch()
                     lastWrittenScores.clear()
                     Log.w("HomeVM", "===== IMPORT: data inserted, hasData=true, ${cachedMatches.size} matches =====")
                     enrichScheduleFromApi()

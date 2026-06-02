@@ -88,6 +88,8 @@ fun HomeScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(painter = painterResource(R.drawable.logo), contentDescription = null, modifier = Modifier.size(80.dp))
                 Spacer(Modifier.height(16.dp))
+                Text("Buscando partidos...", style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777))
+                Spacer(Modifier.height(8.dp))
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             }
         }

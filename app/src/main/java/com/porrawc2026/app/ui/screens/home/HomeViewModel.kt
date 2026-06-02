@@ -163,11 +163,13 @@ class HomeViewModel @Inject constructor(
         _hasData.value = true
         _players.value = testPlayers
         _testModeTitle.value = ""
+        Log.w("HomeVM", "===== enterTestMode: launching fetch =====")
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             fetchFriendlyMatches()
             _isBusy.value = false
             _isReady.value = true
+            Log.w("HomeVM", "===== enterTestMode: done, isReady=true, cachedMatches=${cachedMatches.size} =====")
         }
     }
 
@@ -546,6 +548,7 @@ class HomeViewModel @Inject constructor(
     private fun buildAndShowMatches(raw: List<ScrapedMatch>) {
         val rng = java.util.Random()
         val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
+        Log.w("HomeVM", "===== buildAndShowMatches: ${raw.size} raw matches =====")
         if (raw.isEmpty()) {
             _testModeTitle.value = "SIN AMISTOSOS HOY"
             cachedMatches = emptyList()
@@ -557,7 +560,7 @@ class HomeViewModel @Inject constructor(
             if (m.eventId > 0) sofascoreEventIds[matchId] = m.eventId
             if (m.liveMinute > 0) testLiveMinutes[matchId] = m.liveMinute
             MatchEntity(
-                id = 900 + idx, groupName = "Amistoso",
+                id = matchId, groupName = "Amistoso",
                 matchday = "Amistoso", dateTime = m.utcDate.ifBlank { now },
                 homeTeam = m.homeTeam, awayTeam = m.awayTeam,
                 tvChannel = "", isKnockout = false,
@@ -566,9 +569,7 @@ class HomeViewModel @Inject constructor(
             )
         }
         cachedMatches = entities
-        viewModelScope.launch(Dispatchers.IO) {
-            try { repository.insertAllData(emptyList(), entities, emptyList(), emptyList(), emptyList(), emptyList()) } catch (_: Exception) {}
-        }
+        Log.w("HomeVM", "===== built ${entities.size} entities, first: ${entities.firstOrNull()?.homeTeam} vs ${entities.firstOrNull()?.awayTeam} =====")
         _testModeTitle.value = "AMISTOSOS HOY"
         refreshUpcomingMatches()
         startTestPolling()
@@ -711,6 +712,7 @@ class HomeViewModel @Inject constructor(
                 .map { toDisplay(it) }
             _sectionTitle.value = _testModeTitle.value.ifBlank { "AMISTOSOS HOY" }
             _upcomingMatches.value = allDisplay
+            Log.w("HomeVM", "===== TEST refresh: ${allDisplay.size} matches, first: ${allDisplay.firstOrNull()?.homeTeam} vs ${allDisplay.firstOrNull()?.awayTeam} =====")
             return
         }
         val cal = Calendar.getInstance(madridTZ)

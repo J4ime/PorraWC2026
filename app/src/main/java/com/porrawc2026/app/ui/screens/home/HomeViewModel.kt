@@ -525,7 +525,7 @@ class HomeViewModel @Inject constructor(
     private fun buildAndShowMatches(raw: List<ScrapedMatch>) {
         val rng = java.util.Random()
         val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
-        cachedMatches = raw.mapIndexed { idx, m ->
+        val entities = raw.mapIndexed { idx, m ->
             MatchEntity(
                 id = 900 + idx, groupName = "Amistoso",
                 matchday = "Amistoso", dateTime = m.utcDate.ifBlank { now },
@@ -534,6 +534,10 @@ class HomeViewModel @Inject constructor(
                 predictedHomeGoals = rng.nextInt(3), predictedAwayGoals = rng.nextInt(3),
                 pointsEarned = 0, homeGoals = m.homeGoals, awayGoals = m.awayGoals
             )
+        }
+        cachedMatches = entities
+        viewModelScope.launch(Dispatchers.IO) {
+            try { repository.insertAllData(emptyList(), entities, emptyList(), emptyList(), emptyList(), emptyList()) } catch (_: Exception) {}
         }
         _testModeTitle.value = "AMISTOSOS HOY"
         refreshUpcomingMatches()

@@ -692,7 +692,7 @@ class HomeViewModel @Inject constructor(
         val today = cal.get(Calendar.DAY_OF_YEAR)
         val year = cal.get(Calendar.YEAR)
 
-        val groupMatches = cachedMatches.filter { !it.isKnockout }
+        val groupMatches = cachedMatches.filter { !it.isKnockout && it.id != MATCH_ID_AMISTOSO }
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = groupMatches.map { match -> toDisplay(match) }
 

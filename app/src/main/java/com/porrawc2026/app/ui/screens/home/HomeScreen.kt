@@ -91,7 +91,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().height(56.dp).padding(horizontal = 16.dp)) {
-                Image(painter = painterResource(R.drawable.logo_porra), contentDescription = "Logo", modifier = Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.CenterStart))
+                Image(painter = painterResource(R.drawable.icons), contentDescription = "Logo", modifier = Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.CenterStart))
                 Text("PORRA MUNDIAL 26", Modifier.fillMaxWidth().align(Alignment.Center), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF333333)).align(Alignment.CenterEnd), contentAlignment = Alignment.Center) {
                     Text("$totalPoints", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)

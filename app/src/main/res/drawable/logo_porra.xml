@@ -5,66 +5,131 @@
     android:viewportWidth="200"
     android:viewportHeight="200">
 
-    <!-- Circular background -->
+    <!-- Green pitch -->
     <path
-        android:fillColor="#0D4F30"
-        android:pathData="M100,12m-88,0a88,88 0,1 1,176 0a88,88 0,1 1,-176 0"/>
+        android:fillColor="#2E7D32"
+        android:pathData="M4,10 L196,10 L196,190 L4,190 Z"/>
 
-    <!-- Gold ring -->
+    <!-- Outer pitch border -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#DAA520"
-        android:strokeWidth="4"
-        android:pathData="M100,14m-84,0a84,84 0,1 1,168 0a84,84 0,1 1,-168 0"/>
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M4,10 L196,10 L196,190 L4,190 Z"/>
 
-    <!-- Football -->
+    <!-- Center line -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M100,10 L100,190"/>
+
+    <!-- Center circle -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M100,100m-30,0a30,30 0,1 1,60 0a30,30 0,1 1,-60 0"/>
+
+    <!-- Center dot -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M100,72m-28,0a28,28 0,1 1,56 0a28,28 0,1 1,-56 0"/>
+        android:pathData="M100,100m-2.5,0a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0"/>
 
-    <!-- Football center pentagon -->
-    <path
-        android:fillColor="#1A1A1A"
-        android:pathData="M100,66 L95,77 L97,85 L103,85 L105,77 Z"/>
-
-    <!-- Football seams -->
+    <!-- Left penalty area -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#333"
-        android:strokeWidth="2"
-        android:pathData="M100,44 L74,58 L66,80 L74,96 L100,100 M100,44 L126,58 L134,80 L126,96 L100,100"/>
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M4,40 L32,40 L32,160 L4,160"/>
 
-    <!-- Trophy -->
+    <!-- Right penalty area -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M196,40 L168,40 L168,160 L196,160"/>
+
+    <!-- Left penalty arc -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M28,100m0,-14a14,14 0,1 1,0 28a14,14 0,1 1,0 -28"/>
+
+    <!-- Right penalty arc -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M172,100m0,-14a14,14 0,1 1,0 28a14,14 0,1 1,0 -28"/>
+
+    <!-- Left goal area -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M4,66 L14,66 L14,134 L4,134"/>
+
+    <!-- Right goal area -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M196,66 L186,66 L186,134 L196,134"/>
+
+    <!-- Left goal net lines -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0.8"
+        android:pathData="M0,84 L4,84 M0,92 L4,92 M0,100 L4,100 M0,108 L4,108 M0,116 L4,116"/>
+
+    <!-- Right goal net lines -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0.8"
+        android:pathData="M200,84 L196,84 M200,92 L196,92 M200,100 L196,100 M200,108 L196,108 M200,116 L196,116"/>
+
+    <!-- Corner arcs -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M4,10m0,8a8,8 0,1 1,-0 -16 M196,10m0,8a8,8 0,1 1,-0 -16 M4,190m0,-8a8,8 0,1 1,-0 16 M196,190m0,-8a8,8 0,1 1,-0 16"/>
+
+    <!-- World Cup Trophy (center) -->
+    <!-- Trophy cup -->
     <path
         android:fillColor="#DAA520"
-        android:pathData="M82,40 L78,48 L66,48 L62,52 L62,56 C62,64 66,68 70,70 L74,70 L74,78 L126,78 L126,70 L130,70 C134,68 138,64 138,56 L138,52 L134,48 L122,48 L118,40 Z"/>
+        android:pathData="M86,74 L82,82 L70,82 L66,86 C66,94 70,98 74,100 L78,100 L78,118 L122,118 L122,100 L126,100 C130,98 134,94 134,86 L130,82 L118,82 L114,74 Z"/>
+
+    <!-- Trophy inner detail -->
+    <path
+        android:fillColor="#B8860B"
+        android:pathData="M94,74 L90,82 L74,82 L70,86 C70,90 74,94 78,96 L78,118 L122,118 L122,96 L126,96 C130,94 130,90 130,86 L126,82 L110,82 L106,74 Z"/>
 
     <!-- Trophy base -->
     <path
         android:fillColor="#DAA520"
-        android:pathData="M80,78 L120,78 L124,86 L76,86 Z"/>
+        android:pathData="M86,118 L114,118 L118,126 L82,126 Z"/>
 
     <!-- Trophy handles -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#DAA520"
-        android:strokeWidth="3"
-        android:pathData="M66,48 C48,48 48,64 48,64 M134,48 C152,48 152,64 152,64"/>
+        android:strokeWidth="4"
+        android:pathData="M70,82 C48,82 48,102 48,102 M130,82 C152,82 152,102 152,102"/>
 
-    <!-- Stars -->
+    <!-- Trophy globe/ball on top -->
     <path
         android:fillColor="#DAA520"
-        android:pathData="M50,46 L53,56 L63,56 L55,62 L58,72 L50,66 L42,72 L45,62 L37,56 L47,56 Z"/>
-    <path
-        android:fillColor="#DAA520"
-        android:pathData="M150,46 L153,56 L163,56 L155,62 L158,72 L150,66 L142,72 L145,62 L137,56 L147,56 Z"/>
-    <path
-        android:fillColor="#DAA520"
-        android:pathData="M100,136 L103,146 L113,146 L105,152 L108,162 L100,156 L92,162 L95,152 L87,146 L97,146 Z"/>
+        android:pathData="M94,68 L100,54 L106,68 Z"/>
 
-    <!-- "WC 26" text (simplified blocks) -->
+    <!-- Star on top of trophy -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M60,120 L60,140 L66,140 L70,120 L74,120 L74,140 L80,140 L80,120 Z M86,120 L86,140 L92,140 L92,130 L86,130 Z M96,120 L100,130 L104,120 L108,120 L102,130 L108,140 L104,140 L100,130 L96,140 L92,140 L98,130 L92,120 Z M112,120 L116,130 L120,120 L124,120 L124,140 L118,140 L118,130 L114,140 L110,140 L110,120 Z M128,120 L128,140 L140,140 L140,134 L134,134 L134,120 Z"/>
+        android:fillColor="#DAA520"
+        android:pathData="M100,42 L102,52 L112,52 L103,56 L107,66 L100,60 L93,66 L97,56 L88,52 L98,52 Z"/>
 
 </vector>

@@ -17,6 +17,7 @@ import com.porrawc2026.app.util.ValidationResult
 import com.porrawc2026.app.util.LiveScoreScraper
 import com.porrawc2026.app.util.ScrapedMatch
 import com.porrawc2026.app.util.UpdateManager
+import com.porrawc2026.app.util.GoalNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -89,6 +90,7 @@ class HomeViewModel @Inject constructor(
     private var livePollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
     private val goalScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
+    private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
 
     companion object {
         val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
@@ -303,6 +305,28 @@ class HomeViewModel @Inject constructor(
         refreshPoints()
     }
 
+    private fun checkGoalNotifications() {
+        val predictedNames = _players.value.mapNotNull { it.predictedName }.map { it.lowercase() }.toSet()
+        if (predictedNames.isEmpty()) return
+        for ((matchId, pair) in goalScorers) {
+            val seen = seenScorers.getOrPut(matchId) { mutableSetOf() }
+            val allScorers = pair.first + pair.second
+            for (scorer in allScorers) {
+                val name = scorer.playerName
+                val key = name.lowercase().trim()
+                if (seen.add(key)) {
+                    val matches = predictedNames.any { pred ->
+                        key.contains(pred, ignoreCase = true) || pred.contains(key, ignoreCase = true)
+                    }
+                    if (matches) {
+                        val displayName = name.split(" ").last()
+                        GoalNotifier.notifyGoal(context, displayName)
+                    }
+                }
+            }
+        }
+    }
+
     private suspend fun enrichScheduleFromApi() {
         enrichScheduleFallback()
         try {
@@ -444,6 +468,7 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+        checkGoalNotifications()
     }
 
     private fun refreshUpcomingMatches() {

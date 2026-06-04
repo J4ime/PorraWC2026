@@ -30,9 +30,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import com.porrawc2026.app.R
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.ValidationResult
@@ -52,8 +49,6 @@ fun HomeScreen(
     val players by viewModel.players.collectAsState()
     val isReady by viewModel.isReady.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
-    val isTestMode by viewModel.isTestMode.collectAsState()
-    val testModeTitle by viewModel.testModeTitle.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val isUpdating by viewModel.isUpdating.collectAsState()
 
@@ -91,7 +86,6 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().height(56.dp).padding(horizontal = 16.dp)) {
-                Image(painter = painterResource(R.drawable.icons), contentDescription = "Logo", modifier = Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.CenterStart))
                 Text("PORRA MUNDIAL 26", Modifier.fillMaxWidth().align(Alignment.Center), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF333333)).align(Alignment.CenterEnd), contentAlignment = Alignment.Center) {
                     Text("$totalPoints", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
@@ -101,17 +95,6 @@ fun HomeScreen(
         bottomBar = {
             Surface(modifier = Modifier.fillMaxWidth().navigationBarsPadding(), color = Color(0xFF1A1A1A)) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Button(
-                        onClick = { viewModel.toggleTestMode() },
-                        modifier = Modifier.fillMaxWidth().height(40.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isTestMode) Color(0xFF2E7D32) else Color(0xFF333333),
-                            contentColor = Color.White
-                        ), shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(if (isTestMode) "MODO TEST ACTIVADO" else "MODO TEST", style = MaterialTheme.typography.titleSmall)
-                    }
-                    Spacer(Modifier.height(6.dp))
                     Button(
                         onClick = { viewModel.installUpdate() },
                         modifier = Modifier.fillMaxWidth().height(40.dp),
@@ -131,22 +114,20 @@ fun HomeScreen(
                     Text("v${viewModel.appVersion}", Modifier.fillMaxWidth().padding(end = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), textAlign = TextAlign.End)
                     Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (!isTestMode) {
-                            Button(
-                                onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                                modifier = Modifier.weight(1f).height(48.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
-                            ) {
-                                if (isLoading) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(if (hasData) "Actualizar" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
-                                }
+                        Button(
+                            onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(if (hasData) "Actualizar" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
                             }
                         }
-                        if (hasData && !isTestMode) {
+                        if (hasData) {
                             Button(
                                 onClick = { showDeleteDialog = true },
                                 modifier = Modifier.height(48.dp),
@@ -199,12 +180,8 @@ fun HomeScreen(
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (isTestMode) {
-                        SectionButton("Partidos Test", "Predicciones aleatorias de los amistosos de hoy", Icons.Filled.EmojiEvents, true, onNavigateToMatches)
-                    } else {
-                        SectionButton("Partidos", "Resultados de la fase de grupos y eliminatorias", Icons.Filled.EmojiEvents, hasData, onNavigateToMatches)
-                        SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, hasData, onNavigateToQuestions)
-                    }
+                    SectionButton("Partidos", "Resultados de la fase de grupos y eliminatorias", Icons.Filled.EmojiEvents, hasData, onNavigateToMatches)
+                    SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, hasData, onNavigateToQuestions)
                 }
             }
             item { Spacer(Modifier.height(16.dp)) }
@@ -335,14 +312,16 @@ private fun MatchRow(match: MatchDisplay) {
         }
 
         Spacer(Modifier.width(4.dp))
-        val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
-        channels.forEach { ch ->
-            val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF0037A1) else Color(0xFF333333)
-            Text(ch.trim().take(4), fontSize = 8.sp, color = Color.White,
-                modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
+        if (!isLive && !hasResult) {
+            val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
+            channels.forEach { ch ->
+                val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF0037A1) else Color(0xFF333333)
+                Text(ch.trim().take(4), fontSize = 8.sp, color = Color.White,
+                    modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
+            }
         }
 
-        if (hasResult || (hasPred && isLive)) {
+        if (hasPred && (isLive || hasResult)) {
             val ptsValue = if (match.pointsEarned > 0) "${match.pointsEarned}" else "0"
             val ptsBg = if (isLive) Color(0xFF2E7D32) else Color.Transparent
             val ptsColor = when {

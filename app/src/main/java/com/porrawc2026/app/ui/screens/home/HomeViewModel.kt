@@ -78,10 +78,6 @@ class HomeViewModel @Inject constructor(
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
     private val _isBusy = MutableStateFlow(false)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
-    private val _isTestMode = MutableStateFlow(false)
-    val isTestMode: StateFlow<Boolean> = _isTestMode.asStateFlow()
-    private val _testModeTitle = MutableStateFlow("")
-    val testModeTitle: StateFlow<String> = _testModeTitle.asStateFlow()
     private val _updateAvailable = MutableStateFlow(false)
     val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
     private val _isUpdating = MutableStateFlow(false)
@@ -89,24 +85,12 @@ class HomeViewModel @Inject constructor(
     val appVersion: String = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
 
     private var cachedMatches: List<MatchEntity> = emptyList()
-    private var wcCachedMatches: List<MatchEntity> = emptyList()
-    private var wcPlayers: List<PlayerPredictionEntity> = emptyList()
-    private var wcHasData: Boolean = false
     private var refreshJob: Job? = null
     private var livePollJob: Job? = null
-    private var testPollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
-    private val sofascoreEventIds = mutableMapOf<Int, Long>()
-    private val testScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
-    private val testLiveMinutes = mutableMapOf<Int, Int>()
-    private val testPlayers = listOf(
-        PlayerPredictionEntity(rank = 1, playerName = "Romelu Lukaku", predictedName = "Lukaku", pointsPerGoal = 50),
-        PlayerPredictionEntity(rank = 2, playerName = "Luka Modric", predictedName = "Modric", pointsPerGoal = 30),
-        PlayerPredictionEntity(rank = 3, playerName = "Kevin De Bruyne", predictedName = "De Bruyne", pointsPerGoal = 10)
-    )
+    private val goalScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
+
     companion object {
-        private const val PREFS = "porra_prefs"
-        private const val KEY_TEST = "test_mode"
         val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
             "Switzerland", "Qatar", "Bosnia-Herzegovina", "Brazil", "Morocco", "Haiti", "Scotland",
             "United States", "Paraguay", "Turkey", "Australia", "Germany", "Curacao", "Ivory Coast",
@@ -117,63 +101,8 @@ class HomeViewModel @Inject constructor(
     }
 
     init {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (prefs.getBoolean(KEY_TEST, false)) {
-            _isTestMode.value = true
-            enterTestMode()
-        } else {
-            refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
-        }
-        checkForUpdate()
-    }
-
-    private fun saveTestMode(enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_TEST, enabled).apply()
-    }
-
-    fun toggleTestMode() {
-        val newMode = !_isTestMode.value
-        _isTestMode.value = newMode
-        saveTestMode(newMode)
-        _isReady.value = false
-        livePollJob?.cancel()
-        testPollJob?.cancel()
-        refreshJob?.cancel()
-        testScorers.clear()
-        testLiveMinutes.clear()
-        sofascoreEventIds.clear()
-        lastWrittenScores.clear()
-        if (newMode) {
-            enterTestMode()
-        } else {
-            exitTestMode()
-        }
-        checkForUpdate()
-    }
-
-    private fun enterTestMode() {
-        wcCachedMatches = cachedMatches.toList()
-        wcPlayers = _players.value.toList()
-        wcHasData = _hasData.value
-        _hasData.value = true
-        _players.value = testPlayers
-        _testModeTitle.value = ""
-        Log.w("HomeVM", "===== enterTestMode: launching fetch =====")
-        viewModelScope.launch(Dispatchers.IO) {
-            _isBusy.value = true
-            fetchFriendlyMatches()
-            _isBusy.value = false
-            _isReady.value = true
-            Log.w("HomeVM", "===== enterTestMode: done, isReady=true, cachedMatches=${cachedMatches.size} =====")
-        }
-    }
-
-    private fun exitTestMode() {
-        cachedMatches = wcCachedMatches
-        _players.value = wcPlayers
-        _hasData.value = wcHasData
-        _testModeTitle.value = ""
         refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
+        checkForUpdate()
     }
 
     private fun precachePhotos() {
@@ -223,18 +152,12 @@ class HomeViewModel @Inject constructor(
                 tvChannel = tv, isKnockout = false
             )
         }
-        loadTestPlayers()
-    }
-
-    private fun loadTestPlayers() {
-        if (_isTestMode.value) _players.value = testPlayers
     }
 
     private fun loadPlayers() {
         viewModelScope.launch {
             repository.getPlayerPredictions().collect { dbPlayers ->
-                _players.value = if (_isTestMode.value) testPlayers
-                    else dbPlayers.sortedBy { it.rank }
+                _players.value = dbPlayers.sortedBy { it.rank }
             }
         }
     }
@@ -364,7 +287,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun recalcPlayerPoints() {
-        val allScorers = testScorers.values.flatMap { it.first + it.second }
+        val allScorers = goalScorers.values.flatMap { it.first + it.second }
         val updated = _players.value.map { player ->
             val matchingScorers = allScorers.count { scorer ->
                 val pName = player.predictedName ?: player.playerName
@@ -420,7 +343,6 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun checkLiveWindow() {
-        if (_isTestMode.value) return
         val todayWithDates = getTodayMatchesWithDates()
         if (todayWithDates.isEmpty()) { livePollJob?.cancel(); return }
         val now = Date()
@@ -497,9 +419,10 @@ class HomeViewModel @Inject constructor(
                         val awayScr = detail.goals?.filter { g -> val t = g.team?.name; t == detail.awayTeam?.name || (t != null && detail.awayTeam?.name?.contains(t, true) == true) }
                             ?.mapNotNull { g -> val n = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: 0; GoalEvent(n, m) } ?: emptyList()
                         if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
-                            testScorers[entity.id] = Pair(homeScr.reversed(), awayScr.reversed())
+                            goalScorers[entity.id] = Pair(homeScr.reversed(), awayScr.reversed())
                         }
                     } catch (_: Exception) {}
+                    recalcAllPoints()
                     refreshPoints()
                     refreshUpcomingMatches()
                 }
@@ -514,7 +437,7 @@ class HomeViewModel @Inject constructor(
             if (eId > 0) {
                 val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
                 if (h.isNotEmpty() || a.isNotEmpty()) {
-                    testScorers[cm.id] = Pair(
+                    goalScorers[cm.id] = Pair(
                         h.map { GoalEvent(it.playerName, it.minute) },
                         a.map { GoalEvent(it.playerName, it.minute) }
                     )
@@ -523,141 +446,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchFriendlyMatches() {
-        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        val all = try { apiService.getMatches(dateFrom = dateStr, dateTo = dateStr) } catch (_: Exception) { null }
-        val apiMatches = all?.matches?.take(5) ?: emptyList()
-
-        if (apiMatches.isNotEmpty()) {
-            buildAndShowMatches(apiMatches.map { m ->
-                ScrapedMatch(
-                    homeTeam = m.homeTeam?.name ?: "?", awayTeam = m.awayTeam?.name ?: "?",
-                    utcDate = m.utcDate, status = m.status ?: "TIMED",
-                    homeGoals = if (m.status == "FINISHED") m.score?.fullTime?.home else null,
-                    awayGoals = if (m.status == "FINISHED") m.score?.fullTime?.away else null
-                )
-            })
-        } else {
-            Log.w("HomeVM", "===== API returned ${apiMatches.size} matches, trying scraper =====")
-            val scraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchMatches() }
-            Log.w("HomeVM", "===== Scraper returned ${scraped.size} matches =====")
-            if (scraped.isNotEmpty()) {
-                Log.d("HomeVM", "LiveScore fallback: ${scraped.size} matches")
-                buildAndShowMatches(scraped)
-            } else {
-                _testModeTitle.value = "SIN AMISTOSOS HOY"
-                cachedMatches = emptyList()
-                refreshUpcomingMatches()
-            }
-        }
-    }
-
-    private fun buildAndShowMatches(raw: List<ScrapedMatch>) {
-        val rng = java.util.Random()
-        val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date())
-        Log.w("HomeVM", "===== buildAndShowMatches: ${raw.size} raw matches =====")
-        if (raw.isEmpty()) {
-            _testModeTitle.value = "SIN AMISTOSOS HOY"
-            cachedMatches = emptyList()
-            refreshUpcomingMatches()
-            return
-        }
-        val entities = raw.mapIndexed { idx, m ->
-            val matchId = 900 + idx
-            if (m.eventId > 0) sofascoreEventIds[matchId] = m.eventId
-            if (m.liveMinute > 0) testLiveMinutes[matchId] = m.liveMinute
-            MatchEntity(
-                id = matchId, groupName = "Amistoso",
-                matchday = "Amistoso", dateTime = m.utcDate.ifBlank { now },
-                homeTeam = m.homeTeam, awayTeam = m.awayTeam,
-                tvChannel = "", isKnockout = false,
-                predictedHomeGoals = rng.nextInt(3), predictedAwayGoals = rng.nextInt(3),
-                pointsEarned = 0, homeGoals = m.homeGoals, awayGoals = m.awayGoals
-            )
-        }
-        cachedMatches = entities
-        Log.w("HomeVM", "===== built ${entities.size} entities, first: ${entities.firstOrNull()?.homeTeam} vs ${entities.firstOrNull()?.awayTeam} =====")
-        _testModeTitle.value = "AMISTOSOS HOY"
-        refreshUpcomingMatches()
-        startTestPolling()
-    }
-
-    private fun startTestPolling() {
-        testPollJob?.cancel()
-        testPollJob = viewModelScope.launch(Dispatchers.IO) {
-            while (isActive && _isTestMode.value) {
-                fetchLiveFriendly()
-                delay(5 * 60_000L)
-            }
-        }
-    }
-
-    private suspend fun fetchLiveFriendly() {
-        val scraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchMatches() }
-        if (scraped.isEmpty()) return
-
-        var changed = false
-        scraped.forEach { sm ->
-            val cm = cachedMatches.firstOrNull {
-                it.homeTeam.contains(sm.homeTeam, true) || sm.homeTeam.contains(it.homeTeam, true)
-            } ?: return@forEach
-            if (sm.liveMinute > 0) testLiveMinutes[cm.id] = sm.liveMinute
-            val hg = sm.homeGoals; val ag = sm.awayGoals
-            val prev = lastWrittenScores[cm.id]
-            if (hg != null && ag != null && (prev == null || prev.first != hg || prev.second != ag)) {
-                lastWrittenScores[cm.id] = hg to ag
-                val idx = cachedMatches.indexOf(cm)
-                if (idx >= 0) {
-                    cachedMatches = cachedMatches.toMutableList().also { it[idx] = cm.copy(homeGoals = hg, awayGoals = ag) }
-                }
-                changed = true
-            }
-        }
-        if (changed) {
-            Log.w("HomeVM", "===== fetchLiveFriendly: changed=true, fetching goal details =====")
-            cachedMatches.forEach { cm ->
-                val eId = sofascoreEventIds[cm.id] ?: return@forEach
-                Log.w("HomeVM", "===== fetching goal details for match ${cm.id} eventId=$eId =====")
-                val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
-                if (h.isNotEmpty() || a.isNotEmpty()) {
-                    val homeEvents = h.map { GoalEvent(it.playerName, it.minute) }
-                    val awayEvents = a.map { GoalEvent(it.playerName, it.minute) }
-                    testScorers[cm.id] = Pair(homeEvents, awayEvents)
-                    Log.w("HomeVM", "===== stored scorers for match ${cm.id}: H=$h A=$a =====")
-                } else {
-                    Log.w("HomeVM", "===== no scorers for match ${cm.id} (H=$h A=$a) =====")
-                }
-            }
-            cachedMatches = cachedMatches.map { m ->
-                val realHome = m.homeGoals; val realAway = m.awayGoals
-                if (realHome != null && realAway != null) {
-                    val predHome = m.predictedHomeGoals; val predAway = m.predictedAwayGoals
-                    var pts = 0
-                    if (predHome != null && predAway != null) {
-                        if (predHome == realHome) pts += 10
-                        if (predAway == realAway) pts += 10
-                        val pr = when { predHome > predAway -> "h"; predHome < predAway -> "a"; else -> "d" }
-                        val rr = when { realHome > realAway -> "h"; realHome < realAway -> "a"; else -> "d" }
-                        if (pr == rr) pts += 30
-                    }
-                    m.copy(pointsEarned = pts)
-                } else m
-            }
-            recalcPlayerPoints()
-            refreshUpcomingMatches()
-        }
-    }
-
     private fun refreshUpcomingMatches() {
-        if (_isTestMode.value) {
-            val allDisplay = cachedMatches.filter { !it.isKnockout }
-                .sortedBy { it.dateTime.ifBlank { "zzz" } }
-                .map { toDisplay(it) }
-            _sectionTitle.value = _testModeTitle.value.ifBlank { "AMISTOSOS HOY" }
-            _upcomingMatches.value = allDisplay
-            Log.w("HomeVM", "===== TEST refresh: ${allDisplay.size} matches, first: ${allDisplay.firstOrNull()?.homeTeam} vs ${allDisplay.firstOrNull()?.awayTeam} =====")
-            return
-        }
         val cal = Calendar.getInstance(madridTZ)
         val today = cal.get(Calendar.DAY_OF_YEAR)
         val year = cal.get(Calendar.YEAR)
@@ -709,25 +498,13 @@ class HomeViewModel @Inject constructor(
         val dateLabel = if (date != null) dateFmt.format(date).replace(".", "") else ""
         val status = matchStatus(match)
 
-        val liveMin: String?
-        val homeScr: List<GoalEvent>
-        val awayScr: List<GoalEvent>
-        if (_isTestMode.value && match.id >= 900) {
-            liveMin = when (status) {
-                MatchStatus.FINISHED -> "FINAL"
-                MatchStatus.LIVE -> testLiveMinutes[match.id]?.let { "${it}'" } ?: "?"
-                else -> null
-            }
-        } else {
-            liveMin = when (status) {
-                MatchStatus.FINISHED -> "FINAL"
-                MatchStatus.LIVE -> null
-                else -> null
-            }
+        val liveMin = when (status) {
+            MatchStatus.FINISHED -> "FINAL"
+            else -> null
         }
-        val s = testScorers[match.id]
-        homeScr = s?.first ?: emptyList()
-        awayScr = s?.second ?: emptyList()
+        val s = goalScorers[match.id]
+        val homeScr = s?.first ?: emptyList()
+        val awayScr = s?.second ?: emptyList()
 
         return MatchDisplay(
             id = match.id, dateLabel = dateLabel, time = time,
@@ -746,8 +523,6 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun matchStatus(match: MatchEntity): MatchStatus {
-        val hasLiveMin = testLiveMinutes[match.id]?.let { it > 0 } == true
-        if (hasLiveMin) return MatchStatus.LIVE
         if (match.homeGoals != null && match.awayGoals != null) return MatchStatus.FINISHED
         val start = parseMadridDate(match.dateTime) ?: return MatchStatus.UPCOMING
         val now = Date()

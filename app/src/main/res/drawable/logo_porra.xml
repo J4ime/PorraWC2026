@@ -14,10 +14,13 @@
   ~ limitations under the License.
   -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="5263dp"
-    android:height="2960dp"
-    android:viewportWidth="5263"
-    android:viewportHeight="2960">
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:translateX="54" android:translateY="54">
+    <group android:scaleX="0.01254" android:scaleY="0.01254">
+    <group android:translateX="-2631.5" android:translateY="-1480">
     <path
         android:pathData="M0,0C1736.8,0 3473.6,0 5263,0C5263,976.8 5263,1953.6 5263,2960C3526.2,2960 1789.4,2960 0,2960C0,1983.2 0,1006.4 0,0Z"
         android:fillColor="#99FE33"/>
@@ -264,4 +267,7 @@
     <path
         android:pathData="M3287,1914C3287.8,1914.2 3287.8,1914.2 3288.7,1914.5C3291.3,1915.1 3293.7,1915.1 3296.4,1915.2C3297.5,1915.2 3298.6,1915.2 3299.7,1915.2C3301.5,1915.2 3301.5,1915.2 3303.3,1915.2C3304.6,1915.2 3305.8,1915.2 3307.1,1915.2C3310.6,1915.3 3314,1915.3 3317.5,1915.3C3321.1,1915.3 3324.7,1915.4 3328.3,1915.4C3335.1,1915.4 3341.9,1915.5 3348.7,1915.5C3356.5,1915.6 3364.3,1915.6 3372.1,1915.7C3388,1915.8 3404,1915.9 3420,1916C3420,1916.3 3420,1916.7 3420,1917C3375.8,1917 3331.6,1917 3286,1917C3286.3,1916 3286.7,1915 3287,1914Z"
         android:fillColor="#2D8701"/>
+    </group>
+    </group>
+    </group>
 </vector>

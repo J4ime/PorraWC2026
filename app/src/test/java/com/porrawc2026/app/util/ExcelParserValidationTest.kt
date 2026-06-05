@@ -46,7 +46,7 @@ class ExcelParserValidationTest {
     fun `validate with no sheet returns error`() {
         val result = ExcelParser.validate()
         assertFalse(result.isValid)
-        assertTrue(result.errors.any { it.contains("columna AG") })
+        assertTrue(result.errors.any { it.contains("No se pudo validar") })
         assertEquals(0, result.totalChecks)
     }
 }

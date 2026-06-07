@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -73,42 +74,48 @@ fun PorraNavGraph() {
 
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
             if (leftPages.isNotEmpty()) {
-                Column(
+                Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxHeight()
-                        .width(14.dp)
-                        .background(Color(0xCC151515)),
-                    verticalArrangement = Arrangement.Top,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .width(22.dp)
+                        .background(Color(0xCC151515))
                 ) {
-                    Spacer(Modifier.height(4.dp))
-                    leftPages.forEach { page ->
-                        SideTab(
-                            label = pageTitles[page],
-                            onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
-                        )
+                    Column(
+                        modifier = Modifier.align(Alignment.TopStart).fillMaxHeight(),
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        Spacer(Modifier.height(2.dp))
+                        leftPages.forEach { page ->
+                            SideTab(
+                                label = pageTitles[page],
+                                onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
+                            )
+                        }
                     }
                 }
             }
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             if (rightPages.isNotEmpty()) {
-                Column(
+                Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .fillMaxHeight()
-                        .width(14.dp)
-                        .background(Color(0xCC151515)),
-                    verticalArrangement = Arrangement.Top,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .width(22.dp)
+                        .background(Color(0xCC151515))
                 ) {
-                    Spacer(Modifier.height(4.dp))
-                    rightPages.forEach { page ->
-                        SideTab(
-                            label = pageTitles[page],
-                            onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
-                        )
+                    Column(
+                        modifier = Modifier.align(Alignment.TopStart).fillMaxHeight(),
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        Spacer(Modifier.height(2.dp))
+                        rightPages.forEach { page ->
+                            SideTab(
+                                label = pageTitles[page],
+                                onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
+                            )
+                        }
                     }
                 }
             }
@@ -140,17 +147,17 @@ private fun SideTab(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp, horizontal = 1.dp),
+            .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             label,
             modifier = Modifier.rotate(-90f),
             fontSize = 8.sp,
-            color = Color(0xFFAAAAAA),
+            color = Color(0xFFCCCCCC),
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            maxLines = 1
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

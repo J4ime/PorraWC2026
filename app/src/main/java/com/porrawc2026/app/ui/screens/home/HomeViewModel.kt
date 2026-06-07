@@ -85,7 +85,10 @@ class HomeViewModel @Inject constructor(
     val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
     private val _isUpdating = MutableStateFlow(false)
     val isUpdating: StateFlow<Boolean> = _isUpdating.asStateFlow()
-    val appVersion: String = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
+    private val _appVersion = MutableStateFlow(
+        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
+    )
+    val appVersion: StateFlow<String> = _appVersion.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
@@ -219,6 +222,7 @@ class HomeViewModel @Inject constructor(
                 val info = UpdateManager.checkForUpdate(context)
                 if (info?.isNewer == true) {
                     UpdateManager.downloadAndInstall(context, info.downloadUrl)
+                    _appVersion.value = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
                 } else {
                     _errorMessage.emit("Ya tienes la ultima version")
                 }

@@ -9,7 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -17,10 +16,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,9 +27,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
-import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
-import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.ValidationResult
 import java.io.File
 
@@ -46,11 +40,11 @@ fun HomeScreen(
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
     val yesterdayMatches by viewModel.yesterdayMatches.collectAsState()
-    val isReady by viewModel.isReady.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val isUpdating by viewModel.isUpdating.collectAsState()
-    val appVersion = LocalContext.current.packageManager.getPackageInfo(LocalContext.current.packageName, 0).versionName ?: "?"
+    val ctx = LocalContext.current
+    val appVersion = remember { try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" } }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -84,9 +78,8 @@ fun HomeScreen(
 
     var showYesterday by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
-        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 8.dp)) {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(bottom = 120.dp), contentPadding = PaddingValues(bottom = 8.dp)) {
             if (yesterdayMatches.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -131,67 +124,71 @@ fun HomeScreen(
             }
         }
 
-        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A))) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color(0xFF1A1A1A))
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Button(
+                onClick = { viewModel.installUpdate() },
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (updateAvailable) Color(0xFF1565C0) else Color(0xFF333333),
+                    contentColor = Color.White
+                ), shape = RoundedCornerShape(10.dp)
+            ) {
+                if (isUpdating) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(6.dp))
+                    Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall)
+                } else {
+                    Text(if (updateAvailable) "ACTUALIZAR APP" else "APP ACTUALIZADA", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+            Text("v$appVersion", Modifier.fillMaxWidth().padding(end = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), textAlign = TextAlign.End)
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { viewModel.installUpdate() },
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (updateAvailable) Color(0xFF1565C0) else Color(0xFF333333),
-                        contentColor = Color.White
-                    ), shape = RoundedCornerShape(10.dp)
+                    onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
                 ) {
-                    if (isUpdating) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall)
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                     } else {
-                        Text(if (updateAvailable) "ACTUALIZAR APP" else "APP ACTUALIZADA", style = MaterialTheme.typography.titleSmall)
+                        Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (hasData) "Actualizar" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
                     }
                 }
-                Text("v$appVersion", Modifier.fillMaxWidth().padding(end = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), textAlign = TextAlign.End)
-                Spacer(Modifier.height(6.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (hasData) {
                     Button(
-                        onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
+                        onClick = { showDeleteDialog = true },
+                        modifier = Modifier.height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (hasData) "Actualizar" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
-                        }
-                    }
-                    if (hasData) {
-                        Button(
-                            onClick = { showDeleteDialog = true },
-                            modifier = Modifier.height(48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935))
-                        }
+                        Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935))
                     }
                 }
             }
         }
-    }
 
-    if (isBusy) {
-        Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
-            val inf = rememberInfiniteTransition("busy")
-            val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
-            val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
-            Text("\u26BD",
-                fontSize = 64.sp,
-                modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
+        if (isBusy) {
+            Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
+                val inf = rememberInfiniteTransition("busy")
+                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
+                val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
+                Text("\u26BD",
+                    fontSize = 64.sp,
+                    modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
+            }
         }
-    }
     }
 }
 

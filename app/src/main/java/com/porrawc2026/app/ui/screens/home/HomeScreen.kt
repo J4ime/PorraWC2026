@@ -50,7 +50,7 @@ fun HomeScreen(
     val isBusy by viewModel.isBusy.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val isUpdating by viewModel.isUpdating.collectAsState()
-    val appVersion by viewModel.appVersion.collectAsState()
+    val appVersion = LocalContext.current.packageManager.getPackageInfo(LocalContext.current.packageName, 0).versionName ?: "?"
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -129,11 +129,9 @@ fun HomeScreen(
             } else if (hasData) {
                 item { Text("Sin partidos pr\u00F3ximos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }
             }
-
-            if (!hasData) return@LazyColumn
         }
 
-        Surface(modifier = Modifier.fillMaxWidth(), color = Color(0xFF1A1A1A)) {
+        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A))) {
             Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Button(
                     onClick = { viewModel.installUpdate() },

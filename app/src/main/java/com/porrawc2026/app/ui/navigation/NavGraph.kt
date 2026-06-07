@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -15,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -74,48 +72,32 @@ fun PorraNavGraph() {
 
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
             if (leftPages.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .fillMaxHeight()
-                        .width(22.dp)
-                        .background(Color(0xCC151515))
+                Column(
+                    modifier = Modifier.align(Alignment.TopStart).padding(start = 2.dp),
+                    verticalArrangement = Arrangement.Top
                 ) {
-                    Column(
-                        modifier = Modifier.align(Alignment.TopStart).fillMaxHeight(),
-                        verticalArrangement = Arrangement.Top
-                    ) {
-                        Spacer(Modifier.height(2.dp))
-                        leftPages.forEach { page ->
-                            SideTab(
-                                label = pageTitles[page],
-                                onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
-                            )
-                        }
+                    Spacer(Modifier.height(2.dp))
+                    leftPages.forEach { page ->
+                        SideTab(
+                            label = pageTitles[page],
+                            onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
+                        )
                     }
                 }
             }
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             if (rightPages.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .fillMaxHeight()
-                        .width(22.dp)
-                        .background(Color(0xCC151515))
+                Column(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 2.dp),
+                    verticalArrangement = Arrangement.Top
                 ) {
-                    Column(
-                        modifier = Modifier.align(Alignment.TopStart).fillMaxHeight(),
-                        verticalArrangement = Arrangement.Top
-                    ) {
-                        Spacer(Modifier.height(2.dp))
-                        rightPages.forEach { page ->
-                            SideTab(
-                                label = pageTitles[page],
-                                onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
-                            )
-                        }
+                    Spacer(Modifier.height(2.dp))
+                    rightPages.forEach { page ->
+                        SideTab(
+                            label = pageTitles[page],
+                            onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
+                        )
                     }
                 }
             }
@@ -143,21 +125,16 @@ fun PorraNavGraph() {
 
 @Composable
 private fun SideTab(label: String, onClick: () -> Unit) {
-    Box(
+    Text(
+        label,
         modifier = Modifier
-            .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            label,
-            modifier = Modifier.rotate(-90f),
-            fontSize = 8.sp,
-            color = Color(0xFFCCCCCC),
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            softWrap = false
-        )
-    }
+            .rotate(-90f)
+            .padding(vertical = 10.dp),
+        fontSize = 10.sp,
+        color = Color(0xFFCCCCCC),
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        softWrap = false
+    )
 }

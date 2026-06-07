@@ -104,14 +104,14 @@ fun PorraNavGraph() {
         }
 
         Row(
-            Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 4.dp),
+            Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 2.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             repeat(4) { index ->
                 Box(
                     modifier = Modifier
                         .padding(horizontal = 5.dp)
-                        .size(if (pagerState.currentPage == index) 8.dp else 6.dp)
+                        .size(if (pagerState.currentPage == index) 6.dp else 4.dp)
                         .clip(CircleShape)
                         .background(
                             if (pagerState.currentPage == index) Color(0xFFE65100)
@@ -125,21 +125,16 @@ fun PorraNavGraph() {
 
 @Composable
 private fun SideTab(label: String, onClick: () -> Unit) {
-    Box(
+    Text(
+        label,
         modifier = Modifier
-            .width(18.dp)
-            .wrapContentHeight()
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            label,
-            modifier = Modifier.rotate(-90f),
-            fontSize = 10.sp,
-            color = Color(0xFFBBBBBB),
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            softWrap = false
-        )
-    }
+            .clickable(onClick = onClick)
+            .rotate(-90f)
+            .padding(vertical = 6.dp),
+        fontSize = 11.sp,
+        color = Color(0xFFBBBBBB),
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        softWrap = false
+    )
 }

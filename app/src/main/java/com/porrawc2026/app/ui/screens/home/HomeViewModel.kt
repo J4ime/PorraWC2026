@@ -220,11 +220,14 @@ class HomeViewModel @Inject constructor(
             _isUpdating.value = true
             try {
                 val info = UpdateManager.checkForUpdate(context)
-                if (info?.isNewer == true) {
-                    UpdateManager.downloadAndInstall(context, info.downloadUrl)
-                    _appVersion.value = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
-                } else {
-                    _errorMessage.emit("Ya tienes la ultima version")
+                when {
+                    info == null -> _errorMessage.emit("Error al comprobar actualizacion. Sin conexion?")
+                    !info.isNewer -> _errorMessage.emit("Ya tienes la ultima version")
+                    else -> {
+                        val ok = UpdateManager.downloadAndInstall(context, info.downloadUrl)
+                        if (!ok) _errorMessage.emit("Error al descargar la actualizacion")
+                        else _appVersion.value = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
+                    }
                 }
             } catch (e: Exception) {
                 _errorMessage.emit("Error al actualizar: ${e.message}")

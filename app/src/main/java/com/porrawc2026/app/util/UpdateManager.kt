@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
@@ -22,46 +23,66 @@ object UpdateManager {
 
     suspend fun checkForUpdate(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
         try {
-            val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
-            val conn = URL(GITHUB_API).openConnection() as HttpURLConnection
-            conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
-            conn.connectTimeout = 10000; conn.readTimeout = 10000
-            val json = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
-            val arr = JSONArray(json)
-            if (arr.length() == 0) return@withContext null
-            val release = arr.getJSONObject(0)
-            val tag = release.getString("tag_name")
-            val assets = release.getJSONArray("assets")
-            val apkAsset = (0 until assets.length()).map { assets.getJSONObject(it) }
-                .firstOrNull { it.getString("name").endsWith(".apk") } ?: return@withContext null
-            val downloadUrl = apkAsset.getString("browser_download_url")
-            val isNewer = compareVersions(tag.removePrefix("v"), currentVersion) > 0
-            Log.d(TAG, "Latest: $tag (current: v$currentVersion), newer=$isNewer")
-            UpdateInfo(tag, downloadUrl, isNewer)
+            withTimeout(15_000) {
+                val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
+                val conn = URL(GITHUB_API).openConnection() as HttpURLConnection
+                conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                conn.connectTimeout = 10_000; conn.readTimeout = 10_000
+                val code = conn.responseCode
+                if (code != 200) {
+                    val err = conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
+                    Log.w(TAG, "Update check HTTP $code: $err")
+                    conn.disconnect()
+                    return@withTimeout null
+                }
+                val json = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
+                val arr = JSONArray(json)
+                if (arr.length() == 0) return@withTimeout null
+                val release = arr.getJSONObject(0)
+                val tag = release.getString("tag_name")
+                val assets = release.getJSONArray("assets")
+                val apkAsset = (0 until assets.length()).map { assets.getJSONObject(it) }
+                    .firstOrNull { it.getString("name").endsWith(".apk") } ?: return@withTimeout null
+                val downloadUrl = apkAsset.getString("browser_download_url")
+                val isNewer = compareVersions(tag.removePrefix("v"), currentVersion) > 0
+                Log.d(TAG, "Latest: $tag (current: v$currentVersion), newer=$isNewer")
+                UpdateInfo(tag, downloadUrl, isNewer)
+            }
         } catch (e: Exception) {
-            Log.d(TAG, "Update check failed: ${e.message}")
+            Log.w(TAG, "Update check failed: ${e.message}")
             null
         }
     }
 
     suspend fun downloadAndInstall(context: Context, url: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            val file = File(context.cacheDir, "update.apk")
-            val conn = URL(url).openConnection() as HttpURLConnection
-            conn.connectTimeout = 30000; conn.readTimeout = 60000
-            FileOutputStream(file).use { out -> conn.inputStream.copyTo(out) }
-            conn.disconnect()
-            if (file.exists() && file.length() > 0) {
-                val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(apkUri, "application/vnd.android.package-archive")
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+            withTimeout(120_000) {
+                val file = File(context.cacheDir, "update.apk")
+                file.delete()
+                val conn = URL(url).openConnection() as HttpURLConnection
+                conn.connectTimeout = 15_000; conn.readTimeout = 60_000
+                conn.setRequestProperty("Accept", "application/octet-stream")
+                val code = conn.responseCode
+                if (code !in 200..299) {
+                    val err = conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
+                    Log.w(TAG, "Download HTTP $code: $err")
+                    conn.disconnect()
+                    return@withTimeout false
                 }
-                context.startActivity(intent)
-                true
-            } else false
+                FileOutputStream(file).use { out -> conn.inputStream.copyTo(out, bufferSize = 8192) }
+                conn.disconnect()
+                if (file.exists() && file.length() > 0) {
+                    val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    }
+                    context.startActivity(intent)
+                    true
+                } else false
+            }
         } catch (e: Exception) {
-            Log.d(TAG, "Download/install failed: ${e.message}")
+            Log.w(TAG, "Download/install failed: ${e.message}")
             false
         }
     }

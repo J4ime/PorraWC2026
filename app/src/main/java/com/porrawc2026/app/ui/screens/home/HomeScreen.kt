@@ -28,7 +28,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.util.ValidationResult
-import java.io.File
 
 @Composable
 fun HomeScreen(
@@ -62,21 +61,23 @@ fun HomeScreen(
             text = { Text("Se eliminar\u00E1n todos los datos importados del Excel. \u00BFEst\u00E1s seguro?", color = Color(0xFF999999)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.deleteAllData(); showDeleteDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE53935))) {
-                    Text("BORRAR")
-                }
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE53935))) { Text("BORRAR") }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF777777))) {
-                    Text("Cancelar")
-                }
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF777777))) { Text("Cancelar") }
             },
             containerColor = Color(0xFF1E1E1E)
         )
     }
 
     var showYesterday by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        viewModel.errorMessage.collect { msg ->
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
         LazyColumn(modifier = Modifier.fillMaxSize().padding(bottom = 120.dp), contentPadding = PaddingValues(bottom = 8.dp)) {
@@ -88,13 +89,9 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("AYER",
-                                style = MaterialTheme.typography.titleSmall, color = Color(0xFF777777), fontWeight = FontWeight.Bold)
+                            Text("AYER", style = MaterialTheme.typography.titleSmall, color = Color(0xFF777777), fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(6.dp))
-                            Icon(
-                                if (showYesterday) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                                null, tint = Color(0xFF777777), modifier = Modifier.size(18.dp)
-                            )
+                            Icon(if (showYesterday) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = Color(0xFF777777), modifier = Modifier.size(18.dp))
                         }
                         AnimatedVisibility(visible = showYesterday) {
                             Column {
@@ -125,20 +122,13 @@ fun HomeScreen(
         }
 
         Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(Color(0xFF1A1A1A))
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             Button(
                 onClick = { viewModel.installUpdate() },
                 modifier = Modifier.fillMaxWidth().height(40.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (updateAvailable) Color(0xFF1565C0) else Color(0xFF333333),
-                    contentColor = Color.White
-                ), shape = RoundedCornerShape(10.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = if (updateAvailable) Color(0xFF1565C0) else Color(0xFF333333), contentColor = Color.White),
+                shape = RoundedCornerShape(10.dp)
             ) {
                 if (isUpdating) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -179,14 +169,14 @@ fun HomeScreen(
             }
         }
 
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp))
+
         if (isBusy) {
             Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
                 val inf = rememberInfiniteTransition("busy")
                 val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
                 val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
-                Text("\u26BD",
-                    fontSize = 64.sp,
-                    modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
+                Text("\u26BD", fontSize = 64.sp, modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
             }
         }
     }
@@ -198,66 +188,38 @@ private fun MatchRow(match: MatchDisplay) {
     val hasResult = match.homeGoals != null && match.awayGoals != null
     val isLive = match.status == MatchStatus.LIVE
     val hasLiveMinute = match.liveMinute != null
+    val scoreBg = if (isLive) Color(0xFF2E7D32) else Color.Transparent
 
-    val scoreBg = when {
-        isLive -> Color(0xFF2E7D32)
-        hasResult -> Color.Transparent
-        else -> Color.Transparent
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)).padding(horizontal = 16.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.Top
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)).padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.Top) {
         val timeText = if (hasLiveMinute) match.liveMinute ?: "?" else match.time.ifBlank { "?" }
         val timeColor = if (isLive) Color(0xFF4CAF50) else Color.White
-        Text(timeText, Modifier.width(42.dp).padding(top = 2.dp),
-            style = MaterialTheme.typography.labelMedium, color = timeColor, fontWeight = FontWeight.Bold,
-            maxLines = 1, softWrap = false, textAlign = TextAlign.Center)
+        Text(timeText, Modifier.width(42.dp).padding(top = 2.dp), style = MaterialTheme.typography.labelMedium, color = timeColor, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, textAlign = TextAlign.Center)
 
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            Text(match.homeTeam,
-                style = MaterialTheme.typography.bodySmall, color = Color.White,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (match.homeScorers.isNotEmpty()) {
                 match.homeScorers.forEachIndexed { idx, scorer ->
-                    Text("\u26BD ${scorer.playerName.split(" ").last()} ${scorer.minute}'",
-                        style = MaterialTheme.typography.labelSmall, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("\u26BD ${scorer.playerName.split(" ").last()} ${scorer.minute}'", style = MaterialTheme.typography.labelSmall, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (idx < match.homeScorers.lastIndex) Spacer(Modifier.height(2.dp))
                 }
             }
         }
 
-        Box(
-            modifier = Modifier.padding(horizontal = 4.dp).background(scoreBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)
-        ) {
+        Box(modifier = Modifier.padding(horizontal = 4.dp).background(scoreBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)) {
             if (hasResult || isLive) {
                 val h = if (hasResult) "${match.homeGoals}" else (match.homeGoals?.toString() ?: "0")
                 val a = if (hasResult) "${match.awayGoals}" else (match.awayGoals?.toString() ?: "0")
-                Text("$h - $a",
-                    style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold,
-                    maxLines = 1)
-            } else if (hasPred) {
-                Text("-",
-                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777),
-                    maxLines = 1)
+                Text("$h - $a", style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
             } else {
-                Text("-",
-                    style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777),
-                    maxLines = 1)
+                Text("-", style = MaterialTheme.typography.bodySmall, color = Color(0xFF777777), maxLines = 1)
             }
         }
 
         Column(Modifier.weight(1f)) {
-            Text(match.awayTeam,
-                style = MaterialTheme.typography.bodySmall, color = Color.White,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (match.awayScorers.isNotEmpty()) {
                 match.awayScorers.forEachIndexed { idx, scorer ->
-                    Text("\u26BD ${scorer.playerName.split(" ").last()} ${scorer.minute}'",
-                        style = MaterialTheme.typography.labelSmall, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("\u26BD ${scorer.playerName.split(" ").last()} ${scorer.minute}'", style = MaterialTheme.typography.labelSmall, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (idx < match.awayScorers.lastIndex) Spacer(Modifier.height(2.dp))
                 }
             }
@@ -268,8 +230,7 @@ private fun MatchRow(match: MatchDisplay) {
             val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
             channels.forEach { ch ->
                 val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF0037A1) else Color(0xFF333333)
-                Text(ch.trim().take(4), fontSize = 8.sp, color = Color.White,
-                    modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
+                Text(ch.trim().take(4), fontSize = 8.sp, color = Color.White, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp))
             }
         }
 
@@ -281,10 +242,7 @@ private fun MatchRow(match: MatchDisplay) {
                 hasResult && match.pointsEarned > 0 -> Color(0xFF4CAF50)
                 else -> Color(0xFF666666)
             }
-            Text(ptsValue,
-                modifier = Modifier.width(24.dp).background(ptsBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall, color = ptsColor,
-                fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Text(ptsValue, modifier = Modifier.width(24.dp).background(ptsBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = ptsColor, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         }
     }
 }
@@ -296,18 +254,15 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = { dismissed = true; onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(modifier = Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)), shape = RoundedCornerShape(20.dp)) {
             Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(if (result.isValid) Icons.Filled.CheckCircle else Icons.Filled.Warning, null,
-                    tint = if (result.isValid) Color(0xFF4CAF50) else Color(0xFF888888), modifier = Modifier.size(40.dp))
+                Icon(if (result.isValid) Icons.Filled.CheckCircle else Icons.Filled.Warning, null, tint = if (result.isValid) Color(0xFF4CAF50) else Color(0xFF888888), modifier = Modifier.size(40.dp))
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(if (result.isValid) "EXCEL V\u00C1LIDO" else "EXCEL INCOMPLETO",
-                    style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (result.isValid) "EXCEL V\u00C1LIDO" else "EXCEL INCOMPLETO", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
                 if (!result.isValid) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("No es v\u00E1lido. Revisa el Excel y vuelve a cargarlo.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF999999), textAlign = TextAlign.Center)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { dismissed = true; onDismiss() }, Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (result.isValid) Color(0xFF444444) else Color(0xFF333333)), shape = RoundedCornerShape(10.dp)) {
+                Button(onClick = { dismissed = true; onDismiss() }, Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if (result.isValid) Color(0xFF444444) else Color(0xFF333333)), shape = RoundedCornerShape(10.dp)) {
                     Text(if (result.isValid) "CONTINUAR" else "ENTENDIDO", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }

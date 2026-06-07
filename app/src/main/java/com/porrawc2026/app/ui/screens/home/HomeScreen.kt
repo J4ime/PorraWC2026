@@ -3,8 +3,12 @@ package com.porrawc2026.app.ui.screens.home
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -16,11 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -39,8 +40,6 @@ import java.io.File
 
 @Composable
 fun HomeScreen(
-    onNavigateToMatches: () -> Unit,
-    onNavigateToQuestions: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val totalPoints by viewModel.totalPoints.collectAsState()
@@ -48,6 +47,7 @@ fun HomeScreen(
     val validationResult by viewModel.validationResult.collectAsState()
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
+    val yesterdayMatches by viewModel.yesterdayMatches.collectAsState()
     val players by viewModel.players.collectAsState()
     val isReady by viewModel.isReady.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
@@ -67,7 +67,7 @@ fun HomeScreen(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Borrar datos", color = Color.White) },
-            text = { Text("Se eliminarán todos los datos importados del Excel. ¿Estás seguro?", color = Color(0xFF999999)) },
+            text = { Text("Se eliminar\u00E1n todos los datos importados del Excel. \u00BFEst\u00E1s seguro?", color = Color(0xFF999999)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.deleteAllData(); showDeleteDialog = false },
                     colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE53935))) {
@@ -83,6 +83,8 @@ fun HomeScreen(
             containerColor = Color(0xFF1E1E1E)
         )
     }
+
+    var showYesterday by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
@@ -148,10 +150,40 @@ fun HomeScreen(
         containerColor = Color(0xFF0E0E0E)
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 16.dp)) {
+            if (yesterdayMatches.isNotEmpty()) {
+                item {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().clickable { showYesterday = !showYesterday }.padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("AYER \u2014 ${yesterdayMatches.first().dateLabel.uppercase()}",
+                                style = MaterialTheme.typography.titleSmall, color = Color(0xFF777777), fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(6.dp))
+                            Icon(
+                                if (showYesterday) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                null, tint = Color(0xFF777777), modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        AnimatedVisibility(visible = showYesterday) {
+                            Column {
+                                Spacer(Modifier.height(4.dp))
+                                yesterdayMatches.forEach { match ->
+                                    MatchRow(match)
+                                    if (match != yesterdayMatches.last()) Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(8.dp)) }
+            }
+
             if (upcomingMatches.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PR\u00D3XIMOS PARTIDOS", style = MaterialTheme.typography.titleSmall,
+                        Text(upcomingMatches.firstOrNull()?.dateLabel?.let { "HOY \u2014 ${it.uppercase()}" } ?: "PR\u00D3XIMOS PARTIDOS", style = MaterialTheme.typography.titleSmall,
                             color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(6.dp))
                         upcomingMatches.take(8).forEach { match ->
@@ -161,12 +193,13 @@ fun HomeScreen(
                     }
                 }
             } else if (hasData) {
-                item { Text("Sin partidos próximos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }
+                item { Text("Sin partidos pr\u00F3ximos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }
             }
 
             if (!hasData) { item { Spacer(Modifier.height(16.dp)) }; return@LazyColumn }
 
             if (players.isNotEmpty()) {
+                item { Spacer(Modifier.height(8.dp)) }
                 item {
                     val isAnyLive = upcomingMatches.any { it.status == MatchStatus.LIVE }
                     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -178,15 +211,8 @@ fun HomeScreen(
                         }
                     }
                 }
-                item { Spacer(Modifier.height(8.dp)) }
             }
 
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SectionButton("Partidos", "Resultados de la fase de grupos y eliminatorias", Icons.Filled.EmojiEvents, hasData, onNavigateToMatches)
-                    SectionButton("50 Preguntas", "Verdadero o Falso \u00B7 20 pts", Icons.Filled.Quiz, hasData, onNavigateToQuestions)
-                }
-            }
             item { Spacer(Modifier.height(16.dp)) }
         }
     }
@@ -362,25 +388,6 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
                     Text(if (result.isValid) "CONTINUAR" else "ENTENDIDO", fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SectionButton(title: String, subtitle: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    Card(onClick = { if (enabled) onClick() }, Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Color(0xFFE65100))) {
-        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = Color.White, modifier = Modifier.size(24.dp))
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = Color.White)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color(0xFF999999))
-            }
-            if (!enabled) Icon(Icons.Filled.Lock, null, tint = Color(0xFF555555), modifier = Modifier.size(18.dp))
-            else Icon(Icons.Filled.ChevronRight, null, tint = Color(0xFF555555))
         }
     }
 }

@@ -69,6 +69,8 @@ class HomeViewModel @Inject constructor(
     val hasData: StateFlow<Boolean> = _hasData.asStateFlow()
     private val _upcomingMatches = MutableStateFlow<List<MatchDisplay>>(emptyList())
     val upcomingMatches: StateFlow<List<MatchDisplay>> = _upcomingMatches.asStateFlow()
+    private val _yesterdayMatches = MutableStateFlow<List<MatchDisplay>>(emptyList())
+    val yesterdayMatches: StateFlow<List<MatchDisplay>> = _yesterdayMatches.asStateFlow()
     private val _sectionTitle = MutableStateFlow("")
     val sectionTitle: StateFlow<String> = _sectionTitle.asStateFlow()
     private val _players = MutableStateFlow<List<PlayerPredictionEntity>>(emptyList())
@@ -479,6 +481,15 @@ class HomeViewModel @Inject constructor(
         val groupMatches = cachedMatches.filter { !it.isKnockout && it.id < 900 }
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = groupMatches.map { match -> toDisplay(match) }
+
+        val yesterdayMatches = allDisplay.filter { display ->
+            val d = parseMadridDate(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
+            val c = Calendar.getInstance(madridTZ).apply { time = d }
+            c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today - 1
+        }.sortedBy { display ->
+            parseMadridDate(cachedMatches.first { it.id == display.id }.dateTime)
+        }
+        _yesterdayMatches.value = yesterdayMatches
 
         val todayMatches = allDisplay.filter { display ->
             val d = parseMadridDate(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false

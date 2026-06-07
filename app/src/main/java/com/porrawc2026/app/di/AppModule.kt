@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.porrawc2026.app.data.local.AppDatabase
 import com.porrawc2026.app.data.local.dao.*
 import com.porrawc2026.app.data.remote.ApiService
+import com.porrawc2026.app.data.remote.SofascoreApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -15,6 +16,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -76,5 +78,22 @@ object AppModule {
     @Singleton
     fun provideApiService(retrofit: Retrofit): ApiService {
         return retrofit.create(ApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @Named("sofascore")
+    fun provideSofascoreRetrofit(client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.sofascore.com/api/v1/")
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSofascoreApiService(@Named("sofascore") retrofit: Retrofit): SofascoreApiService {
+        return retrofit.create(SofascoreApiService::class.java)
     }
 }

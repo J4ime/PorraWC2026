@@ -48,7 +48,6 @@ fun HomeScreen(
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
     val yesterdayMatches by viewModel.yesterdayMatches.collectAsState()
-    val players by viewModel.players.collectAsState()
     val isReady by viewModel.isReady.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
@@ -158,7 +157,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("AYER \u2014 ${yesterdayMatches.first().dateLabel.uppercase()}",
+                            Text("AYER",
                                 style = MaterialTheme.typography.titleSmall, color = Color(0xFF777777), fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(6.dp))
                             Icon(
@@ -183,7 +182,7 @@ fun HomeScreen(
             if (upcomingMatches.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Text(upcomingMatches.firstOrNull()?.dateLabel?.let { "HOY \u2014 ${it.uppercase()}" } ?: "PR\u00D3XIMOS PARTIDOS", style = MaterialTheme.typography.titleSmall,
+                        Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PR\u00D3XIMOS PARTIDOS", style = MaterialTheme.typography.titleSmall,
                             color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(6.dp))
                         upcomingMatches.take(8).forEach { match ->
@@ -197,21 +196,6 @@ fun HomeScreen(
             }
 
             if (!hasData) { item { Spacer(Modifier.height(16.dp)) }; return@LazyColumn }
-
-            if (players.isNotEmpty()) {
-                item { Spacer(Modifier.height(8.dp)) }
-                item {
-                    val isAnyLive = upcomingMatches.any { it.status == MatchStatus.LIVE }
-                    Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Color(0xFFE65100))) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text("GOLEADORES", style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                            players.forEach { p -> PlayerRow(p, isLive = isAnyLive) }
-                        }
-                    }
-                }
-            }
 
             item { Spacer(Modifier.height(16.dp)) }
         }

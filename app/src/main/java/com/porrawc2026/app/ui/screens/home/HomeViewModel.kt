@@ -531,7 +531,20 @@ class HomeViewModel @Inject constructor(
         val timeFmt = SimpleDateFormat("HH:mm", Locale.US).apply { timeZone = madridTZ }
         val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "ES")).apply { timeZone = madridTZ }
         val time = if (date != null) timeFmt.format(date) else ""
-        val dateLabel = if (date != null) dateFmt.format(date).replace(".", "") else ""
+        val dateLabel = if (date != null) {
+            val cal = Calendar.getInstance(madridTZ)
+            val today = cal.get(Calendar.DAY_OF_YEAR)
+            val year = cal.get(Calendar.YEAR)
+            val matchCal = Calendar.getInstance(madridTZ).also { it.time = date }
+            val matchDay = matchCal.get(Calendar.DAY_OF_YEAR)
+            val matchYear = matchCal.get(Calendar.YEAR)
+            when {
+                matchYear == year && matchDay == today - 1 -> "AYER"
+                matchYear == year && matchDay == today -> "HOY"
+                matchYear == year && matchDay == today + 1 -> "MA\u00D1ANA"
+                else -> dateFmt.format(date).replace(".", "")
+            }
+        } else ""
         val status = matchStatus(match)
 
         val liveMin = when (status) {

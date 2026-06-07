@@ -75,11 +75,14 @@ fun PorraNavGraph() {
             if (leftPages.isNotEmpty()) {
                 Column(
                     modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .fillMaxHeight(0.2f)
-                        .padding(start = 1.dp),
-                    verticalArrangement = Arrangement.Center
+                        .align(Alignment.TopStart)
+                        .fillMaxHeight()
+                        .width(14.dp)
+                        .background(Color(0xCC151515)),
+                    verticalArrangement = Arrangement.Top,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Spacer(Modifier.height(4.dp))
                     leftPages.forEach { page ->
                         SideTab(
                             label = pageTitles[page],
@@ -93,11 +96,14 @@ fun PorraNavGraph() {
             if (rightPages.isNotEmpty()) {
                 Column(
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight(0.2f)
-                        .padding(end = 1.dp),
-                    verticalArrangement = Arrangement.Center
+                        .align(Alignment.TopEnd)
+                        .fillMaxHeight()
+                        .width(14.dp)
+                        .background(Color(0xCC151515)),
+                    verticalArrangement = Arrangement.Top,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Spacer(Modifier.height(4.dp))
                     rightPages.forEach { page ->
                         SideTab(
                             label = pageTitles[page],
@@ -132,15 +138,15 @@ fun PorraNavGraph() {
 private fun SideTab(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
+            .fillMaxWidth()
             .clickable(onClick = onClick)
-            .background(Color(0xCC222222), RoundedCornerShape(4.dp))
-            .padding(vertical = 6.dp, horizontal = 3.dp),
+            .padding(vertical = 6.dp, horizontal = 1.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             label,
             modifier = Modifier.rotate(-90f),
-            fontSize = 9.sp,
+            fontSize = 8.sp,
             color = Color(0xFFAAAAAA),
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,

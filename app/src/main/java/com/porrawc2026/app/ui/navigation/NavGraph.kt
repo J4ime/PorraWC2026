@@ -73,7 +73,7 @@ fun PorraNavGraph() {
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
             if (leftPages.isNotEmpty()) {
                 Column(
-                    modifier = Modifier.align(Alignment.TopStart).padding(start = 1.dp),
+                    modifier = Modifier.align(Alignment.TopStart),
                     verticalArrangement = Arrangement.Top
                 ) {
                     Spacer(Modifier.height(2.dp))
@@ -89,7 +89,7 @@ fun PorraNavGraph() {
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             if (rightPages.isNotEmpty()) {
                 Column(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 1.dp),
+                    modifier = Modifier.align(Alignment.TopEnd),
                     verticalArrangement = Arrangement.Top
                 ) {
                     Spacer(Modifier.height(2.dp))
@@ -104,7 +104,7 @@ fun PorraNavGraph() {
         }
 
         Row(
-            Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 10.dp),
+            Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             repeat(4) { index ->
@@ -131,7 +131,7 @@ private fun SideTab(label: String, onClick: () -> Unit) {
             .wrapContentSize(unbounded = true)
             .rotate(-90f)
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(vertical = 4.dp),
         fontSize = 10.sp,
         color = Color(0xFFBBBBBB),
         fontWeight = FontWeight.Bold,

@@ -74,7 +74,7 @@ fun PorraNavGraph() {
             if (leftPages.isNotEmpty()) {
                 Column(
                     modifier = Modifier.align(Alignment.TopStart),
-                    verticalArrangement = Arrangement.Top
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Spacer(Modifier.height(2.dp))
                     leftPages.forEach { page ->
@@ -90,7 +90,7 @@ fun PorraNavGraph() {
             if (rightPages.isNotEmpty()) {
                 Column(
                     modifier = Modifier.align(Alignment.TopEnd),
-                    verticalArrangement = Arrangement.Top
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Spacer(Modifier.height(2.dp))
                     rightPages.forEach { page ->
@@ -125,17 +125,21 @@ fun PorraNavGraph() {
 
 @Composable
 private fun SideTab(label: String, onClick: () -> Unit) {
-    Text(
-        label,
+    Box(
         modifier = Modifier
-            .wrapContentSize(unbounded = true)
-            .rotate(-90f)
-            .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
-        fontSize = 10.sp,
-        color = Color(0xFFBBBBBB),
-        fontWeight = FontWeight.Bold,
-        maxLines = 1,
-        softWrap = false
-    )
+            .width(18.dp)
+            .wrapContentHeight()
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            modifier = Modifier.rotate(-90f),
+            fontSize = 10.sp,
+            color = Color(0xFFBBBBBB),
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
 }

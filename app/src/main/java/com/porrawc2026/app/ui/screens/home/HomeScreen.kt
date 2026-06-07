@@ -16,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -148,9 +150,9 @@ fun HomeScreen(
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 16.dp)) {
             if (upcomingMatches.isNotEmpty()) {
                 item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
                         Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PR\u00D3XIMOS PARTIDOS", style = MaterialTheme.typography.titleSmall,
-                            color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), textAlign = TextAlign.Center)
+                            color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(6.dp))
                         upcomingMatches.take(8).forEach { match ->
                             MatchRow(match)
@@ -168,7 +170,8 @@ fun HomeScreen(
                 item {
                     val isAnyLive = upcomingMatches.any { it.status == MatchStatus.LIVE }
                     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), shape = RoundedCornerShape(14.dp)) {
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE65100))) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text("GOLEADORES", style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
                             players.forEach { p -> PlayerRow(p, isLive = isAnyLive) }
@@ -254,7 +257,7 @@ private fun MatchRow(match: MatchDisplay) {
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, Color(0xFFE65100)), RoundedCornerShape(8.dp)).background(Color(0xFF1E1E1E)).padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.Top
     ) {
         val timeText = if (hasLiveMinute) match.liveMinute ?: "?" else match.time.ifBlank { "?" }
@@ -365,7 +368,8 @@ private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
 
 @Composable
 private fun SectionButton(title: String, subtitle: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    Card(onClick = { if (enabled) onClick() }, Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), shape = RoundedCornerShape(12.dp)) {
+    Card(onClick = { if (enabled) onClick() }, Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, Color(0xFFE65100))) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(44.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = Color.White, modifier = Modifier.size(24.dp))

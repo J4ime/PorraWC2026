@@ -24,7 +24,7 @@ val TextMuted = Color(0xFF777777)
 // Accent
 val AccentBlue = Color(0xFF777777)
 val AccentGreen = Color(0xFF4CAF50)
-val AccentOrange = Color(0xFF888888)
+val AccentOrange = Color(0xFFE65100)
 val AccentRed = Color(0xFFE53935)
 
 // Misc

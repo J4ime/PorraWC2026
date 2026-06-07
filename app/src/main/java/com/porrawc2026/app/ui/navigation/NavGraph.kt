@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,11 +57,26 @@ fun PorraNavGraph() {
             }
         }
 
-        Row(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.weight(1f)) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> GoalscorersScreen()
+                    1 -> HomeScreen()
+                    2 -> MatchesScreen()
+                    3 -> QuestionsScreen()
+                }
+            }
+
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
             if (leftPages.isNotEmpty()) {
                 Column(
-                    modifier = Modifier.width(18.dp).fillMaxHeight().background(Color(0xFF151515)),
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxHeight(0.2f)
+                        .padding(start = 1.dp),
                     verticalArrangement = Arrangement.Center
                 ) {
                     leftPages.forEach { page ->
@@ -75,22 +88,13 @@ fun PorraNavGraph() {
                 }
             }
 
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            ) { page ->
-                when (page) {
-                    0 -> GoalscorersScreen()
-                    1 -> HomeScreen()
-                    2 -> MatchesScreen()
-                    3 -> QuestionsScreen()
-                }
-            }
-
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             if (rightPages.isNotEmpty()) {
                 Column(
-                    modifier = Modifier.width(18.dp).fillMaxHeight().background(Color(0xFF151515)),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight(0.2f)
+                        .padding(end = 1.dp),
                     verticalArrangement = Arrangement.Center
                 ) {
                     rightPages.forEach { page ->
@@ -125,23 +129,16 @@ fun PorraNavGraph() {
 
 @Composable
 private fun SideTab(label: String, onClick: () -> Unit) {
-    Box(
+    Text(
+        label,
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .background(Color(0xFF2A2A2A), RoundedCornerShape(3.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 4.dp, horizontal = 1.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            label,
-            modifier = Modifier.rotate(-90f),
-            fontSize = 9.sp,
-            color = Color(0xFFAAAAAA),
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            maxLines = 1
-        )
-    }
+            .background(Color(0xCC222222), RoundedCornerShape(4.dp))
+            .padding(horizontal = 3.dp, vertical = 6.dp),
+        fontSize = 9.sp,
+        color = Color(0xFFAAAAAA),
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        maxLines = 1
+    )
 }

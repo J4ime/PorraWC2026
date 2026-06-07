@@ -182,8 +182,6 @@ fun HomeScreen(
             if (upcomingMatches.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PR\u00D3XIMOS PARTIDOS", style = MaterialTheme.typography.titleSmall,
-                            color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(6.dp))
                         upcomingMatches.take(8).forEach { match ->
                             MatchRow(match)
@@ -267,7 +265,7 @@ private fun MatchRow(match: MatchDisplay) {
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().border(BorderStroke(1.dp, Color(0xFFE65100)), RoundedCornerShape(8.dp)).background(Color(0xFF1E1E1E)).padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.Top
     ) {
         val timeText = if (hasLiveMinute) match.liveMinute ?: "?" else match.time.ifBlank { "?" }

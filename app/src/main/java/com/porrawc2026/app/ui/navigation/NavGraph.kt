@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,34 +72,48 @@ fun PorraNavGraph() {
             }
 
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
-            if (leftPages.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.align(Alignment.TopStart),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+            leftPages.forEachIndexed { index, page ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset(y = (index * 90).dp)
+                        .width(16.dp)
+                        .wrapContentHeight()
+                        .clickable { scope.launch { pagerState.animateScrollToPage(page) } },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Spacer(Modifier.height(2.dp))
-                    leftPages.forEach { page ->
-                        SideTab(
-                            label = pageTitles[page],
-                            onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
-                        )
-                    }
+                    Text(
+                        pageTitles[page],
+                        modifier = Modifier.rotate(-90f),
+                        fontSize = 10.sp,
+                        color = Color(0xFFBBBBBB),
+                        fontWeight = FontWeight.Bold,
+                        softWrap = false,
+                        maxLines = 1
+                    )
                 }
             }
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
-            if (rightPages.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.align(Alignment.TopEnd),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+            rightPages.forEachIndexed { index, page ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(y = (index * 90).dp)
+                        .width(16.dp)
+                        .wrapContentHeight()
+                        .clickable { scope.launch { pagerState.animateScrollToPage(page) } },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Spacer(Modifier.height(2.dp))
-                    rightPages.forEach { page ->
-                        SideTab(
-                            label = pageTitles[page],
-                            onClick = { scope.launch { pagerState.animateScrollToPage(page) } }
-                        )
-                    }
+                    Text(
+                        pageTitles[page],
+                        modifier = Modifier.rotate(-90f),
+                        fontSize = 10.sp,
+                        color = Color(0xFFBBBBBB),
+                        fontWeight = FontWeight.Bold,
+                        softWrap = false,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -121,20 +136,4 @@ fun PorraNavGraph() {
             }
         }
     }
-}
-
-@Composable
-private fun SideTab(label: String, onClick: () -> Unit) {
-    Text(
-        label,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .rotate(-90f)
-            .padding(vertical = 6.dp),
-        fontSize = 11.sp,
-        color = Color(0xFFBBBBBB),
-        fontWeight = FontWeight.Bold,
-        maxLines = 1,
-        softWrap = false
-    )
 }

@@ -16,6 +16,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
 
+private val koOrder = mapOf(
+    "Dieciseisavos" to 1, "Octavos" to 2, "Cuartos" to 3,
+    "Semifinales" to 4, "3er puesto" to 5, "Final" to 6
+)
+
 @Composable
 fun MatchesScreen(
     viewModel: GroupsViewModel = hiltViewModel()
@@ -29,10 +34,12 @@ fun MatchesScreen(
             val key = if (m.isKnockout) m.knockoutRound ?: "Eliminatorias" else m.groupName
             groups.getOrPut(key) { mutableListOf() }.add(m)
         }
-        groups.toList().sortedBy { (key, list) ->
+        groups.toList().sortedBy { (key, _) ->
             if (key.startsWith("Grupo")) {
                 key.substringAfter("Grupo ").trim().padStart(2, '0')
-            } else "z$key"
+            } else {
+                (koOrder[key] ?: 99).toString().padStart(2, '0')
+            }
         }
     }
 
@@ -78,12 +85,10 @@ private fun MatchRow(match: MatchEntity) {
         else -> SurfaceMedium.copy(alpha = 0.3f)
     }
 
-    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         val time = if (match.dateTime.length >= 16) match.dateTime.substring(11, 16) else match.dateTime
         Text(time, Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold)
 
-        val label = if (match.isKnockout) match.knockoutRound ?: match.groupName else match.groupName
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
             Text(" ${if (hasPred) "${match.predictedHomeGoals}-${match.predictedAwayGoals}" else "-"} ", style = MaterialTheme.typography.bodySmall, color = if (hasPred) TextPrimary else TextMuted, maxLines = 1)

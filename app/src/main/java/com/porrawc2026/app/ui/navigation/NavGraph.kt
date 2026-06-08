@@ -38,32 +38,15 @@ fun PorraNavGraph() {
     val pageTitles = listOf("GOLEADORES", "INICIO", "PARTIDOS", "PREGUNTAS")
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
-        Box(
-            modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().height(56.dp).padding(horizontal = 16.dp)
-        ) {
-            Text(
-                "PORRA MUNDIAL 26",
-                Modifier.fillMaxWidth().align(Alignment.Center),
-                style = MaterialTheme.typography.titleLarge,
-                color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
-            )
-            Box(
-                modifier = Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF333333)).align(Alignment.CenterEnd),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "$totalPoints",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White, fontWeight = FontWeight.Bold
-                )
+        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().height(56.dp).padding(horizontal = 16.dp)) {
+            Text("PORRA MUNDIAL 26", Modifier.fillMaxWidth().align(Alignment.Center), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Box(modifier = Modifier.size(42.dp).clip(CircleShape).background(Color(0xFF333333)).align(Alignment.CenterEnd), contentAlignment = Alignment.Center) {
+                Text("$totalPoints", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
 
         Box(modifier = Modifier.weight(1f)) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                 when (page) {
                     0 -> GoalscorersScreen()
                     1 -> HomeScreen()
@@ -74,65 +57,30 @@ fun PorraNavGraph() {
 
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
             leftPages.forEachIndexed { index, page ->
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 0.dp)
-                        .offset(y = (index * 82).dp)
-                        .clickable { scope.launch { pagerState.animateScrollToPage(page) } },
-                    contentAlignment = Alignment.TopStart
-                ) {
+                Box(modifier = Modifier.align(Alignment.TopStart).offset(y = (index * 82).dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
                     Text(
                         pageTitles[page],
-                        modifier = Modifier
-                            .rotate(-90f),
-                        fontSize = 10.sp,
-                        color = Color(0xFFAAAAAA),
-                        fontWeight = FontWeight.Bold,
-                        softWrap = false,
-                        maxLines = 1
+                        modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) },
+                        fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
                     )
                 }
             }
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             rightPages.forEachIndexed { index, page ->
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(y = (index * 82).dp)
-                        .clickable { scope.launch { pagerState.animateScrollToPage(page) } },
-                    contentAlignment = Alignment.TopEnd
-                ) {
+                Box(modifier = Modifier.align(Alignment.TopEnd).offset(y = (index * 82).dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
                     Text(
                         pageTitles[page],
-                        modifier = Modifier
-                            .rotate(-90f),
-                        fontSize = 10.sp,
-                        color = Color(0xFFAAAAAA),
-                        fontWeight = FontWeight.Bold,
-                        softWrap = false,
-                        maxLines = 1
+                        modifier = Modifier.graphicsLayer { rotationZ = 90f; transformOrigin = TransformOrigin(1f, 0f) },
+                        fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
                     )
                 }
             }
         }
 
-        Row(
-            Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
+        Row(Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 2.dp), horizontalArrangement = Arrangement.Center) {
             repeat(4) { index ->
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 5.dp)
-                        .size(if (pagerState.currentPage == index) 6.dp else 4.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (pagerState.currentPage == index) Color(0xFFE65100)
-                            else Color(0xFF444444)
-                        )
-                )
+                Box(modifier = Modifier.padding(horizontal = 5.dp).size(if (pagerState.currentPage == index) 6.dp else 4.dp).clip(CircleShape).background(if (pagerState.currentPage == index) Color(0xFFE65100) else Color(0xFF444444)))
             }
         }
     }

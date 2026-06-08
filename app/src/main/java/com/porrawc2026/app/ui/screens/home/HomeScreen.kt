@@ -110,6 +110,10 @@ fun HomeScreen(
             if (upcomingMatches.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PARTIDOS",
+                            style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.height(6.dp))
                         upcomingMatches.take(8).forEach { match ->
                             MatchRow(match)
                             if (match != upcomingMatches.take(8).last()) Spacer(Modifier.height(4.dp))
@@ -151,7 +155,7 @@ fun HomeScreen(
                     } else {
                         Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (hasData) "Actualizar" else "Cargar Porra", style = MaterialTheme.typography.titleSmall)
+                        Text(if (hasData) "Actualizar Porra" else "Cargar Porra", style = MaterialTheme.typography.titleSmall)
                     }
                 }
                 if (hasData) {

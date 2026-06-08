@@ -32,7 +32,6 @@ import kotlinx.coroutines.launch
 fun PorraNavGraph() {
     val homeVM: HomeViewModel = hiltViewModel()
     val totalPoints by homeVM.totalPoints.collectAsState()
-
     val pagerState = rememberPagerState(initialPage = 1, pageCount = { 4 })
     val scope = rememberCoroutineScope()
     val pageTitles = listOf("GOLEADORES", "INICIO", "PARTIDOS", "PREGUNTAS")
@@ -57,17 +56,10 @@ fun PorraNavGraph() {
 
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
             if (leftPages.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.align(Alignment.CenterStart),
-                    verticalArrangement = Arrangement.Center
-                ) {
+                Column(modifier = Modifier.align(Alignment.CenterStart), verticalArrangement = Arrangement.Center) {
                     leftPages.forEach { page ->
-                        Box(modifier = Modifier.height(80.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
-                            Text(
-                                pageTitles[page],
-                                modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0.5f) },
-                                fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
-                            )
+                        Box(modifier = Modifier.height(100.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.TopStart) {
+                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) }, fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
                     }
                 }
@@ -75,26 +67,19 @@ fun PorraNavGraph() {
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             if (rightPages.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    verticalArrangement = Arrangement.Center
-                ) {
+                Column(modifier = Modifier.align(Alignment.CenterEnd), verticalArrangement = Arrangement.Center) {
                     rightPages.forEach { page ->
-                        Box(modifier = Modifier.height(80.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
-                            Text(
-                                pageTitles[page],
-                                modifier = Modifier.graphicsLayer { rotationZ = 90f; transformOrigin = TransformOrigin(1f, 0.5f) },
-                                fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
-                            )
+                        Box(modifier = Modifier.height(100.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.TopEnd) {
+                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = 90f; transformOrigin = TransformOrigin(1f, 0f) }, fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
                     }
                 }
             }
         }
 
-        Row(Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 2.dp), horizontalArrangement = Arrangement.Center) {
+        Row(Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 1.dp), horizontalArrangement = Arrangement.Center) {
             repeat(4) { index ->
-                Box(modifier = Modifier.padding(horizontal = 5.dp).size(if (pagerState.currentPage == index) 6.dp else 4.dp).clip(CircleShape).background(if (pagerState.currentPage == index) Color(0xFFE65100) else Color(0xFF444444)))
+                Box(modifier = Modifier.padding(horizontal = 4.dp).size(if (pagerState.currentPage == index) 5.dp else 3.dp).clip(CircleShape).background(if (pagerState.currentPage == index) Color(0xFFE65100) else Color(0xFF444444)))
             }
         }
     }

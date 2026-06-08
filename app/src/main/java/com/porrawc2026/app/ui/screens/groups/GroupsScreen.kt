@@ -16,59 +16,45 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
 
-private val koOrder = mapOf(
-    "Dieciseisavos" to 1, "Octavos" to 2, "Cuartos" to 3,
-    "Semifinales" to 4, "3er puesto" to 5, "Final" to 6
-)
-
 @Composable
 fun MatchesScreen(
     viewModel: GroupsViewModel = hiltViewModel()
 ) {
     val allMatches by viewModel.allMatches.collectAsState()
+    val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
 
-    val groupedMatches = remember(allMatches) {
-        val sorted = allMatches.sortedBy { it.dateTime }
-        val groups = linkedMapOf<String, MutableList<MatchEntity>>()
-        for (m in sorted) {
-            val key = if (m.isKnockout) m.knockoutRound ?: "Eliminatorias" else m.groupName
-            groups.getOrPut(key) { mutableListOf() }.add(m)
-        }
-        groups.toList().sortedBy { (key, _) ->
-            if (key.startsWith("Grupo")) {
-                key.substringAfter("Grupo ").trim().padStart(2, '0')
-            } else {
-                (koOrder[key] ?: 99).toString().padStart(2, '0')
+    LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("Hora", Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text("Partido", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text("Pred.", Modifier.width(46.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
+                Text("Pts", Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
             }
         }
-    }
 
-    LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        for ((groupName, matches) in groupedMatches) {
-            item {
-                Spacer(Modifier.height(4.dp))
-                Text(groupName, style = MaterialTheme.typography.titleSmall, color = WCGold, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp))
+        var lastDate = ""
+        for (match in sorted) {
+            val dl = showDateLabel(match)
+            if (dl != lastDate) {
+                lastDate = dl
+                item { Text(dl, style = MaterialTheme.typography.labelMedium, color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)) }
             }
-
-            if (groupName == groupedMatches.first().first) {
-                item {
-                    Row(Modifier.fillMaxWidth().background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Text("Hora", Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                        Text("Partido", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                        Text("Pred.", Modifier.width(46.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
-                        Text("Pts", Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
-                    }
-                }
-            }
-
-            for (match in matches) {
-                item { MatchRow(match) }
-            }
+            item { MatchRow(match) }
         }
         item { Spacer(Modifier.height(16.dp)) }
     }
+}
+
+private fun showDateLabel(m: MatchEntity): String {
+    if (m.dateTime.isBlank() || m.dateTime.length < 10) return ""
+    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+    val fmt = java.text.SimpleDateFormat("EEE d MMM", java.util.Locale("es", "ES"))
+    return try {
+        val d = sdf.parse(m.dateTime.take(10))
+        if (d != null) fmt.format(d).replace(".", "").uppercase() else m.dateTime.take(10)
+    } catch (_: Exception) { m.dateTime.take(10) }
 }
 
 @Composable

@@ -56,24 +56,38 @@ fun PorraNavGraph() {
             }
 
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
-            leftPages.forEachIndexed { index, page ->
-                Box(modifier = Modifier.align(Alignment.TopStart).offset(y = (index * 82).dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
-                    Text(
-                        pageTitles[page],
-                        modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) },
-                        fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
-                    )
+            if (leftPages.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.align(Alignment.CenterStart),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    leftPages.forEach { page ->
+                        Box(modifier = Modifier.clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
+                            Text(
+                                pageTitles[page],
+                                modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) },
+                                fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
-            rightPages.forEachIndexed { index, page ->
-                Box(modifier = Modifier.align(Alignment.TopEnd).offset(y = (index * 82).dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
-                    Text(
-                        pageTitles[page],
-                        modifier = Modifier.graphicsLayer { rotationZ = 90f; transformOrigin = TransformOrigin(1f, 0f) },
-                        fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
-                    )
+            if (rightPages.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    rightPages.forEach { page ->
+                        Box(modifier = Modifier.clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
+                            Text(
+                                pageTitles[page],
+                                modifier = Modifier.graphicsLayer { rotationZ = 90f; transformOrigin = TransformOrigin(1f, 0f) },
+                                fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         }

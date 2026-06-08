@@ -43,7 +43,7 @@ fun HomeScreen(
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val isUpdating by viewModel.isUpdating.collectAsState()
     val ctx = LocalContext.current
-    val appVersion = remember { try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" } }
+    val appVersion = try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()

@@ -14,7 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -76,17 +77,17 @@ fun PorraNavGraph() {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .offset(y = (index * 90).dp)
-                        .width(16.dp)
-                        .wrapContentHeight()
+                        .padding(start = 0.dp)
+                        .offset(y = (index * 82).dp)
                         .clickable { scope.launch { pagerState.animateScrollToPage(page) } },
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.TopStart
                 ) {
                     Text(
                         pageTitles[page],
-                        modifier = Modifier.rotate(-90f),
+                        modifier = Modifier
+                            .rotate(-90f),
                         fontSize = 10.sp,
-                        color = Color(0xFFBBBBBB),
+                        color = Color(0xFFAAAAAA),
                         fontWeight = FontWeight.Bold,
                         softWrap = false,
                         maxLines = 1
@@ -99,17 +100,16 @@ fun PorraNavGraph() {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(y = (index * 90).dp)
-                        .width(16.dp)
-                        .wrapContentHeight()
+                        .offset(y = (index * 82).dp)
                         .clickable { scope.launch { pagerState.animateScrollToPage(page) } },
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.TopEnd
                 ) {
                     Text(
                         pageTitles[page],
-                        modifier = Modifier.rotate(-90f),
+                        modifier = Modifier
+                            .rotate(-90f),
                         fontSize = 10.sp,
-                        color = Color(0xFFBBBBBB),
+                        color = Color(0xFFAAAAAA),
                         fontWeight = FontWeight.Bold,
                         softWrap = false,
                         maxLines = 1

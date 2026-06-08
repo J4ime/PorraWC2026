@@ -151,7 +151,7 @@ fun HomeScreen(
                     } else {
                         Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (hasData) "Actualizar" else "Cargar Excel", style = MaterialTheme.typography.titleSmall)
+                        Text(if (hasData) "Actualizar" else "Cargar Porra", style = MaterialTheme.typography.titleSmall)
                     }
                 }
                 if (hasData) {

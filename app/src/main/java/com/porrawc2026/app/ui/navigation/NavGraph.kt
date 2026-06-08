@@ -59,13 +59,13 @@ fun PorraNavGraph() {
             if (leftPages.isNotEmpty()) {
                 Column(
                     modifier = Modifier.align(Alignment.CenterStart),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.Center
                 ) {
                     leftPages.forEach { page ->
-                        Box(modifier = Modifier.clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
+                        Box(modifier = Modifier.height(80.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
                             Text(
                                 pageTitles[page],
-                                modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) },
+                                modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0.5f) },
                                 fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
                             )
                         }
@@ -77,13 +77,13 @@ fun PorraNavGraph() {
             if (rightPages.isNotEmpty()) {
                 Column(
                     modifier = Modifier.align(Alignment.CenterEnd),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.Center
                 ) {
                     rightPages.forEach { page ->
-                        Box(modifier = Modifier.clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
+                        Box(modifier = Modifier.height(80.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }) {
                             Text(
                                 pageTitles[page],
-                                modifier = Modifier.graphicsLayer { rotationZ = 90f; transformOrigin = TransformOrigin(1f, 0f) },
+                                modifier = Modifier.graphicsLayer { rotationZ = 90f; transformOrigin = TransformOrigin(1f, 0.5f) },
                                 fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1
                             )
                         }

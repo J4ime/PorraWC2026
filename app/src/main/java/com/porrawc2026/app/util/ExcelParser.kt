@@ -373,6 +373,8 @@ object ExcelParser {
                 val rowIdx = startRow + offset
                 val row = sheet.getRow(rowIdx) ?: continue
                 val matchNumber = cellInt(row, COL_KNOCKOUT_MATCH_NUM) ?: continue
+                val homeRef = cellText(row, COL_KNOCKOUT_HOME_REF) ?: "W$matchNumber"
+                val awayRef = cellText(row, COL_KNOCKOUT_AWAY_REF) ?: "W$matchNumber"
 
                 val dateStr = readDateCell(row)
 
@@ -383,8 +385,8 @@ object ExcelParser {
                         groupName = round,
                         matchday = round,
                         dateTime = dateStr,
-                        homeTeam = "W$matchNumber",
-                        awayTeam = "W$matchNumber",
+                        homeTeam = cleanText(homeRef),
+                        awayTeam = cleanText(awayRef),
                         isKnockout = true,
                         knockoutRound = round,
                         matchNumber = matchNumber,
@@ -395,6 +397,25 @@ object ExcelParser {
         }
 
         Log.d("ExcelParser", "parseMatches: found ${matches.size} (group=${matches.count { !it.isKnockout }}, ko=${matches.count { it.isKnockout }})")
+
+        val thirdPlaceRow = sheet.getRow(142)
+        if (thirdPlaceRow != null) {
+            matchId++
+            matches.add(MatchEntity(id = 103, groupName = "3er puesto", matchday = "3er puesto",
+                dateTime = readDateCell(thirdPlaceRow),
+                homeTeam = "L101", awayTeam = "L102",
+                isKnockout = true, knockoutRound = "3er puesto", matchNumber = 103))
+        }
+
+        val finalRow = sheet.getRow(146)
+        if (finalRow != null) {
+            matchId++
+            matches.add(MatchEntity(id = 104, groupName = "Final", matchday = "Final",
+                dateTime = readDateCell(finalRow),
+                homeTeam = "W101", awayTeam = "W102",
+                isKnockout = true, knockoutRound = "Final", matchNumber = 104))
+        }
+
         return matches
     }
 

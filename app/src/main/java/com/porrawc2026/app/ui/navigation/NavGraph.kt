@@ -73,7 +73,7 @@ fun PorraNavGraph() {
                         Box(modifier = Modifier.width(12.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 pageTitles[page].forEach { c ->
-                                    Text("$c", fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("$c", fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold, lineHeight = 9.sp)
                                 }
                             }
                         }

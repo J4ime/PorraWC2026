@@ -20,6 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.ui.screens.goalscorers.GoalscorersScreen
 import com.porrawc2026.app.ui.screens.groups.MatchesScreen
@@ -56,10 +58,10 @@ fun PorraNavGraph() {
 
             val leftPages = (0 until pagerState.currentPage).reversed().toList()
             if (leftPages.isNotEmpty()) {
-                Column(modifier = Modifier.align(Alignment.CenterStart), verticalArrangement = Arrangement.Center) {
+                Column(modifier = Modifier.align(Alignment.CenterStart).zIndex(10f), verticalArrangement = Arrangement.Center) {
                     leftPages.forEach { page ->
                         Box(modifier = Modifier.height(100.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.TopStart) {
-                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) }, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) }, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
                     }
                 }
@@ -67,10 +69,10 @@ fun PorraNavGraph() {
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             if (rightPages.isNotEmpty()) {
-                Column(modifier = Modifier.align(Alignment.CenterEnd), verticalArrangement = Arrangement.Center) {
+                Column(modifier = Modifier.align(Alignment.CenterEnd).zIndex(10f), verticalArrangement = Arrangement.Center) {
                     rightPages.forEach { page ->
                         Box(modifier = Modifier.height(100.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.TopEnd) {
-                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(1f, 0f) }, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(1f, 0f) }, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
                     }
                 }

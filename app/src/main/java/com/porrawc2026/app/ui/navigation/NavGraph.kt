@@ -68,12 +68,12 @@ fun PorraNavGraph() {
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             if (rightPages.isNotEmpty()) {
-                Column(modifier = Modifier.align(Alignment.CenterEnd).zIndex(10f), verticalArrangement = Arrangement.Center) {
+                Column(modifier = Modifier.align(Alignment.CenterEnd).zIndex(10f).padding(top = 60.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     rightPages.forEach { page ->
                         Box(modifier = Modifier.width(12.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 pageTitles[page].forEach { c ->
-                                    Text("$c", fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold, lineHeight = 9.sp)
+                                    Text("$c", fontSize = 8.sp, color = Color.White, fontWeight = FontWeight.Bold, lineHeight = 8.sp)
                                 }
                             }
                         }

@@ -31,7 +31,9 @@ object PlayerPhotoDownloader {
         "Romelu Lukaku", "Lamine Yamal", "Julián Álvarez",
         "Son Heung-min", "Viktor Gyökeres", "Bukayo Saka",
         "Memphis Depay", "Kai Havertz", "Alexander Isak",
-        "Luis Díaz", "Jude Bellingham"
+        "Luis Díaz", "Jude Bellingham", "Michael Olise",
+        "Ousmane Dembélé", "Florian Wirtz", "Jamal Musiala",
+        "Cody Gakpo", "Phil Foden", "Cole Palmer"
     )
 
     private var squadEntryMap: Map<String, SquadEntry>? = null

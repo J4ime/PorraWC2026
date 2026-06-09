@@ -17,16 +17,13 @@ import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
 
 @Composable
-fun MatchesScreen(
-    viewModel: GroupsViewModel = hiltViewModel()
-) {
+fun MatchesScreen(viewModel: GroupsViewModel = hiltViewModel()) {
     val allMatches by viewModel.allMatches.collectAsState()
     val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
 
     LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item {
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Hora", Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 Text("Partido", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 Text("Pred.", Modifier.width(46.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
@@ -34,32 +31,22 @@ fun MatchesScreen(
             }
         }
 
-        var lastDate = ""
+        var lastLabel = ""
         for (match in sorted) {
-            val dl = showDateLabel(match)
-            if (dl != lastDate) {
-                lastDate = dl
-                item { Text(dl, style = MaterialTheme.typography.labelMedium, color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)) }
+            val label = if (match.isKnockout) (match.knockoutRound ?: "Eliminatorias") else ""
+            if (match.isKnockout && label != lastLabel) {
+                lastLabel = label
+                item { Text(label.uppercase(), style = MaterialTheme.typography.titleSmall, color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) }
             }
-            item { MatchRow(match) }
+            if (match.isKnockout) item { KnockoutMatchRow(match) }
+            else item { GroupMatchRow(match) }
         }
         item { Spacer(Modifier.height(16.dp)) }
     }
 }
 
-private fun showDateLabel(m: MatchEntity): String {
-    if (m.isKnockout) return m.knockoutRound ?: "Eliminatorias"
-    if (m.dateTime.isBlank() || m.dateTime.length < 10) return ""
-    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-    val fmt = java.text.SimpleDateFormat("EEE d MMM", java.util.Locale("es", "ES"))
-    return try {
-        val d = sdf.parse(m.dateTime.take(10))
-        if (d != null) fmt.format(d).replace(".", "").uppercase() else m.dateTime.take(10)
-    } catch (_: Exception) { m.dateTime.take(10) }
-}
-
 @Composable
-private fun MatchRow(match: MatchEntity) {
+private fun GroupMatchRow(match: MatchEntity) {
     val hasResult = match.homeGoals != null && match.awayGoals != null
     val hasPred = match.predictedHomeGoals != null && match.predictedAwayGoals != null
     val isLive = !hasResult && hasPred
@@ -76,23 +63,60 @@ private fun MatchRow(match: MatchEntity) {
         val time = if (match.dateTime.length >= 16) match.dateTime.substring(11, 16) else match.dateTime
         Text(time, Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold)
 
-        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-            Text(" ${if (hasPred) "${match.predictedHomeGoals}-${match.predictedAwayGoals}" else "-"} ", style = MaterialTheme.typography.bodySmall, color = if (hasPred) TextPrimary else TextMuted, maxLines = 1)
-            Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f))
-        }
+        Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
 
         Text(
-            if (hasResult) "${match.homeGoals}-${match.awayGoals}" else if (hasPred) "${match.predictedHomeGoals}-${match.predictedAwayGoals}" else "-",
-            Modifier.width(46.dp),
-            style = MaterialTheme.typography.bodySmall, color = if (hasResult) AccentOrange else if (hasPred) TextPrimary else TextMuted, textAlign = TextAlign.Center, fontWeight = if (hasResult) FontWeight.Bold else FontWeight.Normal
+            if (hasPred) "${match.predictedHomeGoals}-${match.predictedAwayGoals}" else "-",
+            modifier = Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.labelSmall, color = if (hasPred) TextPrimary else TextMuted, fontWeight = FontWeight.Bold
+        )
+
+        Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = TextPrimary, maxLines = 1, modifier = Modifier.weight(1f))
+
+        Text(
+            if (hasResult) "${match.homeGoals}-${match.awayGoals}" else "-",
+            Modifier.width(46.dp), style = MaterialTheme.typography.bodySmall, color = if (hasResult) AccentOrange else TextMuted, textAlign = TextAlign.Center, fontWeight = if (hasResult) FontWeight.Bold else FontWeight.Normal
         )
 
         Text(
             if (hasResult) "${match.pointsEarned}" else "",
-            Modifier.width(42.dp),
-            style = MaterialTheme.typography.bodySmall, color = if (hasResult && match.pointsEarned > 0) AccentGreen else TextMuted,
-            fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
+            Modifier.width(42.dp), style = MaterialTheme.typography.bodySmall, color = if (hasResult && match.pointsEarned > 0) AccentGreen else TextMuted, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun KnockoutMatchRow(match: MatchEntity) {
+    val hasPred = match.predictedHomeGoals != null && match.predictedAwayGoals != null
+    val hasResult = match.homeGoals != null && match.awayGoals != null
+    val predHome = match.predictedHomeGoals ?: 1
+    val predAway = match.predictedAwayGoals ?: 0
+    val homeWins = hasPred && predHome > predAway
+    val awayWins = hasPred && predAway > predHome
+
+    val bgColor = when {
+        hasResult && match.pointsEarned > 0 -> AccentGreen.copy(alpha = 0.1f)
+        hasResult -> AccentRed.copy(alpha = 0.1f)
+        else -> SurfaceMedium.copy(alpha = 0.3f)
+    }
+
+    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        val time = if (match.dateTime.length >= 16) match.dateTime.substring(11, 16) else match.dateTime
+        Text(time, Modifier.width(42.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold)
+
+        Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = if (homeWins) AccentGreen else TextPrimary, maxLines = 1, modifier = Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = if (homeWins) FontWeight.Bold else FontWeight.Normal)
+
+        Text("vs", Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+
+        Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = if (awayWins) AccentGreen else TextPrimary, maxLines = 1, modifier = Modifier.weight(1f), fontWeight = if (awayWins) FontWeight.Bold else FontWeight.Normal)
+
+        Text(
+            if (hasResult) "${match.homeGoals}-${match.awayGoals}" else "-",
+            Modifier.width(46.dp), style = MaterialTheme.typography.bodySmall, color = if (hasResult) AccentOrange else TextMuted, textAlign = TextAlign.Center, fontWeight = if (hasResult) FontWeight.Bold else FontWeight.Normal
+        )
+
+        Text(
+            if (hasResult && match.pointsEarned > 0) "+${match.pointsEarned}" else "",
+            Modifier.width(42.dp), style = MaterialTheme.typography.bodySmall, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center
         )
     }
 }

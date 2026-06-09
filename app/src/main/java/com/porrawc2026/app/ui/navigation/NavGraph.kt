@@ -21,7 +21,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.ui.screens.goalscorers.GoalscorersScreen
 import com.porrawc2026.app.ui.screens.groups.MatchesScreen
@@ -71,8 +70,12 @@ fun PorraNavGraph() {
             if (rightPages.isNotEmpty()) {
                 Column(modifier = Modifier.align(Alignment.CenterEnd).zIndex(10f), verticalArrangement = Arrangement.Center) {
                     rightPages.forEach { page ->
-                        Box(modifier = Modifier.height(100.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.TopEnd) {
-                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(1f, 0f) }, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                        Box(modifier = Modifier.width(12.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                pageTitles[page].forEach { c ->
+                                    Text("$c", fontSize = 9.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                 }

@@ -373,10 +373,12 @@ object ExcelParser {
                 val rowIdx = startRow + offset
                 val row = sheet.getRow(rowIdx) ?: continue
                 val matchNumber = cellInt(row, COL_KNOCKOUT_MATCH_NUM) ?: continue
-                val homeRef = cellText(row, COL_KNOCKOUT_HOME_REF) ?: "W$matchNumber"
-                val awayRef = cellText(row, COL_KNOCKOUT_AWAY_REF) ?: "W$matchNumber"
+                val homeTeam = cellText(row, COL_MATCH_HOME) ?: (cellText(row, COL_KNOCKOUT_HOME_REF) ?: "W$matchNumber")
+                val awayTeam = cellText(row, COL_MATCH_AWAY) ?: (cellText(row, COL_KNOCKOUT_AWAY_REF) ?: "W$matchNumber")
 
                 val dateStr = readDateCell(row)
+                val predHome = cellInt(row, COL_GOAL_HOME)
+                val predAway = cellInt(row, COL_GOAL_AWAY)
 
                 matchId++
                 matches.add(
@@ -385,8 +387,10 @@ object ExcelParser {
                         groupName = round,
                         matchday = round,
                         dateTime = dateStr,
-                        homeTeam = cleanText(homeRef),
-                        awayTeam = cleanText(awayRef),
+                        homeTeam = cleanText(homeTeam),
+                        awayTeam = cleanText(awayTeam),
+                        predictedHomeGoals = predHome,
+                        predictedAwayGoals = predAway,
                         isKnockout = true,
                         knockoutRound = round,
                         matchNumber = matchNumber,
@@ -401,18 +405,26 @@ object ExcelParser {
         val thirdPlaceRow = sheet.getRow(142)
         if (thirdPlaceRow != null) {
             matchId++
+            val h = cellText(thirdPlaceRow, COL_MATCH_HOME) ?: "L101"
+            val a = cellText(thirdPlaceRow, COL_MATCH_AWAY) ?: "L102"
             matches.add(MatchEntity(id = 103, groupName = "3er puesto", matchday = "3er puesto",
                 dateTime = readDateCell(thirdPlaceRow),
-                homeTeam = "L101", awayTeam = "L102",
+                homeTeam = cleanText(h), awayTeam = cleanText(a),
+                predictedHomeGoals = cellInt(thirdPlaceRow, COL_GOAL_HOME),
+                predictedAwayGoals = cellInt(thirdPlaceRow, COL_GOAL_AWAY),
                 isKnockout = true, knockoutRound = "3er puesto", matchNumber = 103))
         }
 
         val finalRow = sheet.getRow(146)
         if (finalRow != null) {
             matchId++
+            val h = cellText(finalRow, COL_MATCH_HOME) ?: "W101"
+            val a = cellText(finalRow, COL_MATCH_AWAY) ?: "W102"
             matches.add(MatchEntity(id = 104, groupName = "Final", matchday = "Final",
                 dateTime = readDateCell(finalRow),
-                homeTeam = "W101", awayTeam = "W102",
+                homeTeam = cleanText(h), awayTeam = cleanText(a),
+                predictedHomeGoals = cellInt(finalRow, COL_GOAL_HOME),
+                predictedAwayGoals = cellInt(finalRow, COL_GOAL_AWAY),
                 isKnockout = true, knockoutRound = "Final", matchNumber = 104))
         }
 

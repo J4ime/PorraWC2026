@@ -48,6 +48,7 @@ fun MatchesScreen(
 }
 
 private fun showDateLabel(m: MatchEntity): String {
+    if (m.isKnockout) return m.knockoutRound ?: "Eliminatorias"
     if (m.dateTime.isBlank() || m.dateTime.length < 10) return ""
     val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
     val fmt = java.text.SimpleDateFormat("EEE d MMM", java.util.Locale("es", "ES"))

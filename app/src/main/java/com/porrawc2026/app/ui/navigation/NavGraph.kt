@@ -59,7 +59,7 @@ fun PorraNavGraph() {
                 Column(modifier = Modifier.align(Alignment.CenterStart), verticalArrangement = Arrangement.Center) {
                     leftPages.forEach { page ->
                         Box(modifier = Modifier.height(100.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.TopStart) {
-                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) }, fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(0f, 0f) }, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
                     }
                 }
@@ -70,7 +70,7 @@ fun PorraNavGraph() {
                 Column(modifier = Modifier.align(Alignment.CenterEnd), verticalArrangement = Arrangement.Center) {
                     rightPages.forEach { page ->
                         Box(modifier = Modifier.height(100.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.TopEnd) {
-                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(1f, 0f) }, fontSize = 10.sp, color = Color(0xFFAAAAAA), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
+                            Text(pageTitles[page], modifier = Modifier.graphicsLayer { rotationZ = -90f; transformOrigin = TransformOrigin(1f, 0f) }, fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.Bold, softWrap = false, maxLines = 1)
                         }
                     }
                 }

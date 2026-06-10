@@ -46,7 +46,12 @@ fun GoalscorersScreen(
                     border = BorderStroke(1.dp, Color(0xFFE65100))
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Text("MIS GOLEADORES", style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        Text("MIS GOLEADORES", style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+                        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                            Spacer(Modifier.width(48.dp))
+                            Text("Goles", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777), textAlign = TextAlign.Center)
+                            Text("Puntos", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777), textAlign = TextAlign.Center)
+                        }
                         players.forEach { p -> PlayerRow(p) }
                     }
                 }
@@ -91,11 +96,10 @@ private fun PlayerRow(p: PlayerPredictionEntity) {
         ?: p.predictedName?.let { name -> PlayerPhotoDownloader.lookupCache(context, name) }
     val photoFile = photoPath?.let { File(it) }
     val hasPoints = p.pointsEarned > 0
-
     val ptsColor = if (hasPoints) Color(0xFF4CAF50) else Color(0xFF666666)
 
     Row(Modifier.fillMaxWidth().background(Color(0xFF222222), RoundedCornerShape(8.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
             if (photoFile != null) {
                 AsyncImage(model = photoFile, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } else {
@@ -103,13 +107,10 @@ private fun PlayerRow(p: PlayerPredictionEntity) {
                 Text(initials, style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(p.predictedName ?: "-", style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.Medium)
-            Text("${p.pointsPerGoal} pts/gol", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
-        }
-        Text("${p.goalsScored} goles", Modifier.width(60.dp).padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.bodySmall, color = Color.White, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-        Text("${p.pointsEarned}", Modifier.width(50.dp).padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.bodySmall, color = ptsColor, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(8.dp))
+        Text(p.predictedName ?: "-", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1)
+        Text("${p.goalsScored}", Modifier.width(48.dp), fontSize = 11.sp, color = Color.White, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+        Text("${p.pointsEarned}", Modifier.width(48.dp), fontSize = 11.sp, color = ptsColor, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
     }
 }
 

@@ -28,7 +28,7 @@ fun MatchesScreen(viewModel: GroupsViewModel = hiltViewModel()) {
     LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Fecha", Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text("Fecha", Modifier.width(72.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 Text("Partido", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
                 Text("Pts", Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
             }
@@ -54,10 +54,13 @@ fun MatchesScreen(viewModel: GroupsViewModel = hiltViewModel()) {
 private fun fmtDate(match: MatchEntity): String {
     val dt = match.dateTime.ifBlank { return "" }
     return try {
-        val date = dt.take(10).substringAfter("-2026-", "").replace("-", "-")
-        val time = if (dt.length >= 16) dt.substring(11, 16) else ""
-        if (date.isBlank()) time else "$date $time"
-    } catch (_: Exception) { dt }
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+        val date = sdf.parse(dt) ?: return ""
+        val dayAbbr = java.text.SimpleDateFormat("EEE", java.util.Locale("es", "ES")).format(date).replace(".", "").uppercase()
+        val dayNum = java.text.SimpleDateFormat("dd", java.util.Locale.US).format(date)
+        val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(date)
+        "$dayAbbr$dayNum $time"
+    } catch (_: Exception) { dt.take(10) }
 }
 
 @Composable
@@ -74,7 +77,7 @@ private fun GroupMatchRow(match: MatchEntity) {
     }
 
     Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(fmtDate(match), Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+        Text(fmtDate(match), Modifier.width(72.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(match.homeTeam, fontSize = 11.sp, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
@@ -112,7 +115,7 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
     }
 
     Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(fmtDate(match), Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+        Text(fmtDate(match), Modifier.width(72.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(match.homeTeam, fontSize = 11.sp, color = hColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = if (homeWins) FontWeight.Bold else FontWeight.Normal)

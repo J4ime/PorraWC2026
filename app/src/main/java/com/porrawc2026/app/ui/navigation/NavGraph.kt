@@ -53,11 +53,11 @@ fun PorraNavGraph() {
         Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().height(56.dp).padding(horizontal = 12.dp)) {
             val headerTitle = when (pagerState.currentPage) {
                 0 -> "GOLEADORES"
-                1 -> "PORRA MUNDIAL 26"
+                 1 -> "PORRA WC 2026"
                 2 -> "PARTIDOS"
                 3 -> "PREGUNTAS"
                 4 -> "AJUSTES"
-                else -> "PORRA MUNDIAL 26"
+                else -> "PORRA WC 2026"
             }
             Image(painter = painterResource(R.drawable.logo_porra), contentDescription = "WC2026", modifier = Modifier.size(36.dp).align(Alignment.CenterStart), contentScale = ContentScale.Fit)
             Text(headerTitle, Modifier.align(Alignment.Center).padding(horizontal = 48.dp), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
@@ -92,7 +92,7 @@ fun PorraNavGraph() {
                             item.icon,
                             contentDescription = item.label,
                             tint = if (selected) Color(0xFFE65100) else Color(0xFF555555),
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(

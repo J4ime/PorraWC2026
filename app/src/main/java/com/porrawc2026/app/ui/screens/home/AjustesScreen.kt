@@ -80,7 +80,7 @@ fun AjustesScreen(
                 }
                 item {
                     SquareButton(
-                            icon = if (hasData) Icons.Filled.Refresh else Icons.Filled.TableChart,
+                            icon = if (hasData) Icons.Filled.Refresh else Icons.Filled.GridOn,
                         label = if (hasData) "Actualizar" else "Cargar",
                         color = Color(0xFF2E7D32),
                         loading = isLoading,

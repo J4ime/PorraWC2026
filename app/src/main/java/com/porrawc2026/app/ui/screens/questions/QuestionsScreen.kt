@@ -52,7 +52,7 @@ private fun QuestionRow(q: QuestionEntity) {
     Row(Modifier.fillMaxWidth().background(bg, RoundedCornerShape(6.dp)).padding(8.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Text("${q.id}", Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, fontWeight = FontWeight.Bold)
-        Text(q.text, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+        Text(q.text, Modifier.weight(1f).padding(vertical = 2.dp), style = MaterialTheme.typography.bodySmall, color = TextPrimary, softWrap = true)
         val answer = when (q.predictedAnswer) { true -> "V" ; false -> "F" ; else -> "-" }
         val ansColor = when (q.predictedAnswer) { true -> AccentGreen ; false -> AccentRed ; else -> TextMuted }
         Text(answer, Modifier.width(50.dp), style = MaterialTheme.typography.bodySmall, color = ansColor, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)

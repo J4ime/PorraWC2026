@@ -50,11 +50,6 @@ fun GoalscorersScreen(
                             Text("MIS GOLEADORES", fontSize = 12.sp, color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
                         }
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-                                Spacer(Modifier.width(48.dp))
-                                Text("Goles", Modifier.width(48.dp), fontSize = 10.sp, color = Color(0xFF777777), textAlign = TextAlign.End)
-                                Text("Puntos", Modifier.width(48.dp), fontSize = 10.sp, color = Color(0xFF777777), textAlign = TextAlign.End)
-                            }
                             players.forEach { p -> PlayerRow(p) }
                         }
                     }
@@ -113,8 +108,7 @@ private fun PlayerRow(p: PlayerPredictionEntity) {
         }
         Spacer(Modifier.width(8.dp))
         Text(p.predictedName ?: "-", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1)
-        Text("${p.goalsScored}", Modifier.width(48.dp), fontSize = 11.sp, color = Color.White, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-        Text("${p.pointsEarned}", Modifier.width(48.dp), fontSize = 11.sp, color = ptsColor, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+        Text("${p.pointsEarned} pts", fontSize = 11.sp, color = ptsColor, fontWeight = FontWeight.Bold)
     }
 }
 

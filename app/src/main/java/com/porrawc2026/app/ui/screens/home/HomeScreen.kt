@@ -136,17 +136,17 @@ fun HomeScreen(
         }
 
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 4.dp)
         ) {
             if (updateAvailable) {
                 Button(
                     onClick = { viewModel.installUpdate() },
-                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    modifier = Modifier.fillMaxWidth().height(32.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0), contentColor = Color.White),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     if (isUpdating) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(6.dp))
                         Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
                     } else {
@@ -155,11 +155,11 @@ fun HomeScreen(
                 }
             }
             Text("v$appVersion", Modifier.fillMaxWidth().padding(end = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), textAlign = TextAlign.End)
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(2.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                    modifier = Modifier.weight(1f).height(36.dp),
+                    modifier = Modifier.weight(1f).height(34.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
                 ) {
                     if (isLoading) {
@@ -173,7 +173,7 @@ fun HomeScreen(
                 if (hasData) {
                     Button(
                         onClick = { showDeleteDialog = true },
-                        modifier = Modifier.height(36.dp),
+                        modifier = Modifier.height(34.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -187,7 +187,14 @@ fun HomeScreen(
 
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp))
 
-        PullToRefreshContainer(state = pullRefreshState, modifier = Modifier.align(Alignment.TopCenter).zIndex(1f), containerColor = Color(0xFF1E1E1E), contentColor = Color.White)
+        PullToRefreshContainer(state = pullRefreshState, modifier = Modifier.align(Alignment.TopCenter).zIndex(1f), containerColor = Color(0xFF1E1E1E), contentColor = Color.White, indicator = { s ->
+            if (s.progress > 0f || s.isRefreshing) {
+                val inf = rememberInfiniteTransition("ptr")
+                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
+                val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
+                Text("\u26BD", fontSize = 36.sp, color = Color.White, modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
+            }
+        })
 
         if (isBusy) {
             Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {

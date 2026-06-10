@@ -2,6 +2,7 @@ package com.porrawc2026.app.ui.screens.groups
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.TeamEntity
 import com.porrawc2026.app.data.repository.PorraRepository
@@ -19,6 +20,9 @@ class GroupsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val allMatches: StateFlow<List<MatchEntity>> = repository.getAllMatches()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val allKnockoutPredictions: StateFlow<List<KnockoutPredictionEntity>> = repository.getKnockoutPredictions()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun getGroupTeams(group: String): Flow<List<TeamEntity>> = repository.getTeamsByGroup(group)

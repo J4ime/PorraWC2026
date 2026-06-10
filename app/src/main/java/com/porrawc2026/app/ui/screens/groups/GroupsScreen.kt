@@ -15,12 +15,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
 
 @Composable
 fun MatchesScreen(viewModel: GroupsViewModel = hiltViewModel()) {
     val allMatches by viewModel.allMatches.collectAsState()
+    val koPredictions by viewModel.allKnockoutPredictions.collectAsState()
     val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
 
     LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -40,7 +42,7 @@ fun MatchesScreen(viewModel: GroupsViewModel = hiltViewModel()) {
                     lastLabel = label
                     item { Text(label.uppercase(), style = MaterialTheme.typography.titleSmall, color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) }
                 }
-                item { KnockoutMatchRow(match) }
+                item { KnockoutMatchRow(match, koPredictions) }
             } else {
                 item { GroupMatchRow(match) }
             }
@@ -88,13 +90,11 @@ private fun GroupMatchRow(match: MatchEntity) {
 }
 
 @Composable
-private fun KnockoutMatchRow(match: MatchEntity) {
-    val hasPred = match.predictedHomeGoals != null && match.predictedAwayGoals != null
+private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPredictionEntity>) {
     val hasResult = match.homeGoals != null && match.awayGoals != null
-    val predHome = match.predictedHomeGoals ?: 1
-    val predAway = match.predictedAwayGoals ?: 0
-    val homeWins = hasPred && predHome > predAway
-    val awayWins = hasPred && predAway > predHome
+    val koPred = koPredictions.firstOrNull { it.homeTeamRef == match.homeTeam && it.awayTeamRef == match.awayTeam }
+    val homeWins = koPred?.winner == 1
+    val awayWins = koPred?.winner == 2
     val correct = hasResult && match.pointsEarned > 0
 
     val bgColor = when {

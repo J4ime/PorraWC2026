@@ -7,6 +7,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.LiveHelp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -44,7 +45,7 @@ fun PorraNavGraph() {
         NavItem("Goleadores", Icons.Filled.EmojiEvents),
         NavItem("Inicio", Icons.Filled.Home),
         NavItem("Partidos", Icons.Filled.SportsSoccer),
-        NavItem("Preguntas", Icons.Filled.LiveHelp),
+        NavItem("Preguntas", Icons.AutoMirrored.Filled.LiveHelp),
         NavItem("Ajustes", Icons.Filled.Settings)
     )
 
@@ -91,14 +92,7 @@ fun PorraNavGraph() {
                             item.icon,
                             contentDescription = item.label,
                             tint = if (selected) Color(0xFFE65100) else Color(0xFF555555),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    },
-                    label = {
-                        Text(
-                            item.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selected) Color(0xFFE65100) else Color(0xFF555555)
+                            modifier = Modifier.size(28.dp)
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(

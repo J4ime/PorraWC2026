@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -30,7 +32,6 @@ fun AjustesScreen(
     val validationResult by viewModel.validationResult.collectAsState()
     val hasData by viewModel.hasData.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
-    val updateAvailable by viewModel.updateAvailable.collectAsState()
     val isUpdating by viewModel.isUpdating.collectAsState()
     val appVersion by viewModel.appVersion.collectAsState()
 
@@ -61,63 +62,78 @@ fun AjustesScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
-        Column(
-            modifier = Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text("v$appVersion", style = MaterialTheme.typography.titleMedium, color = Color(0xFF555555), textAlign = TextAlign.Center)
-
-            if (updateAvailable) {
-                Button(
-                    onClick = { viewModel.installUpdate() },
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0), contentColor = Color.White),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    if (isUpdating) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                        Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
-                    } else {
-                        Text("ACTUALIZAR APP", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
+        Column(modifier = Modifier.fillMaxSize()) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    SquareButton(
+                        icon = Icons.Filled.SystemUpdate,
+                        label = if (isUpdating) "Descargando" else "Actualizar",
+                        color = Color(0xFF1565C0),
+                        loading = isUpdating,
+                        onClick = { viewModel.installUpdate() }
+                    )
+                }
+                item {
+                    SquareButton(
+                        icon = if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload,
+                        label = if (hasData) "Actualizar" else "Cargar",
+                        color = Color(0xFF2E7D32),
+                        loading = isLoading,
+                        onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) }
+                    )
+                }
+                if (hasData) {
+                    item {
+                        SquareButton(
+                            icon = Icons.Filled.Delete,
+                            label = "Borrar",
+                            color = Color(0xFFB71C1C),
+                            loading = false,
+                            onClick = { showDeleteDialog = true }
+                        )
                     }
                 }
             }
 
-            Button(
-                onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                modifier = Modifier.fillMaxWidth().height(44.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (hasData) "Actualizar Porra" else "Cargar Porra", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
-                }
-            }
-
-            if (hasData) {
-                Button(
-                    onClick = { showDeleteDialog = true },
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A1A1A), contentColor = Color(0xFFE53935)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Filled.Delete, null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935), maxLines = 1, softWrap = false)
-                }
-            }
+            Text(
+                "v$appVersion",
+                Modifier.fillMaxWidth().padding(end = 16.dp, bottom = 12.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF555555),
+                textAlign = TextAlign.End
+            )
         }
 
         if (isBusy) {
             Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
                 Text("\u26BD", fontSize = 64.sp, color = Color.White)
             }
+        }
+    }
+}
+
+@Composable
+private fun SquareButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, color: Color, loading: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.aspectRatio(1f),
+        colors = ButtonDefaults.buttonColors(containerColor = color, contentColor = Color.White),
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(4.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            if (loading) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+            } else {
+                Icon(icon, null, modifier = Modifier.size(28.dp))
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, maxLines = 1, softWrap = false, textAlign = TextAlign.Center)
         }
     }
 }

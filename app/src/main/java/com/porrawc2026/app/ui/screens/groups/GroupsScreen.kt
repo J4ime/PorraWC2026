@@ -73,19 +73,16 @@ private fun GroupMatchRow(match: MatchEntity) {
         else -> SurfaceMedium.copy(alpha = 0.3f)
     }
 
-    val maxNameLen = maxOf(match.homeTeam.length, match.awayTeam.length)
-    val fontSize = if (maxNameLen > 14) 10.sp else if (maxNameLen > 10) 11.sp else MaterialTheme.typography.bodySmall.fontSize
-
     Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(fmtDate(match), Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Text(match.homeTeam, style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-            Text(if (hasPred) " ${match.predictedHomeGoals}-${match.predictedAwayGoals} " else " - ", style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = if (hasPred) TextPrimary else TextMuted, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(match.awayTeam, style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(match.homeTeam, fontSize = 11.sp, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+            Text(if (hasPred) " ${match.predictedHomeGoals}-${match.predictedAwayGoals} " else " - ", fontSize = 11.sp, color = if (hasPred) TextPrimary else TextMuted, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(match.awayTeam, fontSize = 11.sp, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
 
-        Text(if (pts > 0) "$pts" else "", Modifier.width(24.dp), style = MaterialTheme.typography.bodySmall, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(if (pts > 0) "$pts" else "", Modifier.width(24.dp), fontSize = 11.sp, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 
@@ -103,9 +100,6 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
         else -> SurfaceMedium.copy(alpha = 0.3f)
     }
 
-    val maxNameLen = maxOf(match.homeTeam.length, match.awayTeam.length)
-    val fontSize = if (maxNameLen > 14) 10.sp else if (maxNameLen > 10) 11.sp else MaterialTheme.typography.bodySmall.fontSize
-
     val hColor = when {
         correct && homeWins -> AccentGreen
         hasResult && homeWins -> AccentRed
@@ -121,11 +115,11 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
         Text(fmtDate(match), Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Text(match.homeTeam, style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = hColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = if (homeWins) FontWeight.Bold else FontWeight.Normal)
-            Text(" vs ", style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = TextMuted, maxLines = 1)
-            Text(match.awayTeam, style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = aColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), fontWeight = if (awayWins) FontWeight.Bold else FontWeight.Normal)
+            Text(match.homeTeam, fontSize = 11.sp, color = hColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = if (homeWins) FontWeight.Bold else FontWeight.Normal)
+            Text(" vs ", fontSize = 11.sp, color = TextMuted, maxLines = 1)
+            Text(match.awayTeam, fontSize = 11.sp, color = aColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), fontWeight = if (awayWins) FontWeight.Bold else FontWeight.Normal)
         }
 
-        Text(if (correct) "+${match.pointsEarned}" else "", Modifier.width(24.dp), style = MaterialTheme.typography.bodySmall, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(if (correct) "+${match.pointsEarned}" else "", Modifier.width(24.dp), fontSize = 11.sp, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }

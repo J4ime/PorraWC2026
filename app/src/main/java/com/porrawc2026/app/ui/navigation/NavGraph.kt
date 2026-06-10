@@ -79,7 +79,7 @@ fun PorraNavGraph() {
 
             val rightPages = ((pagerState.currentPage + 1) until 4).toList()
             if (rightPages.isNotEmpty()) {
-                Column(modifier = Modifier.align(Alignment.CenterEnd).zIndex(10f).padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.align(Alignment.CenterEnd).zIndex(10f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     rightPages.forEach { page ->
                         Box(modifier = Modifier.width(12.dp).clickable { scope.launch { pagerState.animateScrollToPage(page) } }, contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -93,7 +93,7 @@ fun PorraNavGraph() {
             }
         }
 
-        Row(Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(vertical = 1.dp), horizontalArrangement = Arrangement.Center) {
+        Row(Modifier.fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding(), horizontalArrangement = Arrangement.Center) {
             repeat(4) { index ->
                 Box(modifier = Modifier.padding(horizontal = 4.dp).size(if (pagerState.currentPage == index) 5.dp else 3.dp).clip(CircleShape).background(if (pagerState.currentPage == index) Color(0xFFE65100) else Color(0xFF444444)))
             }

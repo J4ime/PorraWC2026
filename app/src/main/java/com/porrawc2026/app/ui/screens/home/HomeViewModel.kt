@@ -210,13 +210,8 @@ class HomeViewModel @Inject constructor(
 
     fun forceCheckUpdate() {
         viewModelScope.launch(Dispatchers.IO) {
-            _isBusy.value = true
-            try {
-                val info = UpdateManager.checkForUpdate(context)
-                _updateAvailable.value = info?.isNewer == true
-            } finally {
-                _isBusy.value = false
-            }
+            val info = UpdateManager.checkForUpdate(context)
+            _updateAvailable.value = info?.isNewer == true
         }
     }
 

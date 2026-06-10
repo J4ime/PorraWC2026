@@ -90,7 +90,7 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(bottom = 120.dp).nestedScroll(pullRefreshState.nestedScrollConnection), contentPadding = PaddingValues(bottom = 8.dp)) {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(bottom = 90.dp).nestedScroll(pullRefreshState.nestedScrollConnection), contentPadding = PaddingValues(bottom = 8.dp)) {
             if (yesterdayMatches.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -136,7 +136,7 @@ fun HomeScreen(
         }
 
         Column(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 4.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1A1A1A)).padding(horizontal = 16.dp)
         ) {
             if (updateAvailable) {
                 Button(

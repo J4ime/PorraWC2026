@@ -1,8 +1,5 @@
 package com.porrawc2026.app.ui.screens.home
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -24,11 +21,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.porrawc2026.app.util.ValidationResult
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 
 @Composable
@@ -36,15 +30,10 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val totalPoints by viewModel.totalPoints.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val validationResult by viewModel.validationResult.collectAsState()
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
     val yesterdayMatches by viewModel.yesterdayMatches.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
-    val updateAvailable by viewModel.updateAvailable.collectAsState()
-    val isUpdating by viewModel.isUpdating.collectAsState()
-    val appVersion by viewModel.appVersion.collectAsState()
 
     val pullRefreshState = rememberPullToRefreshState()
     LaunchedEffect(pullRefreshState.isRefreshing) {
@@ -52,32 +41,6 @@ fun HomeScreen(
             viewModel.forceCheckUpdate()
             pullRefreshState.endRefresh()
         }
-    }
-
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? -> uri?.let { viewModel.importExcel(it) } }
-
-    validationResult?.let { result ->
-        ValidationDialog(result = result, onDismiss = { viewModel.dismissValidation() })
-    }
-
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Borrar datos", color = Color.White) },
-            text = { Text("Se eliminar\u00E1n todos los datos importados del Excel. \u00BFEst\u00E1s seguro?", color = Color(0xFF999999)) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.deleteAllData(); showDeleteDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFE53935))) { Text("BORRAR") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF777777))) { Text("Cancelar") }
-            },
-            containerColor = Color(0xFF1E1E1E)
-        )
     }
 
     var showYesterday by remember { mutableStateOf(false) }
@@ -89,7 +52,7 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(bottom = 90.dp).nestedScroll(pullRefreshState.nestedScrollConnection), contentPadding = PaddingValues(bottom = 8.dp)) {
+        LazyColumn(modifier = Modifier.fillMaxSize().nestedScroll(pullRefreshState.nestedScrollConnection), contentPadding = PaddingValues(bottom = 8.dp)) {
             if (yesterdayMatches.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -131,56 +94,6 @@ fun HomeScreen(
                 }
             } else if (hasData) {
                 item { Text("Sin partidos pr\u00F3ximos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }
-            }
-        }
-
-        Column(
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1A1A1A)).padding(horizontal = 16.dp)
-        ) {
-            if (updateAvailable) {
-                Button(
-                    onClick = { viewModel.installUpdate() },
-                    modifier = Modifier.fillMaxWidth().height(32.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0), contentColor = Color.White),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    if (isUpdating) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(6.dp))
-                        Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
-                    } else {
-                        Text("ACTUALIZAR APP", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
-                    }
-                }
-            }
-            Text("v$appVersion", Modifier.fillMaxWidth().padding(end = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), textAlign = TextAlign.End)
-            Spacer(Modifier.height(2.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                    modifier = Modifier.weight(1f).height(34.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (hasData) "Actualizar Porra" else "Cargar Porra", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
-                    }
-                }
-                if (hasData) {
-                    Button(
-                        onClick = { showDeleteDialog = true },
-                        modifier = Modifier.height(34.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935), maxLines = 1, softWrap = false)
-                    }
-                }
             }
         }
 
@@ -267,29 +180,6 @@ private fun MatchRow(match: MatchDisplay) {
                 else -> Color(0xFF666666)
             }
             Text(ptsValue, modifier = Modifier.width(24.dp).background(ptsBg, RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall, color = ptsColor, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-        }
-    }
-}
-
-@Composable
-private fun ValidationDialog(result: ValidationResult, onDismiss: () -> Unit) {
-    var dismissed by remember { mutableStateOf(false) }
-    if (dismissed) return
-    Dialog(onDismissRequest = { dismissed = true; onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Card(modifier = Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF2A2A2A)), shape = RoundedCornerShape(20.dp)) {
-            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(if (result.isValid) Icons.Filled.CheckCircle else Icons.Filled.Warning, null, tint = if (result.isValid) Color(0xFF4CAF50) else Color(0xFF888888), modifier = Modifier.size(40.dp))
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(if (result.isValid) "EXCEL V\u00C1LIDO" else "EXCEL INCOMPLETO", style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold)
-                if (!result.isValid) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("No es v\u00E1lido. Revisa el Excel y vuelve a cargarlo.", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF999999), textAlign = TextAlign.Center)
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { dismissed = true; onDismiss() }, Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = if (result.isValid) Color(0xFF444444) else Color(0xFF333333)), shape = RoundedCornerShape(10.dp)) {
-                    Text(if (result.isValid) "CONTINUAR" else "ENTENDIDO", fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            }
         }
     }
 }

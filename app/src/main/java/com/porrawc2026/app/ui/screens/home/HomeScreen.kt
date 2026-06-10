@@ -29,7 +29,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.util.ValidationResult
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 
 @Composable
@@ -187,14 +186,14 @@ fun HomeScreen(
 
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp))
 
-        PullToRefreshContainer(state = pullRefreshState, modifier = Modifier.align(Alignment.TopCenter).zIndex(1f), containerColor = Color(0xFF1E1E1E), contentColor = Color.White, indicator = { s ->
-            if (s.progress > 0f || s.isRefreshing) {
+        if (pullRefreshState.isRefreshing) {
+            Box(modifier = Modifier.align(Alignment.TopCenter).zIndex(1f).padding(top = 12.dp), contentAlignment = Alignment.Center) {
                 val inf = rememberInfiniteTransition("ptr")
                 val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
                 val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
                 Text("\u26BD", fontSize = 36.sp, color = Color.White, modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
             }
-        })
+        }
 
         if (isBusy) {
             Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {

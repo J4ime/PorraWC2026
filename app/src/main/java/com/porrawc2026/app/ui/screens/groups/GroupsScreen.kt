@@ -28,9 +28,9 @@ fun MatchesScreen(viewModel: GroupsViewModel = hiltViewModel()) {
     LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Fecha", Modifier.width(80.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text("Fecha", Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 Text("Partido", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
-                Text("Pts", Modifier.width(32.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
+                Text("Pts", Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, textAlign = TextAlign.Center)
             }
         }
 
@@ -76,8 +76,8 @@ private fun GroupMatchRow(match: MatchEntity) {
     val maxNameLen = maxOf(match.homeTeam.length, match.awayTeam.length)
     val fontSize = if (maxNameLen > 14) 10.sp else if (maxNameLen > 10) 11.sp else MaterialTheme.typography.bodySmall.fontSize
 
-    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(fmtDate(match), Modifier.width(80.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1)
+    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(fmtDate(match), Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(match.homeTeam, style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
@@ -85,7 +85,7 @@ private fun GroupMatchRow(match: MatchEntity) {
             Text(match.awayTeam, style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
 
-        Text(if (pts > 0) "$pts" else "", Modifier.width(32.dp), style = MaterialTheme.typography.bodySmall, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(if (pts > 0) "$pts" else "", Modifier.width(24.dp), style = MaterialTheme.typography.bodySmall, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 
@@ -117,8 +117,8 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
         else -> TextPrimary
     }
 
-    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(fmtDate(match), Modifier.width(80.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1)
+    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(fmtDate(match), Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text(match.homeTeam, style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = hColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = if (homeWins) FontWeight.Bold else FontWeight.Normal)
@@ -126,6 +126,6 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
             Text(match.awayTeam, style = MaterialTheme.typography.bodySmall.copy(fontSize = fontSize), color = aColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), fontWeight = if (awayWins) FontWeight.Bold else FontWeight.Normal)
         }
 
-        Text(if (correct) "+${match.pointsEarned}" else "", Modifier.width(32.dp), style = MaterialTheme.typography.bodySmall, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(if (correct) "+${match.pointsEarned}" else "", Modifier.width(24.dp), style = MaterialTheme.typography.bodySmall, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }

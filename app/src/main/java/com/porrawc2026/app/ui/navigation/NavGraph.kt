@@ -92,7 +92,7 @@ fun PorraNavGraph() {
                             item.icon,
                             contentDescription = item.label,
                             tint = if (selected) Color(0xFFE65100) else Color(0xFF555555),
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp)
                         )
                     },
                     colors = NavigationBarItemDefaults.colors(

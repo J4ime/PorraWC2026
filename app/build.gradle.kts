@@ -14,8 +14,8 @@ android {
         applicationId = "com.porrawc2026.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 82
-        versionName = "0.0.82"
+        versionCode = 83
+        versionName = "0.0.83"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

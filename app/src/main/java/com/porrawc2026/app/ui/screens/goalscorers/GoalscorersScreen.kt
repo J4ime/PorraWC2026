@@ -45,14 +45,18 @@ fun GoalscorersScreen(
                     shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(1.dp, Color(0xFFE65100))
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text("MIS GOLEADORES", style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-                            Spacer(Modifier.width(48.dp))
-                            Text("Goles", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777), textAlign = TextAlign.Center)
-                            Text("Puntos", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777), textAlign = TextAlign.Center)
+                    Column {
+                        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFFE65100)).padding(horizontal = 14.dp, vertical = 6.dp)) {
+                            Text("MIS GOLEADORES", fontSize = 12.sp, color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
                         }
-                        players.forEach { p -> PlayerRow(p) }
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                                Spacer(Modifier.width(48.dp))
+                                Text("Goles", Modifier.width(48.dp), fontSize = 10.sp, color = Color(0xFF777777), textAlign = TextAlign.End)
+                                Text("Puntos", Modifier.width(48.dp), fontSize = 10.sp, color = Color(0xFF777777), textAlign = TextAlign.End)
+                            }
+                            players.forEach { p -> PlayerRow(p) }
+                        }
                     }
                 }
             }

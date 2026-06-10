@@ -18,7 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,8 +26,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.util.ValidationResult
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 
 @Composable
 fun HomeScreen(
@@ -42,8 +45,15 @@ fun HomeScreen(
     val isBusy by viewModel.isBusy.collectAsState()
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val isUpdating by viewModel.isUpdating.collectAsState()
-    val ctx = LocalContext.current
-    val appVersion = try { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
+    val appVersion by viewModel.appVersion.collectAsState()
+
+    val pullRefreshState = rememberPullToRefreshState()
+    LaunchedEffect(pullRefreshState.isRefreshing) {
+        if (pullRefreshState.isRefreshing) {
+            viewModel.forceCheckUpdate()
+            pullRefreshState.endRefresh()
+        }
+    }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -80,7 +90,7 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(bottom = 120.dp), contentPadding = PaddingValues(bottom = 8.dp)) {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(bottom = 120.dp).nestedScroll(pullRefreshState.nestedScrollConnection), contentPadding = PaddingValues(bottom = 8.dp)) {
             if (yesterdayMatches.isNotEmpty()) {
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -128,18 +138,20 @@ fun HomeScreen(
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1A1A1A)).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Button(
-                onClick = { viewModel.installUpdate() },
-                modifier = Modifier.fillMaxWidth().height(40.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = if (updateAvailable) Color(0xFF1565C0) else Color(0xFF333333), contentColor = Color.White),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                if (isUpdating) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(6.dp))
-                    Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall)
-                } else {
-                    Text(if (updateAvailable) "ACTUALIZAR APP" else "APP ACTUALIZADA", style = MaterialTheme.typography.titleSmall)
+            if (updateAvailable) {
+                Button(
+                    onClick = { viewModel.installUpdate() },
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0), contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (isUpdating) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(6.dp))
+                        Text("DESCARGANDO...", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
+                    } else {
+                        Text("ACTUALIZAR APP", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
+                    }
                 }
             }
             Text("v$appVersion", Modifier.fillMaxWidth().padding(end = 4.dp), style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), textAlign = TextAlign.End)
@@ -147,7 +159,7 @@ fun HomeScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { launcher.launch(arrayOf("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) },
-                    modifier = Modifier.weight(1f).height(48.dp),
+                    modifier = Modifier.weight(1f).height(36.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color.White), shape = RoundedCornerShape(12.dp)
                 ) {
                     if (isLoading) {
@@ -155,25 +167,27 @@ fun HomeScreen(
                     } else {
                         Icon(if (hasData) Icons.Filled.Refresh else Icons.Filled.FileUpload, null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (hasData) "Actualizar Porra" else "Cargar Porra", style = MaterialTheme.typography.titleSmall)
+                        Text(if (hasData) "Actualizar Porra" else "Cargar Porra", style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
                     }
                 }
                 if (hasData) {
                     Button(
                         onClick = { showDeleteDialog = true },
-                        modifier = Modifier.height(48.dp),
+                        modifier = Modifier.height(36.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF444444), contentColor = Color(0xFFE53935)),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935))
+                        Text("Borrar datos", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE53935), maxLines = 1, softWrap = false)
                     }
                 }
             }
         }
 
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.TopCenter).padding(top = 60.dp))
+
+        PullToRefreshContainer(state = pullRefreshState, modifier = Modifier.align(Alignment.TopCenter).zIndex(1f), containerColor = Color(0xFF1E1E1E), contentColor = Color.White)
 
         if (isBusy) {
             Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {

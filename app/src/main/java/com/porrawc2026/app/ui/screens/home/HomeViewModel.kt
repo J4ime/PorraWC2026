@@ -109,7 +109,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
-        checkForUpdate()
+        forceCheckUpdate()
     }
 
     private fun precachePhotos() {
@@ -208,7 +208,7 @@ class HomeViewModel @Inject constructor(
 
     fun dismissValidation() { _validationResult.value = null }
 
-    private fun checkForUpdate() {
+    fun forceCheckUpdate() {
         viewModelScope.launch(Dispatchers.IO) {
             val info = UpdateManager.checkForUpdate(context)
             _updateAvailable.value = info?.isNewer == true

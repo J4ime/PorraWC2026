@@ -50,9 +50,9 @@ object LiveScoreScraper {
                 if (m.isNotEmpty()) {
                     val filtered = m.filter(filter)
                     val sorted = filtered.sortedByDescending { it.utcDate }
-                    val last5 = sorted.take(5).sortedBy { it.utcDate }
-                    Log.d(TAG, "Found ${m.size} matches, ${filtered.size} after filter, showing last ${last5.size}")
-                    return last5
+                    val last = sorted.sortedBy { it.utcDate }
+                    Log.d(TAG, "Found ${m.size} matches, ${filtered.size} after filter, showing ${last.size}")
+                    return last
                 }
             } catch (_: Exception) {}
         }

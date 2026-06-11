@@ -34,6 +34,8 @@ fun AjustesScreen(
     val isBusy by viewModel.isBusy.collectAsState()
     val isUpdating by viewModel.isUpdating.collectAsState()
     val appVersion by viewModel.appVersion.collectAsState()
+    val excelFileName by viewModel.excelFileName.collectAsState()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -98,15 +100,21 @@ fun AjustesScreen(
                         )
                     }
                 }
+                item {
+                    SquareButton(
+                        icon = if (notificationsEnabled) Icons.Filled.NotificationsActive else Icons.Filled.NotificationsOff,
+                        label = if (notificationsEnabled) "Notif. ON" else "Notif. OFF",
+                        color = if (notificationsEnabled) Color(0xFFE65100) else Color(0xFF444444),
+                        loading = false,
+                        onClick = { viewModel.toggleNotifications() }
+                    )
+                }
             }
 
-            Text(
-                "v$appVersion",
-                Modifier.fillMaxWidth().padding(end = 16.dp, bottom = 12.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF555555),
-                textAlign = TextAlign.End
-            )
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(excelFileName ?: "", style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), maxLines = 1, modifier = Modifier.weight(1f))
+                Text("v$appVersion", style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555))
+            }
         }
 
         if (isBusy) {

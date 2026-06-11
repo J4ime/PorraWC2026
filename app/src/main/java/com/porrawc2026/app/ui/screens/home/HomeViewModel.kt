@@ -2,6 +2,7 @@ package com.porrawc2026.app.ui.screens.home
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -89,6 +90,14 @@ class HomeViewModel @Inject constructor(
         try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
     )
     val appVersion: StateFlow<String> = _appVersion.asStateFlow()
+    private val _excelFileName = MutableStateFlow<String?>(null)
+    val excelFileName: StateFlow<String?> = _excelFileName.asStateFlow()
+    private val _notificationsEnabled = MutableStateFlow(true)
+    val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
+    private val _allMatches = MutableStateFlow<List<MatchDisplay>>(emptyList())
+    val allMatches: StateFlow<List<MatchDisplay>> = _allMatches.asStateFlow()
+    private val _dayKeys = MutableStateFlow<List<String>>(emptyList())
+    val dayKeys: StateFlow<List<String>> = _dayKeys.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
@@ -175,6 +184,13 @@ class HomeViewModel @Inject constructor(
             _isBusy.value = true
             _validationResult.value = null
             try {
+                val cursor = context.contentResolver.query(uri, null, null, null, null)
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex >= 0) _excelFileName.value = it.getString(nameIndex)
+                    }
+                }
                 val data = ExcelParser.parse(context, uri)
                 val validation = ExcelParser.validate()
                 _validationResult.value = validation
@@ -213,6 +229,10 @@ class HomeViewModel @Inject constructor(
             val info = UpdateManager.checkForUpdate(context)
             _updateAvailable.value = info?.isNewer == true
         }
+    }
+
+    fun toggleNotifications() {
+        _notificationsEnabled.value = !_notificationsEnabled.value
     }
 
     fun installUpdate() {
@@ -315,6 +335,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun checkGoalNotifications() {
+        if (!_notificationsEnabled.value) return
         val predictedNames = _players.value.mapNotNull { it.predictedName }.map { it.lowercase() }.toSet()
         if (predictedNames.isEmpty()) return
         for ((matchId, pair) in goalScorers) {
@@ -524,6 +545,14 @@ class HomeViewModel @Inject constructor(
                 _upcomingMatches.value = emptyList()
             }
         }
+        _allMatches.value = allDisplay
+        val dayAbbrFmt = SimpleDateFormat("EEE", Locale("es", "ES")).apply { timeZone = madridTZ }
+        val dayNumFmt = SimpleDateFormat("dd", Locale.US).apply { timeZone = madridTZ }
+        _dayKeys.value = allDisplay.mapNotNull { d ->
+            val m = cachedMatches.firstOrNull { it.id == d.id } ?: return@mapNotNull null
+            val date = parseMadridDate(m.dateTime) ?: return@mapNotNull null
+            "${dayAbbrFmt.format(date).replace(".", "").uppercase()} ${dayNumFmt.format(date)}"
+        }.distinct()
         Log.d("HomeVM", "refresh: today=${todayMatches.size} future=${
             allDisplay.count { d ->
                 val dateStr = cachedMatches.firstOrNull { it.id == d.id }?.dateTime ?: ""

@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -33,6 +35,8 @@ fun HomeScreen(
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
     val yesterdayMatches by viewModel.yesterdayMatches.collectAsState()
+    val allMatches by viewModel.allMatches.collectAsState()
+    val dayKeys by viewModel.dayKeys.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
 
     val pullRefreshState = rememberPullToRefreshState()
@@ -41,6 +45,14 @@ fun HomeScreen(
             viewModel.forceCheckUpdate()
             pullRefreshState.endRefresh()
         }
+    }
+
+    var selectedDay by remember { mutableStateOf<String?>(null) }
+
+    val visibleMatches = if (selectedDay == null) {
+        upcomingMatches
+    } else {
+        allMatches.filter { it.dateLabel.uppercase().startsWith(selectedDay!!) || it.dateLabel.uppercase() == selectedDay }
     }
 
     var showYesterday by remember { mutableStateOf(false) }
@@ -52,48 +64,67 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
-        LazyColumn(modifier = Modifier.fillMaxSize().nestedScroll(pullRefreshState.nestedScrollConnection), contentPadding = PaddingValues(bottom = 8.dp)) {
-            if (yesterdayMatches.isNotEmpty()) {
-                item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth().clickable { showYesterday = !showYesterday }.padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("AYER", style = MaterialTheme.typography.titleSmall, color = Color(0xFF777777), fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.width(6.dp))
-                            Icon(if (showYesterday) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = Color(0xFF777777), modifier = Modifier.size(18.dp))
-                        }
-                        AnimatedVisibility(visible = showYesterday) {
-                            Column {
-                                Spacer(Modifier.height(4.dp))
-                                yesterdayMatches.forEach { match ->
-                                    MatchRow(match)
-                                    if (match != yesterdayMatches.last()) Spacer(Modifier.height(4.dp))
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (dayKeys.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
+                ) {
+                    item {
+                        val isToday = selectedDay == null
+                        DayChip("HOY", isToday) { selectedDay = null }
+                    }
+                    itemsIndexed(dayKeys) { _, day ->
+                        val sel = selectedDay == day
+                        DayChip(day, sel) { selectedDay = day }
+                    }
+                }
+            }
+
+            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection), contentPadding = PaddingValues(bottom = 8.dp)) {
+                if (selectedDay == null && yesterdayMatches.isNotEmpty()) {
+                    item {
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth().clickable { showYesterday = !showYesterday }.padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("AYER", style = MaterialTheme.typography.titleSmall, color = Color(0xFF777777), fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(6.dp))
+                                Icon(if (showYesterday) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = Color(0xFF777777), modifier = Modifier.size(18.dp))
+                            }
+                            AnimatedVisibility(visible = showYesterday) {
+                                Column {
+                                    Spacer(Modifier.height(4.dp))
+                                    yesterdayMatches.forEach { match ->
+                                        MatchRow(match)
+                                        if (match != yesterdayMatches.last()) Spacer(Modifier.height(4.dp))
+                                    }
                                 }
                             }
                         }
                     }
+                    item { Spacer(Modifier.height(4.dp)) }
                 }
-                item { Spacer(Modifier.height(4.dp)) }
-            }
 
-            if (upcomingMatches.isNotEmpty()) {
-                item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        Text(upcomingMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PARTIDOS",
-                            style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold,
-                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        upcomingMatches.take(8).forEach { match ->
-                            MatchRow(match)
-                            if (match != upcomingMatches.take(8).last()) Spacer(Modifier.height(4.dp))
+                if (visibleMatches.isNotEmpty()) {
+                    item {
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            Text(visibleMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PARTIDOS",
+                                style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            visibleMatches.take(12).forEach { match ->
+                                MatchRow(match)
+                                if (match != visibleMatches.take(12).last()) Spacer(Modifier.height(4.dp))
+                            }
                         }
                     }
+                } else if (hasData) {
+                    item { Text("Sin partidos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }
                 }
-            } else if (hasData) {
-                item { Text("Sin partidos pr\u00F3ximos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }
             }
         }
 
@@ -117,6 +148,24 @@ fun HomeScreen(
             }
         }
     }
+}
+
+@Composable
+private fun DayChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        label,
+        modifier = Modifier
+            .clickable { onClick() }
+            .background(
+                if (selected) Color(0xFFE65100) else Color(0xFF333333),
+                RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        fontSize = 11.sp,
+        color = if (selected) Color.White else Color(0xFFAAAAAA),
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        maxLines = 1
+    )
 }
 
 @Composable

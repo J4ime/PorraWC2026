@@ -15,8 +15,6 @@ import com.porrawc2026.app.util.TvScraper
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.ValidationResult
-import com.porrawc2026.app.util.LiveScoreScraper
-import com.porrawc2026.app.util.ScrapedMatch
 import com.porrawc2026.app.util.UpdateManager
 import com.porrawc2026.app.util.GoalNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -464,50 +462,17 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
-        val wcScraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchWcMatches() }
-        wcScraped.forEach { sm ->
-            val cm = cachedMatches.firstOrNull {
-                val hMatch = matchName(it.homeTeam, sm.homeTeam)
-                val aMatch = matchName(it.awayTeam, sm.awayTeam)
-                hMatch && aMatch
-            } ?: return@forEach
-            val hg = sm.homeGoals; val ag = sm.awayGoals
-            if (hg != null && ag != null) {
-                val prev = lastWrittenScores[cm.id]
-                if (prev == null || prev.first != hg || prev.second != ag || sm.status == "IN_PLAY") {
-                    lastWrittenScores[cm.id] = hg to ag
-                    repository.updateMatchResults(cm.id, hg, ag)
-                    cachedMatches = cachedMatches.map { if (it.id == cm.id) it.copy(homeGoals = hg, awayGoals = ag) else it }
-                    if (sm.liveMinute > 0) liveMinutes[cm.id] = "${sm.liveMinute}'"
-                    val eId = sm.eventId
-                    if (eId > 0) {
-                        val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
-                        if (h.isNotEmpty() || a.isNotEmpty()) {
-                            goalScorers[cm.id] = Pair(
-                                h.map { GoalEvent(it.playerName, it.minute) },
-                                a.map { GoalEvent(it.playerName, it.minute) }
-                            )
-                            recalcPlayerPoints()
-                        }
-                    }
-                    recalcAllPoints()
-                    refreshPoints()
-                    refreshUpcomingMatches()
-                }
-            }
-        }
         try {
-            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-            val response = apiService.getWorldCupMatches(dateFrom = dateStr, dateTo = dateStr)
+            val response = apiService.getWorldCupMatches()
             response.matches.forEach { fm ->
+                val home = fm.score?.fullTime?.home ?: return@forEach
+                val away = fm.score?.fullTime?.away ?: return@forEach
                 val entities = cachedMatches.filter {
                     fm.homeTeam?.name?.contains(it.homeTeam, ignoreCase = true) == true ||
                     it.homeTeam.contains(fm.homeTeam?.name ?: "", ignoreCase = true)
                 }
                 if (entities.size == 1) {
                     val entity = entities.first()
-                    val home = fm.score?.fullTime?.home ?: return@forEach
-                    val away = fm.score?.fullTime?.away ?: return@forEach
                     if (fm.status == "FINISHED") liveMinutes[entity.id] = "FINAL"
                     val prev = lastWrittenScores[entity.id]
                     if (prev == null || prev.first != home || prev.second != away) {
@@ -521,20 +486,6 @@ class HomeViewModel @Inject constructor(
                 }
             }
         } catch (_: Exception) { }
-        checkGoalNotifications()
-    }
-
-    private fun matchName(ourName: String, scraperName: String): Boolean {
-        if (ourName.contains(scraperName, true) || scraperName.contains(ourName, true)) return true
-        val map = mapOf(
-            "Korea Republic" to "Corea del Sur", "Czechia" to "República Checa",
-            "Bosnia-H." to "Bosnia y Herzegovina", "Curaçao" to "Curazao",
-            "Ivory Coast" to "Costa de Marfil", "Netherlands" to "Países Bajos",
-            "Congo DR" to "RD Congo", "Saudi Arabia" to "Arabia Saudita",
-            "USA" to "Estados Unidos"
-        )
-        val mapped = map[scraperName]
-        return mapped != null && ourName.contains(mapped, true)
     }
 
     private fun refreshUpcomingMatches() {

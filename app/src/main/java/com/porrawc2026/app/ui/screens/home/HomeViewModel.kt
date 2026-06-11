@@ -409,13 +409,6 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun checkLiveWindow() {
         if (!_autoRefreshEnabled.value) { livePollJob?.cancel(); return }
-        val todayWithDates = getTodayMatchesWithDates()
-        if (todayWithDates.isEmpty()) { livePollJob?.cancel(); return }
-        val now = Date()
-        val times = todayWithDates.map { parseMadridDate(it.dateTime) }.filterNotNull()
-        val firstStart = times.minOrNull() ?: return
-        val lastEnd = Date((times.maxOrNull()?.time ?: return) + 150L * 60 * 1000)
-        if (now.before(firstStart) || now.after(lastEnd)) { livePollJob?.cancel(); return }
         if (livePollJob?.isActive != true) startLivePolling()
     }
 

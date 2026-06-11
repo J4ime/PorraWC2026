@@ -59,25 +59,22 @@ fun HomeScreen(
     val yesterdayDayKey = allMatches.firstOrNull { it.dateLabel == "AYER" }?.dayKey ?: ""
 
     fun sortNum(dayKey: String): Int = allMatches.firstOrNull { it.dayKey == dayKey }?.sortKey?.toIntOrNull() ?: 0
-    val todaySort = sortNum(todayDayKey)
 
-    val allDaysSorted = remember(dayKeys) {
-        dayKeys.sortedBy { sortNum(it) }
-    }
+    val allDaysSorted = remember(dayKeys) { dayKeys.sortedBy { sortNum(it) } }
     val todayIdx = allDaysSorted.indexOf(todayDayKey)
 
-    val leftCount = 2
-    val rightCount = 3
-    val totalSlots = leftCount + 1 + rightCount
+    val dayLabel = { day: String ->
+        val s = sortNum(day); val t = sortNum(todayDayKey)
+        when { s == t - 1 -> "AYER"; s == t -> "HOY"; s == t + 1 -> "MAÑANA"; else -> day }
+    }
 
-    val (visibleLeft, visibleRight) = remember(allDaysSorted, todayIdx, selectedDay) {
-        val selIdx = if (selectedDay == null) todayIdx else allDaysSorted.indexOf(selectedDay)
-        val minIdx = maxOf(0, selIdx - leftCount)
-        val maxIdx = minOf(allDaysSorted.size, selIdx + rightCount + 1)
-        val window = allDaysSorted.subList(minIdx, maxIdx)
-        val left = window.takeWhile { sortNum(it) < sortNum(allDaysSorted[selIdx]) }
-        val right = window.dropWhile { sortNum(it) <= sortNum(allDaysSorted[selIdx]) }
-        Pair(left.takeLast(leftCount), right.take(rightCount))
+    val visibleDays = remember(allDaysSorted, selectedDay) {
+        val selIdx = if (selectedDay == null) todayIdx
+        else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
+        val start = maxOf(0, selIdx - 2)
+        val end = minOf(allDaysSorted.size, start + 5).let { if (it - start < 5) minOf(allDaysSorted.size, it + (5 - (it - start))) else it }
+        val adjStart = maxOf(0, end - 5)
+        allDaysSorted.subList(adjStart, end)
     }
 
     val visibleMatches = if (selectedDay == null) upcomingMatches
@@ -99,20 +96,12 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                visibleLeft.forEachIndexed { i, day ->
-                    DayChip(
-                        if (day == yesterdayDayKey && selectedDay == null) "AYER" else day,
-                        selectedDay == day
-                    ) { selectedDay = day }
+                visibleDays.forEach { day ->
+                    val isSelected = if (day == todayDayKey) selectedDay == null else selectedDay == day
+                    DayChip(dayLabel(day), isSelected) {
+                        selectedDay = if (day == todayDayKey) null else day
+                    }
                     Spacer(Modifier.width(4.dp))
-                }
-
-                val centerSelected = if (selectedDay in visibleRight || selectedDay in visibleLeft) null else selectedDay
-                DayChip("HOY", centerSelected == null) { selectedDay = null }
-
-                visibleRight.forEachIndexed { i, day ->
-                    Spacer(Modifier.width(4.dp))
-                    DayChip(day, selectedDay == day) { selectedDay = day }
                 }
             }
 
@@ -209,50 +198,80 @@ private fun MatchRow(match: MatchDisplay) {
     val isLive = match.status == MatchStatus.LIVE
     val isFinished = hasResult && !isLive
     val hasLiveMinute = match.liveMinute != null
-    val timeColor = when { isLive -> Color(0xFF4CAF50); isFinished -> Color(0xFF888888); else -> Color.White }
 
-    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).padding(vertical = 3.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(0.20f), horizontalAlignment = Alignment.CenterHorizontally) {
-            val statusText = when { isFinished -> "FINAL"; hasLiveMinute -> match.liveMinute ?: "?"; else -> match.time.ifBlank { "?" } }
-            Text(statusText, fontSize = 14.sp, color = timeColor, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-        }
-        Row(modifier = Modifier.weight(0.50f), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Minute + Score column
+            Column(modifier = Modifier.width(36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                val timeText = when {
+                    isFinished -> "FINAL"
+                    hasLiveMinute -> match.liveMinute ?: "?"
+                    else -> match.time.ifBlank { "?" }
+                }
+                Text(timeText, fontSize = 12.sp, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888), fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+            }
+
+            // Goals column  
             Column(modifier = Modifier.width(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 val h = if (hasResult || isLive) match.homeGoals?.toString() ?: "0" else "-"
                 val a = if (hasResult || isLive) match.awayGoals?.toString() ?: "0" else "-"
                 val sc = when { isLive -> Color(0xFF4CAF50); hasResult -> Color.White; else -> Color(0xFF777777) }
-                Text(h, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center)
+                Text(h, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(4.dp))
-                Text(a, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center)
+                Text(a, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             }
-            Spacer(Modifier.width(6.dp))
+
+            Spacer(Modifier.width(8.dp))
+
+            // Teams column
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(match.homeFlag, fontSize = 13.sp); Spacer(Modifier.width(3.dp))
+                    Text(match.homeFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
                     Text(match.homeTeam, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    if (isLive) { Spacer(Modifier.width(4.dp)); Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFF4CAF50))) }
+                    if (isLive) { Spacer(Modifier.width(4.dp)); Box(Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFF4CAF50))) }
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(match.awayFlag, fontSize = 13.sp); Spacer(Modifier.width(3.dp))
+                    Text(match.awayFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
                     Text(match.awayTeam, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 }
+            }
+
+            // Points + TV column
+            Column(modifier = Modifier.width(36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (hasPred && (isLive || hasResult)) {
-                    Spacer(Modifier.height(2.dp))
                     val pts = if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0"
-                    val pc = when { isLive -> Color(0xFF4CAF50); match.pointsEarned > 0 -> Color(0xFF4CAF50); else -> Color(0xFF666666) }
-                    Text(pts, fontSize = 10.sp, color = pc, fontWeight = FontWeight.Bold)
+                    val pc = when { match.pointsEarned > 0 -> Color(0xFF4CAF50); else -> Color(0xFF666666) }
+                    Text(pts, fontSize = 12.sp, color = pc, fontWeight = FontWeight.Bold)
+                }
+                if (!isLive && !hasResult) {
+                    val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
+                    channels.forEach { ch ->
+                        val bg = if (ch.contains("RTVE", true)) Color(0xFF0037A1) else Color(0xFF333333)
+                        Text(ch.trim().take(4), fontSize = 7.sp, color = Color.White, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 2.dp, vertical = 1.dp))
+                    }
                 }
             }
         }
-        Column(modifier = Modifier.weight(0.30f).padding(start = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            if (!isLive && !hasResult) {
-                val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    channels.forEach { ch ->
-                        val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF0037A1) else Color(0xFF333333)
-                        Text(ch.trim().take(4), fontSize = 8.sp, color = Color.White, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 2.dp, vertical = 1.dp), maxLines = 1)
+
+        // Goal events during live/finished matches
+        if (isLive || isFinished) {
+            val allScorers = match.homeScorers.map { Triple(it, true, match.homeTeam) } + match.awayScorers.map { Triple(it, false, match.awayTeam) }
+            val sortedScorers = allScorers.sortedBy { it.first.minute }
+            if (sortedScorers.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                val currentH = match.homeGoals ?: 0
+                val currentA = match.awayGoals ?: 0
+                var runningH = 0
+                var runningA = 0
+                sortedScorers.forEach { (goal, isHome, team) ->
+                    if (isHome) runningH++ else runningA++
+                    Row(Modifier.padding(start = 36.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("\u26BD", fontSize = 10.sp); Spacer(Modifier.width(4.dp))
+                        Text(goal.playerName.split(" ").last(), fontSize = 10.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text("${goal.minute}' [$runningH-$runningA]", fontSize = 9.sp, color = Color(0xFF888888))
                     }
+                    Spacer(Modifier.height(2.dp))
                 }
             }
         }

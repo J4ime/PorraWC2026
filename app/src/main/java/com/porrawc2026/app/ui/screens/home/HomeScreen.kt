@@ -52,7 +52,7 @@ fun HomeScreen(
     val visibleMatches = if (selectedDay == null) {
         upcomingMatches
     } else {
-        allMatches.filter { it.dateLabel.uppercase().startsWith(selectedDay!!) || it.dateLabel.uppercase() == selectedDay }
+        allMatches.filter { it.dayKey == selectedDay }
     }
 
     var showYesterday by remember { mutableStateOf(false) }
@@ -112,10 +112,6 @@ fun HomeScreen(
                 if (visibleMatches.isNotEmpty()) {
                     item {
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                            Text(visibleMatches.firstOrNull()?.dateLabel?.uppercase() ?: "PARTIDOS",
-                                style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold,
-                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-                            Spacer(modifier = Modifier.height(6.dp))
                             visibleMatches.take(12).forEach { match ->
                                 MatchRow(match)
                                 if (match != visibleMatches.take(12).last()) Spacer(Modifier.height(4.dp))
@@ -176,13 +172,13 @@ private fun MatchRow(match: MatchDisplay) {
     val hasLiveMinute = match.liveMinute != null
     val scoreBg = if (isLive) Color(0xFF2E7D32) else Color.Transparent
 
-    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)).padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.Top) {
+    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp)).padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         val timeText = if (hasLiveMinute) match.liveMinute ?: "?" else match.time.ifBlank { "?" }
         val timeColor = if (isLive) Color(0xFF4CAF50) else Color.White
         Text(timeText, Modifier.width(42.dp).padding(top = 2.dp), style = MaterialTheme.typography.labelMedium, color = timeColor, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, textAlign = TextAlign.Center)
 
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(match.homeTeam, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             if (match.homeScorers.isNotEmpty()) {
                 match.homeScorers.forEachIndexed { idx, scorer ->
                     Text("\u26BD ${scorer.playerName.split(" ").last()} ${scorer.minute}'", style = MaterialTheme.typography.labelSmall, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -202,7 +198,7 @@ private fun MatchRow(match: MatchDisplay) {
         }
 
         Column(Modifier.weight(1f)) {
-            Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(match.awayTeam, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             if (match.awayScorers.isNotEmpty()) {
                 match.awayScorers.forEachIndexed { idx, scorer ->
                     Text("\u26BD ${scorer.playerName.split(" ").last()} ${scorer.minute}'", style = MaterialTheme.typography.labelSmall, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888), maxLines = 1, overflow = TextOverflow.Ellipsis)

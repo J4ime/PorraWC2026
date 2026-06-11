@@ -49,7 +49,8 @@ data class MatchDisplay(
     val tvChannel: String,
     val liveMinute: String? = null,
     val homeScorers: List<GoalEvent> = emptyList(),
-    val awayScorers: List<GoalEvent> = emptyList()
+    val awayScorers: List<GoalEvent> = emptyList(),
+    val dayKey: String = ""
 )
 
 @HiltViewModel
@@ -546,12 +547,16 @@ class HomeViewModel @Inject constructor(
             }
         }
         _allMatches.value = allDisplay
-        val dayAbbrFmt = SimpleDateFormat("EEE", Locale("es", "ES")).apply { timeZone = madridTZ }
-        val dayNumFmt = SimpleDateFormat("dd", Locale.US).apply { timeZone = madridTZ }
+        val nowCal = Calendar.getInstance(madridTZ)
+        val todayDoy = nowCal.get(Calendar.DAY_OF_YEAR)
+        val thisYear = nowCal.get(Calendar.YEAR)
         _dayKeys.value = allDisplay.mapNotNull { d ->
+            if (d.dayKey.isBlank()) return@mapNotNull null
             val m = cachedMatches.firstOrNull { it.id == d.id } ?: return@mapNotNull null
             val date = parseMadridDate(m.dateTime) ?: return@mapNotNull null
-            "${dayAbbrFmt.format(date).replace(".", "").uppercase()} ${dayNumFmt.format(date)}"
+            val c = Calendar.getInstance(madridTZ).apply { time = date }
+            if (c.get(Calendar.DAY_OF_YEAR) == todayDoy && c.get(Calendar.YEAR) == thisYear) null
+            else d.dayKey
         }.distinct()
         Log.d("HomeVM", "refresh: today=${todayMatches.size} future=${
             allDisplay.count { d ->
@@ -590,6 +595,9 @@ class HomeViewModel @Inject constructor(
         val s = goalScorers[match.id]
         val homeScr = s?.first ?: emptyList()
         val awayScr = s?.second ?: emptyList()
+        val dayAbbrFmt = SimpleDateFormat("EEE", Locale("es", "ES")).apply { timeZone = madridTZ }
+        val dayNumFmt = SimpleDateFormat("dd", Locale.US).apply { timeZone = madridTZ }
+        val dayKey = if (date != null) "${dayAbbrFmt.format(date).replace(".", "").uppercase()} ${dayNumFmt.format(date)}" else ""
 
         return MatchDisplay(
             id = match.id, dateLabel = dateLabel, time = time,
@@ -603,7 +611,8 @@ class HomeViewModel @Inject constructor(
             groupLabel = match.groupName, status = status, tvChannel = match.tvChannel,
             liveMinute = liveMin,
             homeScorers = homeScr,
-            awayScorers = awayScr
+            awayScorers = awayScr,
+            dayKey = dayKey
         )
     }
 

@@ -744,8 +744,15 @@ class HomeViewModel @Inject constructor(
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
             val date = fb?.getOrNull(0) ?: match.dateTime
+            val hardcodedTv = fb?.getOrNull(1) ?: ""
             val scrapedTv = TvScraper.lookupTv(match.homeTeam, match.awayTeam, context.filesDir)
-            val tv = if (match.tvChannel.isNotBlank() && scrapedTv == "DAZN") match.tvChannel else scrapedTv
+            val tv = when {
+                match.tvChannel.isNotBlank() && scrapedTv == "DAZN" -> match.tvChannel
+                scrapedTv != "DAZN" -> scrapedTv
+                match.tvChannel.isNotBlank() -> match.tvChannel
+                hardcodedTv.isNotBlank() -> hardcodedTv
+                else -> "DAZN"
+            }
             match.copy(dateTime = date, tvChannel = tv)
         }
         val withRtv = cachedMatches.count { it.tvChannel.contains("RTVE") }

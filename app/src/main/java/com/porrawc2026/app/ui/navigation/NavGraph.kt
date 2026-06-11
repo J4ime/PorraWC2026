@@ -67,7 +67,7 @@ fun PorraNavGraph() {
         }
 
         Box(modifier = Modifier.weight(1f)) {
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), userScrollEnabled = pagerState.currentPage != 1) { page ->
                 when (page) {
                     0 -> GoalscorersScreen()
                     1 -> HomeScreen()

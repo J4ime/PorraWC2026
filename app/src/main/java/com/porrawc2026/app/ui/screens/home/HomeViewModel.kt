@@ -15,6 +15,8 @@ import com.porrawc2026.app.util.TvScraper
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.ValidationResult
+import com.porrawc2026.app.util.LiveScoreScraper
+import com.porrawc2026.app.util.ScrapedMatch
 import com.porrawc2026.app.util.UpdateManager
 import com.porrawc2026.app.util.GoalNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -455,28 +457,46 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
+        // Livescore scraper for live minute + goal incidents
+        val scraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchWcMatches() }
+        scraped.forEach { sm ->
+            val cm = cachedMatches.firstOrNull {
+                normalize(it.homeTeam) == normalize(sm.homeTeam) && normalize(it.awayTeam) == normalize(sm.awayTeam)
+            }
+            if (cm != null && sm.homeGoals != null && sm.awayGoals != null) {
+                val prev = lastWrittenScores[cm.id]
+                if (prev == null || prev.first != sm.homeGoals || prev.second != sm.awayGoals || sm.status == "IN_PLAY") {
+                    lastWrittenScores[cm.id] = sm.homeGoals!! to sm.awayGoals!!
+                    repository.updateMatchResults(cm.id, sm.homeGoals!!, sm.awayGoals!!)
+                    cachedMatches = cachedMatches.map { if (it.id == cm.id) it.copy(homeGoals = sm.homeGoals, awayGoals = sm.awayGoals) else it }
+                    if (sm.liveMinute > 0) liveMinutes[cm.id] = "${sm.liveMinute}'"
+                    if (sm.eventId > 0) {
+                        val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(sm.eventId) }
+                        if (h.isNotEmpty() || a.isNotEmpty()) {
+                            goalScorers[cm.id] = Pair(h.map { GoalEvent(it.playerName, it.minute) }, a.map { GoalEvent(it.playerName, it.minute) })
+                        }
+                    }
+                    recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
+                }
+            }
+        }
+        // football-data.org for finished matches by chronological order
         try {
             val response = apiService.getWorldCupMatches()
-            response.matches.forEach { fm ->
-                val home = fm.score?.fullTime?.home ?: return@forEach
-                val away = fm.score?.fullTime?.away ?: return@forEach
-                val apiHome = normalize(fm.homeTeam?.name ?: "")
-                val apiAway = normalize(fm.awayTeam?.name ?: "")
-                val entities = cachedMatches.filter {
-                    normalize(it.homeTeam) == apiHome && normalize(it.awayTeam) == apiAway
-                }
-                if (entities.size == 1) {
-                    val entity = entities.first()
-                    if (fm.status == "FINISHED") liveMinutes[entity.id] = "FINAL"
-                    val prev = lastWrittenScores[entity.id]
-                    if (prev == null || prev.first != home || prev.second != away) {
-                        lastWrittenScores[entity.id] = home to away
-                        repository.updateMatchResults(entity.id, home, away)
-                        cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
-                        recalcAllPoints()
-                        refreshPoints()
-                        refreshUpcomingMatches()
-                    }
+            val finished = response.matches.filter { it.score?.fullTime?.home != null && it.score?.fullTime?.away != null }
+            val sortedCached = cachedMatches.filter { !it.isKnockout && it.id < 900 }.sortedBy { it.dateTime }
+            finished.forEachIndexed { idx, fm ->
+                if (idx >= sortedCached.size) return@forEachIndexed
+                val entity = sortedCached[idx]
+                val home = fm.score?.fullTime?.home ?: return@forEachIndexed
+                val away = fm.score?.fullTime?.away ?: return@forEachIndexed
+                if (fm.status == "FINISHED") liveMinutes[entity.id] = "FINAL"
+                val prev = lastWrittenScores[entity.id]
+                if (prev == null || prev.first != home || prev.second != away) {
+                    lastWrittenScores[entity.id] = home to away
+                    repository.updateMatchResults(entity.id, home, away)
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
+                    recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
                 }
             }
         } catch (_: Exception) { }

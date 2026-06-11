@@ -3,8 +3,7 @@ package com.porrawc2026.app.ui.screens.goalscorers
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
-import com.porrawc2026.app.data.remote.SofascoreApiService
-import com.porrawc2026.app.data.remote.SofascoreTopPlayer
+import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +25,7 @@ data class TopScorerDisplay(
 @HiltViewModel
 class GoalscorersViewModel @Inject constructor(
     private val repository: PorraRepository,
-    private val sofascoreApi: SofascoreApiService
+    private val apiService: ApiService
 ) : ViewModel() {
 
     private val _players = MutableStateFlow<List<PlayerPredictionEntity>>(emptyList())
@@ -55,20 +54,19 @@ class GoalscorersViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             try {
-                val response = sofascoreApi.getTopPlayers()
-                val scorers = response.topPlayers?.goals?.take(10)?.mapIndexed { idx, tp ->
-                    val alpha2 = tp.player?.country?.alpha2 ?: ""
+                val response = apiService.getWorldCupScorers()
+                val scorers = response.scorers.take(10).mapIndexed { idx, s ->
                     TopScorerDisplay(
                         rank = idx + 1,
-                        name = tp.player?.shortName ?: tp.player?.name ?: "?",
-                        team = tp.player?.country?.name ?: "",
-                        goals = tp.statistics?.goals ?: 0,
-                        assists = tp.statistics?.assists,
-                        matches = tp.playedMatches,
-                        minutesPlayed = tp.statistics?.minutesPlayed,
-                        flagEmoji = alpha2ToFlag(alpha2)
+                        name = s.player.name ?: "?",
+                        team = s.team.name ?: "",
+                        goals = s.goals ?: 0,
+                        assists = s.assists,
+                        matches = s.playedMatches,
+                        minutesPlayed = null,
+                        flagEmoji = ""
                     )
-                } ?: emptyList()
+                }
                 _topScorers.value = scorers
             } catch (e: Exception) {
                 _topScorers.value = emptyList()
@@ -76,11 +74,5 @@ class GoalscorersViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
-    }
-
-    private fun alpha2ToFlag(code: String): String {
-        if (code.length != 2) return ""
-        val base = 0x1F1E6
-        return code.uppercase().map { c -> String(Character.toChars(base + (c - 'A'))) }.joinToString("")
     }
 }

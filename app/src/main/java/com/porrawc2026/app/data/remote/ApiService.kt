@@ -103,6 +103,20 @@ data class LiveMatchDetail(
     val goals: List<GoalDetail>?
 )
 
+data class ScorersResponse(
+    val count: Int,
+    val scorers: List<ScorerEntry>
+)
+
+data class ScorerEntry(
+    val player: FootballPlayer,
+    val team: FootballTeam,
+    val playedMatches: Int?,
+    val goals: Int?,
+    val assists: Int?,
+    val penalties: Int?
+)
+
 interface ApiService {
 
     @GET("competitions/WC/matches")
@@ -123,6 +137,12 @@ interface ApiService {
     suspend fun getWorldCupTeams(
         @Header("X-Auth-Token") apiKey: String = "YOUR_API_KEY_HERE"
     ): TeamsResponse
+
+    @GET("competitions/WC/scorers")
+    suspend fun getWorldCupScorers(
+        @Header("X-Auth-Token") apiKey: String = "2a91da71f2384b659a3bf57e444eacd8",
+        @Query("limit") limit: Int = 10
+    ): ScorersResponse
 
     @GET("matches/{id}")
     suspend fun getMatchDetail(

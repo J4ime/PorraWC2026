@@ -394,7 +394,10 @@ class HomeViewModel @Inject constructor(
             Log.d("HomeVM", "API schedule: ${response.matches.size} matches, overlaying dates")
             val sortedApi = response.matches.sortedBy { it.utcDate }
             cachedMatches = cachedMatches.map { match ->
-                val apiMatch = sortedApi.getOrNull(match.id - 1)
+                val apiMatch = sortedApi.firstOrNull {
+                    it.homeTeam?.name?.contains(match.homeTeam, ignoreCase = true) == true ||
+                    match.homeTeam.contains(it.homeTeam?.name ?: "", ignoreCase = true)
+                }
                 if (apiMatch != null) {
                     match.copy(dateTime = apiMatch.utcDate)
                 } else match

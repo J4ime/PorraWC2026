@@ -120,6 +120,8 @@ class HomeViewModel @Inject constructor(
     }
 
     init {
+        val prefs = context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE)
+        _excelFileName.value = prefs.getString("excel_filename", null)
         refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
         forceCheckUpdate()
     }
@@ -191,7 +193,11 @@ class HomeViewModel @Inject constructor(
                 cursor?.use {
                     if (it.moveToFirst()) {
                         val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                        if (nameIndex >= 0) _excelFileName.value = it.getString(nameIndex)
+                        if (nameIndex >= 0) {
+                            val name = it.getString(nameIndex)
+                            _excelFileName.value = name
+                            context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE).edit().putString("excel_filename", name).apply()
+                        }
                     }
                 }
                 val data = ExcelParser.parse(context, uri)
@@ -288,6 +294,7 @@ class HomeViewModel @Inject constructor(
             _totalPoints.value = 0
             _players.value = emptyList()
             _excelFileName.value = null
+            context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE).edit().putString("excel_filename", null).apply()
             refreshUpcomingMatches()
             _isBusy.value = false
         }
@@ -387,9 +394,7 @@ class HomeViewModel @Inject constructor(
             cachedMatches = cachedMatches.map { match ->
                 val apiMatch = sortedApi.getOrNull(match.id - 1)
                 if (apiMatch != null) {
-                    val home = apiMatch.homeTeam?.name ?: match.homeTeam
-                    val away = apiMatch.awayTeam?.name ?: match.awayTeam
-                    match.copy(dateTime = apiMatch.utcDate, homeTeam = home, awayTeam = away)
+                    match.copy(dateTime = apiMatch.utcDate)
                 } else match
             }
         } catch (e: Exception) {

@@ -42,7 +42,6 @@ fun HomeScreen(
     val allMatches by viewModel.allMatches.collectAsState()
     val dayKeys by viewModel.dayKeys.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
-    val autoRefreshEnabled by viewModel.autoRefreshEnabled.collectAsState()
 
     val pullRefreshState = rememberPullToRefreshState()
     LaunchedEffect(pullRefreshState.isRefreshing) {
@@ -95,15 +94,6 @@ fun HomeScreen(
                             DayChip(day, sel) { selectedDay = day }
                         }
                     }
-
-                    Spacer(Modifier.width(6.dp))
-
-                    Icon(
-                        if (autoRefreshEnabled) Icons.Filled.Sync else Icons.Filled.SyncDisabled,
-                        contentDescription = "Auto-refresh",
-                        modifier = Modifier.size(20.dp).clickable { viewModel.toggleAutoRefresh() },
-                        tint = if (autoRefreshEnabled) Color(0xFF4CAF50) else Color(0xFF555555)
-                    )
                 }
             }
 
@@ -235,9 +225,9 @@ private fun MatchRow(match: MatchDisplay) {
     Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 6.dp)) {
         // Time column
         Column(
-            modifier = Modifier.width(52.dp).padding(end = 8.dp),
+            modifier = Modifier.width(44.dp).padding(end = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.Center
         ) {
             val liveText = hasLiveMinute?.let { match.liveMinute }
             val statusText = when {
@@ -245,8 +235,7 @@ private fun MatchRow(match: MatchDisplay) {
                 liveText != null -> liveText
                 else -> match.time.ifBlank { "?" }
             }
-            Text(statusText, fontSize = 13.sp, color = timeColor, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(match.dateLabel.take(3), fontSize = 9.sp, color = Color(0xFF777777), maxLines = 1)
+            Text(statusText, fontSize = 14.sp, color = timeColor, fontWeight = FontWeight.Bold, maxLines = 1)
         }
 
         // Score column
@@ -303,10 +292,14 @@ private fun MatchRow(match: MatchDisplay) {
         // TV channels
         if (!isLive && !hasResult) {
             val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
-            Column(Modifier.width(36.dp).padding(start = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                channels.forEach { ch ->
-                    val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF0037A1) else Color(0xFF333333)
-                    Text(ch.trim().take(4), fontSize = 7.sp, color = Color.White, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 2.dp, vertical = 1.dp), maxLines = 1)
+            Row(Modifier.width(36.dp).padding(start = 2.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                if (channels.isEmpty()) {
+                    Text("-", fontSize = 7.sp, color = Color(0xFF555555))
+                } else {
+                    channels.forEach { ch ->
+                        val bg = if (ch.contains("RTVE", ignoreCase = true)) Color(0xFF0037A1) else Color(0xFF333333)
+                        Text(ch.trim().take(4), fontSize = 7.sp, color = Color.White, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 2.dp, vertical = 1.dp), maxLines = 1)
+                    }
                 }
             }
         }

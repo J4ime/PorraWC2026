@@ -44,7 +44,7 @@ object LiveScoreScraper {
     }
 
     private fun fetchWithFilter(filter: (ScrapedMatch) -> Boolean): List<ScrapedMatch> {
-        for (source in listOf(::fetchSofaScore, ::fetchFotmob, ::fetchEspn)) {
+        for (source in listOf(::fetchLiveScoreCom, ::fetchSofaScore, ::fetchFotmob)) {
             try {
                 val m = source()
                 if (m.isNotEmpty()) {
@@ -108,6 +108,55 @@ object LiveScoreScraper {
         }
         home.reverse()
         away.reverse()
+    }
+
+    private fun fetchLiveScoreCom(): List<ScrapedMatch> {
+        try {
+            val url = URL("https://www.livescore.com/es/futbol/internacional/world-cup-2026/fixtures/")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+            conn.connectTimeout = 10000; conn.readTimeout = 10000
+            val html = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
+            val jsonStr = html.substringAfter("__NEXT_DATA__\" type=\"application/json\">").substringBefore("</script>")
+            if (jsonStr.isBlank()) return emptyList()
+            val root = JSONObject(jsonStr)
+            val events = root.optJSONObject("props")?.optJSONObject("pageProps")
+                ?.optJSONObject("initialStageData")?.optJSONArray("events")
+                ?: return emptyList()
+            val matches = mutableListOf<ScrapedMatch>()
+            val now = System.currentTimeMillis() / 1000
+            for (i in 0 until events.length()) {
+                val e = events.getJSONObject(i)
+                val status = e.optString("eventStatus", "TIMED")
+                val homeName = e.optString("homeTeamNameEn", e.optString("homeTeamName", ""))
+                val awayName = e.optString("awayTeamNameEn", e.optString("awayTeamName", ""))
+                if (homeName.length < 3 || awayName.length < 3) continue
+                val homeScore = e.optString("homeTeamScore", "").let { if (it.isNotBlank()) it.toIntOrNull() else null }
+                val awayScore = e.optString("awayTeamScore", "").let { if (it.isNotBlank()) it.toIntOrNull() else null }
+                val liveTime = e.optString("status", "")
+                val startStr = e.optString("startDateTimeString", "")
+                val utc = if (startStr.length >= 12) {
+                    val y = startStr.substring(0, 4); val m = startStr.substring(4, 6); val d = startStr.substring(6, 8)
+                    val h = startStr.substring(8, 10); val min = startStr.substring(10, 12)
+                    "$y-${m}-${d}T$h:${min}:00Z"
+                } else ""
+                val eventId = e.optString("id", "0").toLongOrNull() ?: 0L
+                val statusStr = when (status) {
+                    "LIVE", "HALFTIME" -> "IN_PLAY"
+                    "FINISHED" -> "FINISHED"
+                    else -> "TIMED"
+                }
+                val liveMin = if (statusStr == "IN_PLAY") {
+                    liveTime.replace("'", "").replace("+", "").toIntOrNull() ?: 0
+                } else 0
+                matches.add(ScrapedMatch(homeName, awayName, utc, statusStr, homeScore, awayScore, eventId = eventId, liveMinute = liveMin, tournamentName = "World Cup"))
+            }
+            Log.d(TAG, "LiveScoreCom: ${matches.size} matches")
+            return matches
+        } catch (e: Exception) {
+            Log.d(TAG, "LiveScoreCom failed: ${e.message}")
+            return emptyList()
+        }
     }
 
     private fun fetchSofaScore(): List<ScrapedMatch> {

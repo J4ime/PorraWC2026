@@ -464,58 +464,61 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
-        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-        val response = apiService.getWorldCupMatches(dateFrom = dateStr, dateTo = dateStr)
-        response.matches.forEach { fm ->
-            val entities = cachedMatches.filter {
-                fm.homeTeam?.name?.contains(it.homeTeam, ignoreCase = true) == true ||
-                it.homeTeam.contains(fm.homeTeam?.name ?: "", ignoreCase = true)
-            }
-            if (entities.size == 1) {
-                val entity = entities.first()
-                val isLive = fm.status == "IN_PLAY" || fm.status == "PAUSED"
-                val home = fm.score?.fullTime?.home ?: fm.score?.halfTime?.home
-                val away = fm.score?.fullTime?.away ?: fm.score?.halfTime?.away
-                if (home == null || away == null) return@forEach
-                val prev = lastWrittenScores[entity.id]
-                if (prev == null || prev.first != home || prev.second != away || isLive) {
-                    lastWrittenScores[entity.id] = home to away
-                    repository.updateMatchResults(entity.id, home, away)
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
-                    try {
-                        val detail = apiService.getMatchDetail(matchId = fm.id)
-                        val homeScr = detail.goals?.filter { g -> val t = g.team?.name; t == detail.homeTeam?.name || (t != null && detail.homeTeam?.name?.contains(t, true) == true) }
-                            ?.mapNotNull { g -> val n = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: 0; GoalEvent(n, m) } ?: emptyList()
-                        val awayScr = detail.goals?.filter { g -> val t = g.team?.name; t == detail.awayTeam?.name || (t != null && detail.awayTeam?.name?.contains(t, true) == true) }
-                            ?.mapNotNull { g -> val n = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: 0; GoalEvent(n, m) } ?: emptyList()
-                        if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
-                            goalScorers[entity.id] = Pair(homeScr.reversed(), awayScr.reversed())
+        val wcScraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchWcMatches() }
+        wcScraped.forEach { sm ->
+            val cm = cachedMatches.firstOrNull {
+                it.homeTeam.contains(sm.homeTeam, true) || sm.homeTeam.contains(it.homeTeam, true)
+            } ?: return@forEach
+            val hg = sm.homeGoals; val ag = sm.awayGoals
+            if (hg != null && ag != null) {
+                val prev = lastWrittenScores[cm.id]
+                if (prev == null || prev.first != hg || prev.second != ag || sm.status == "IN_PLAY") {
+                    lastWrittenScores[cm.id] = hg to ag
+                    repository.updateMatchResults(cm.id, hg, ag)
+                    cachedMatches = cachedMatches.map { if (it.id == cm.id) it.copy(homeGoals = hg, awayGoals = ag) else it }
+                    if (sm.liveMinute > 0) liveMinutes[cm.id] = "${sm.liveMinute}'"
+                    val eId = sm.eventId
+                    if (eId > 0) {
+                        val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
+                        if (h.isNotEmpty() || a.isNotEmpty()) {
+                            goalScorers[cm.id] = Pair(
+                                h.map { GoalEvent(it.playerName, it.minute) },
+                                a.map { GoalEvent(it.playerName, it.minute) }
+                            )
                             recalcPlayerPoints()
                         }
-                        detail.minute?.let { liveMinutes[entity.id] = it }
-                    } catch (_: Exception) {}
+                    }
                     recalcAllPoints()
                     refreshPoints()
                     refreshUpcomingMatches()
                 }
             }
         }
-        val wcScraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchWcMatches() }
-        wcScraped.forEach { sm ->
-            val cm = cachedMatches.firstOrNull {
-                it.homeTeam.contains(sm.homeTeam, true) || sm.homeTeam.contains(it.homeTeam, true)
-            } ?: return@forEach
-            val eId = sm.eventId
-            if (eId > 0) {
-                val (h, a) = withContext(Dispatchers.IO) { LiveScoreScraper.fetchGoalDetails(eId) }
-                if (h.isNotEmpty() || a.isNotEmpty()) {
-                    goalScorers[cm.id] = Pair(
-                        h.map { GoalEvent(it.playerName, it.minute) },
-                        a.map { GoalEvent(it.playerName, it.minute) }
-                    )
+        try {
+            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+            val response = apiService.getWorldCupMatches(dateFrom = dateStr, dateTo = dateStr)
+            response.matches.forEach { fm ->
+                val entities = cachedMatches.filter {
+                    fm.homeTeam?.name?.contains(it.homeTeam, ignoreCase = true) == true ||
+                    it.homeTeam.contains(fm.homeTeam?.name ?: "", ignoreCase = true)
+                }
+                if (entities.size == 1) {
+                    val entity = entities.first()
+                    val home = fm.score?.fullTime?.home ?: return@forEach
+                    val away = fm.score?.fullTime?.away ?: return@forEach
+                    if (fm.status == "FINISHED") liveMinutes[entity.id] = "FINAL"
+                    val prev = lastWrittenScores[entity.id]
+                    if (prev == null || prev.first != home || prev.second != away) {
+                        lastWrittenScores[entity.id] = home to away
+                        repository.updateMatchResults(entity.id, home, away)
+                        cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
+                        recalcAllPoints()
+                        refreshPoints()
+                        refreshUpcomingMatches()
+                    }
                 }
             }
-        }
+        } catch (_: Exception) { }
         checkGoalNotifications()
     }
 

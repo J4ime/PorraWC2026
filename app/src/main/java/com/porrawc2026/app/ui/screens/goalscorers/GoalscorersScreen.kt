@@ -65,10 +65,19 @@ fun GoalscorersScreen(
                     shape = RoundedCornerShape(14.dp),
                     border = BorderStroke(1.dp, Color(0xFFE65100))
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text("TOP 10 GOLEADORES MUNDIAL", style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                        Text("vía Sofascore", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777), modifier = Modifier.padding(bottom = 8.dp))
-                        topScorers.forEach { scorer -> TopScorerRow(scorer) }
+                    Column {
+                        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFFE65100)).padding(horizontal = 14.dp, vertical = 6.dp)) {
+                            Text("TOP 10 GOLEADORES MUNDIAL", fontSize = 12.sp, color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
+                        }
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                                Text("Jugador", Modifier.weight(1f), fontSize = 10.sp, color = Color(0xFF777777))
+                                Text("PJ", Modifier.width(30.dp), fontSize = 10.sp, color = Color(0xFF777777), textAlign = TextAlign.Center)
+                                Text("M/G", Modifier.width(36.dp), fontSize = 10.sp, color = Color(0xFF777777), textAlign = TextAlign.Center)
+                                Text("Gol", Modifier.width(30.dp), fontSize = 10.sp, color = Color(0xFF777777), textAlign = TextAlign.End)
+                            }
+                            topScorers.forEach { scorer -> TopScorerRow(scorer) }
+                        }
                     }
                 }
             }
@@ -114,24 +123,21 @@ private fun PlayerRow(p: PlayerPredictionEntity) {
 
 @Composable
 private fun TopScorerRow(scorer: TopScorerDisplay) {
+    val minPerGoal = if (scorer.goals > 0 && scorer.minutesPlayed != null) scorer.minutesPlayed / scorer.goals else null
     Row(
-        Modifier.fillMaxWidth().background(Color(0xFF222222), RoundedCornerShape(8.dp)).padding(12.dp),
+        Modifier.fillMaxWidth().background(Color(0xFF222222), RoundedCornerShape(8.dp)).padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF333333)), contentAlignment = Alignment.Center) {
-            Text("${scorer.rank}", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.width(12.dp))
+        Text(scorer.flagEmoji, fontSize = 14.sp)
+        Spacer(Modifier.width(6.dp))
         Column(Modifier.weight(1f)) {
-            Text(scorer.name, style = MaterialTheme.typography.bodyMedium, color = Color.White, fontWeight = FontWeight.Medium)
+            Text(scorer.name, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1)
             if (scorer.team.isNotBlank()) {
-                Text(scorer.team, style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
+                Text(scorer.team, fontSize = 9.sp, color = Color(0xFF777777), maxLines = 1)
             }
         }
-        Text("${scorer.goals} goles", style = MaterialTheme.typography.bodySmall, color = Color(0xFFE65100), fontWeight = FontWeight.Bold)
-        if (scorer.assists != null && scorer.assists > 0) {
-            Spacer(Modifier.width(8.dp))
-            Text("${scorer.assists} asis.", style = MaterialTheme.typography.labelSmall, color = Color(0xFF777777))
-        }
+        Text("${scorer.matches ?: "-"}", Modifier.width(30.dp), fontSize = 10.sp, color = Color.White, textAlign = TextAlign.Center)
+        Text(if (minPerGoal != null) "$minPerGoal'" else "-", Modifier.width(36.dp), fontSize = 10.sp, color = Color(0xFF777777), textAlign = TextAlign.Center)
+        Text("${scorer.goals}", Modifier.width(30.dp), fontSize = 11.sp, color = Color(0xFFE65100), fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
     }
 }

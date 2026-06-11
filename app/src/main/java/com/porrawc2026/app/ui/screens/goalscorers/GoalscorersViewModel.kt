@@ -18,7 +18,9 @@ data class TopScorerDisplay(
     val team: String,
     val goals: Int,
     val assists: Int? = null,
-    val matches: Int? = null
+    val matches: Int? = null,
+    val minutesPlayed: Int? = null,
+    val flagEmoji: String = ""
 )
 
 @HiltViewModel
@@ -55,13 +57,16 @@ class GoalscorersViewModel @Inject constructor(
             try {
                 val response = sofascoreApi.getTopPlayers()
                 val scorers = response.topPlayers?.goals?.take(10)?.mapIndexed { idx, tp ->
+                    val alpha2 = tp.player?.country?.alpha2 ?: ""
                     TopScorerDisplay(
                         rank = idx + 1,
                         name = tp.player?.shortName ?: tp.player?.name ?: "?",
                         team = tp.player?.country?.name ?: "",
                         goals = tp.statistics?.goals ?: 0,
                         assists = tp.statistics?.assists,
-                        matches = tp.playedMatches
+                        matches = tp.playedMatches,
+                        minutesPlayed = tp.statistics?.minutesPlayed,
+                        flagEmoji = alpha2ToFlag(alpha2)
                     )
                 } ?: emptyList()
                 _topScorers.value = scorers
@@ -71,5 +76,11 @@ class GoalscorersViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
+    }
+
+    private fun alpha2ToFlag(code: String): String {
+        if (code.length != 2) return ""
+        val base = 0x1F1E6
+        return code.uppercase().map { c -> String(Character.toChars(base + (c - 'A'))) }.joinToString("")
     }
 }

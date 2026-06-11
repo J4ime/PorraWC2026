@@ -42,9 +42,9 @@ fun PorraNavGraph() {
     val pageTitles = listOf("GOLEADORES", "INICIO", "PARTIDOS", "PREGUNTAS", "AJUSTES")
 
     val navItems = listOf(
-        NavItem("Goleadores", Icons.Filled.EmojiEvents),
+        NavItem("Goleadores", Icons.Filled.SportsSoccer),
         NavItem("Inicio", Icons.Filled.Home),
-        NavItem("Partidos", Icons.Filled.SportsSoccer),
+        NavItem("Partidos", Icons.Filled.Scoreboard),
         NavItem("Preguntas", Icons.AutoMirrored.Filled.LiveHelp),
         NavItem("Ajustes", Icons.Filled.Settings)
     )

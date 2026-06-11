@@ -269,6 +269,7 @@ class HomeViewModel @Inject constructor(
             _hasData.value = false
             _totalPoints.value = 0
             _players.value = emptyList()
+            _excelFileName.value = null
             refreshUpcomingMatches()
             _isBusy.value = false
         }
@@ -743,7 +744,8 @@ class HomeViewModel @Inject constructor(
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
             val date = fb?.getOrNull(0) ?: match.dateTime
-            val tv = TvScraper.lookupTv(match.homeTeam, match.awayTeam, context.filesDir)
+            val scrapedTv = TvScraper.lookupTv(match.homeTeam, match.awayTeam, context.filesDir)
+            val tv = if (match.tvChannel.isNotBlank() && scrapedTv == "DAZN") match.tvChannel else scrapedTv
             match.copy(dateTime = date, tvChannel = tv)
         }
         val withRtv = cachedMatches.count { it.tvChannel.contains("RTVE") }

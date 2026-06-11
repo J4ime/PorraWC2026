@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,7 +84,35 @@ fun HomeScreen(
                 }
             }
 
-            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection), contentPadding = PaddingValues(bottom = 8.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(dayKeys, selectedDay) {
+                var totalDrag = 0f
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                    onDragEnd = {
+                        val threshold = 150f
+                        if (totalDrag > threshold) {
+                            // Swipe right -> previous day
+                            when {
+                                selectedDay == null && dayKeys.isNotEmpty() -> selectedDay = dayKeys.last()
+                                selectedDay != null -> {
+                                    val idx = dayKeys.indexOf(selectedDay) - 1
+                                    selectedDay = if (idx >= 0) dayKeys[idx] else null
+                                }
+                            }
+                        } else if (totalDrag < -threshold) {
+                            // Swipe left -> next day
+                            when {
+                                selectedDay == null && dayKeys.isNotEmpty() -> selectedDay = dayKeys.first()
+                                selectedDay != null -> {
+                                    val idx = dayKeys.indexOf(selectedDay) + 1
+                                    selectedDay = if (idx < dayKeys.size) dayKeys[idx] else null
+                                }
+                            }
+                        }
+                        totalDrag = 0f
+                    }
+                )
+            }, contentPadding = PaddingValues(bottom = 8.dp)) {
                 if (selectedDay == null && yesterdayMatches.isNotEmpty()) {
                     item {
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {

@@ -109,6 +109,7 @@ class HomeViewModel @Inject constructor(
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
     private val goalScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
+    private val liveMinutes = mutableMapOf<Int, String>()
 
     companion object {
         val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
@@ -472,10 +473,12 @@ class HomeViewModel @Inject constructor(
             }
             if (entities.size == 1) {
                 val entity = entities.first()
-                val home = fm.score?.fullTime?.home ?: return@forEach
-                val away = fm.score?.fullTime?.away ?: return@forEach
+                val isLive = fm.status == "IN_PLAY" || fm.status == "PAUSED"
+                val home = fm.score?.fullTime?.home ?: fm.score?.halfTime?.home
+                val away = fm.score?.fullTime?.away ?: fm.score?.halfTime?.away
+                if (home == null || away == null) return@forEach
                 val prev = lastWrittenScores[entity.id]
-                if (prev == null || prev.first != home || prev.second != away) {
+                if (prev == null || prev.first != home || prev.second != away || isLive) {
                     lastWrittenScores[entity.id] = home to away
                     repository.updateMatchResults(entity.id, home, away)
                     cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
@@ -487,7 +490,9 @@ class HomeViewModel @Inject constructor(
                             ?.mapNotNull { g -> val n = g.scorer?.name ?: return@mapNotNull null; val m = g.minute ?: 0; GoalEvent(n, m) } ?: emptyList()
                         if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
                             goalScorers[entity.id] = Pair(homeScr.reversed(), awayScr.reversed())
+                            recalcPlayerPoints()
                         }
+                        detail.minute?.let { liveMinutes[entity.id] = it }
                     } catch (_: Exception) {}
                     recalcAllPoints()
                     refreshPoints()
@@ -594,8 +599,9 @@ class HomeViewModel @Inject constructor(
         } else ""
         val status = matchStatus(match)
 
-        val liveMin = when (status) {
-            MatchStatus.FINISHED -> "FINAL"
+        val liveMin = when {
+            status == MatchStatus.FINISHED -> "FINAL"
+            liveMinutes.containsKey(match.id) -> liveMinutes[match.id]
             else -> null
         }
         val s = goalScorers[match.id]

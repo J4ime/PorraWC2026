@@ -99,7 +99,7 @@ class HomeViewModel @Inject constructor(
     val allMatches: StateFlow<List<MatchDisplay>> = _allMatches.asStateFlow()
     private val _dayKeys = MutableStateFlow<List<String>>(emptyList())
     val dayKeys: StateFlow<List<String>> = _dayKeys.asStateFlow()
-    private val _autoRefreshEnabled = MutableStateFlow(false)
+    private val _autoRefreshEnabled = MutableStateFlow(true)
     val autoRefreshEnabled: StateFlow<Boolean> = _autoRefreshEnabled.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
@@ -122,6 +122,7 @@ class HomeViewModel @Inject constructor(
     init {
         val prefs = context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE)
         _excelFileName.value = prefs.getString("excel_filename", null)
+        _autoRefreshEnabled.value = prefs.getBoolean("auto_refresh", true)
         refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
         forceCheckUpdate()
     }
@@ -246,6 +247,7 @@ class HomeViewModel @Inject constructor(
 
     fun toggleAutoRefresh() {
         _autoRefreshEnabled.value = !_autoRefreshEnabled.value
+        context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE).edit().putBoolean("auto_refresh", _autoRefreshEnabled.value).apply()
     }
 
     fun refreshLiveScores() {
@@ -577,11 +579,7 @@ class HomeViewModel @Inject constructor(
         val thisYear = nowCal.get(Calendar.YEAR)
         _dayKeys.value = allDisplay.mapNotNull { d ->
             if (d.dayKey.isBlank()) return@mapNotNull null
-            val m = cachedMatches.firstOrNull { it.id == d.id } ?: return@mapNotNull null
-            val date = parseMadridDate(m.dateTime) ?: return@mapNotNull null
-            val c = Calendar.getInstance(madridTZ).apply { time = date }
-            if (c.get(Calendar.DAY_OF_YEAR) == todayDoy && c.get(Calendar.YEAR) == thisYear) null
-            else d.dayKey
+            d.dayKey
         }.distinct()
         Log.d("HomeVM", "refresh: today=${todayMatches.size} future=${
             allDisplay.count { d ->

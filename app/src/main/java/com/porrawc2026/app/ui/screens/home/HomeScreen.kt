@@ -57,11 +57,18 @@ fun HomeScreen(
     var selectedDay by remember { mutableStateOf<String?>(null) }
     val dayNavState = rememberLazyListState()
 
+    val todayDayKey = if (allMatches.isNotEmpty()) allMatches.firstOrNull { it.dateLabel == "HOY" }?.dayKey else null
+    val visibleDayKeys = remember(dayKeys, todayDayKey) {
+        dayKeys.filter { it != todayDayKey }
+    }
+
     LaunchedEffect(selectedDay) {
-        if (selectedDay != null) {
-            val idx = dayKeys.indexOf(selectedDay)
-            if (idx >= 0) {
-                dayNavState.animateScrollToItem(idx)
+        if (selectedDay == null) {
+            dayNavState.animateScrollToItem(0)
+        } else {
+            val idx = visibleDayKeys.indexOf(selectedDay)
+            if (idx >= 6) {
+                dayNavState.animateScrollToItem(idx - 3)
             }
         }
     }
@@ -101,7 +108,7 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        itemsIndexed(dayKeys) { _, day ->
+                        itemsIndexed(visibleDayKeys) { _, day ->
                             val sel = selectedDay == day
                             DayChip(day, sel) { selectedDay = day }
                         }
@@ -109,7 +116,7 @@ fun HomeScreen(
                 }
             }
 
-            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(dayKeys, selectedDay) {
+            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(visibleDayKeys, selectedDay) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val isTopHalf = down.position.y < size.height * 0.55f
@@ -125,18 +132,18 @@ fun HomeScreen(
                     val threshold = 200f
                     if (totalDrag > threshold) {
                         when {
-                            selectedDay == null && dayKeys.isNotEmpty() -> selectedDay = dayKeys.last()
+                            selectedDay == null && visibleDayKeys.isNotEmpty() -> selectedDay = visibleDayKeys.last()
                             selectedDay != null -> {
-                                val idx = dayKeys.indexOf(selectedDay) - 1
-                                selectedDay = if (idx >= 0) dayKeys[idx] else null
+                                val idx = visibleDayKeys.indexOf(selectedDay) - 1
+                                selectedDay = if (idx >= 0) visibleDayKeys[idx] else null
                             }
                         }
                     } else if (totalDrag < -threshold) {
                         when {
-                            selectedDay == null && dayKeys.isNotEmpty() -> selectedDay = dayKeys.first()
+                            selectedDay == null && visibleDayKeys.isNotEmpty() -> selectedDay = visibleDayKeys.first()
                             selectedDay != null -> {
-                                val idx = dayKeys.indexOf(selectedDay) + 1
-                                selectedDay = if (idx < dayKeys.size) dayKeys[idx] else null
+                                val idx = visibleDayKeys.indexOf(selectedDay) + 1
+                                selectedDay = if (idx < visibleDayKeys.size) visibleDayKeys[idx] else null
                             }
                         }
                     }
@@ -234,7 +241,7 @@ private fun MatchRow(match: MatchDisplay) {
         else -> Color.White
     }
 
-    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).padding(vertical = 6.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).padding(vertical = 3.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         // Time column - 20%
         Column(
             modifier = Modifier.weight(0.20f),

@@ -467,7 +467,9 @@ class HomeViewModel @Inject constructor(
         val wcScraped = withContext(Dispatchers.IO) { LiveScoreScraper.fetchWcMatches() }
         wcScraped.forEach { sm ->
             val cm = cachedMatches.firstOrNull {
-                it.homeTeam.contains(sm.homeTeam, true) || sm.homeTeam.contains(it.homeTeam, true)
+                val hMatch = matchName(it.homeTeam, sm.homeTeam)
+                val aMatch = matchName(it.awayTeam, sm.awayTeam)
+                hMatch && aMatch
             } ?: return@forEach
             val hg = sm.homeGoals; val ag = sm.awayGoals
             if (hg != null && ag != null) {
@@ -520,6 +522,19 @@ class HomeViewModel @Inject constructor(
             }
         } catch (_: Exception) { }
         checkGoalNotifications()
+    }
+
+    private fun matchName(ourName: String, scraperName: String): Boolean {
+        if (ourName.contains(scraperName, true) || scraperName.contains(ourName, true)) return true
+        val map = mapOf(
+            "Korea Republic" to "Corea del Sur", "Czechia" to "República Checa",
+            "Bosnia-H." to "Bosnia y Herzegovina", "Curaçao" to "Curazao",
+            "Ivory Coast" to "Costa de Marfil", "Netherlands" to "Países Bajos",
+            "Congo DR" to "RD Congo", "Saudi Arabia" to "Arabia Saudita",
+            "USA" to "Estados Unidos"
+        )
+        val mapped = map[scraperName]
+        return mapped != null && ourName.contains(mapped, true)
     }
 
     private fun refreshUpcomingMatches() {

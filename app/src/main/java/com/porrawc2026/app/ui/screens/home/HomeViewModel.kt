@@ -127,6 +127,7 @@ class HomeViewModel @Inject constructor(
         _autoRefreshEnabled.value = prefs.getBoolean("auto_refresh", true)
         refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
         forceCheckUpdate()
+        viewModelScope.launch(Dispatchers.IO) { fetchLiveResults(); refreshUpcomingMatches() }
     }
 
     private fun precachePhotos() {

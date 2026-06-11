@@ -467,9 +467,10 @@ class HomeViewModel @Inject constructor(
             response.matches.forEach { fm ->
                 val home = fm.score?.fullTime?.home ?: return@forEach
                 val away = fm.score?.fullTime?.away ?: return@forEach
+                val apiHome = normalize(fm.homeTeam?.name ?: "")
+                val apiAway = normalize(fm.awayTeam?.name ?: "")
                 val entities = cachedMatches.filter {
-                    fm.homeTeam?.name?.contains(it.homeTeam, ignoreCase = true) == true ||
-                    it.homeTeam.contains(fm.homeTeam?.name ?: "", ignoreCase = true)
+                    normalize(it.homeTeam) == apiHome && normalize(it.awayTeam) == apiAway
                 }
                 if (entities.size == 1) {
                     val entity = entities.first()
@@ -486,6 +487,13 @@ class HomeViewModel @Inject constructor(
                 }
             }
         } catch (_: Exception) { }
+    }
+
+    private fun normalize(name: String): String {
+        return java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}"), "")
+            .replace(" ", "")
+            .lowercase()
     }
 
     private fun refreshUpcomingMatches() {

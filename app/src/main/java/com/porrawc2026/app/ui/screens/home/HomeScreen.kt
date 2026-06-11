@@ -46,41 +46,35 @@ fun HomeScreen(
     val isBusy by viewModel.isBusy.collectAsState()
 
     val pullRefreshState = rememberPullToRefreshState()
+    var selectedDay by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(pullRefreshState.isRefreshing) {
         if (pullRefreshState.isRefreshing) {
             viewModel.forceCheckUpdate()
             viewModel.refreshLiveScores()
+            selectedDay = null
             pullRefreshState.endRefresh()
         }
     }
-
-    var selectedDay by remember { mutableStateOf<String?>(null) }
     val dayNavState = rememberLazyListState()
 
     val todayDayKey = if (allMatches.isNotEmpty()) allMatches.firstOrNull { it.dateLabel == "HOY" }?.dayKey else null
-    val visibleDayKeys = remember(dayKeys, todayDayKey) {
-        dayKeys.filter { it != todayDayKey }
-    }
-
-    LaunchedEffect(selectedDay) {
-        if (selectedDay == null) {
-            dayNavState.animateScrollToItem(0)
-        } else {
-            val idx = visibleDayKeys.indexOf(selectedDay)
-            if (idx >= 6) {
-                dayNavState.animateScrollToItem(idx - 3)
-            }
-        }
-    }
-
-    LaunchedEffect(selectedDay) {
-        // Auto-scroll day nav is handled by the Row+horizontalScroll
+    val navigableDays = remember(dayKeys, todayDayKey) {
+        val filtered = dayKeys.filter { it != todayDayKey }
+        listOf("HOY") + filtered
     }
 
     val visibleMatches = if (selectedDay == null) {
         upcomingMatches
     } else {
         allMatches.filter { it.dayKey == selectedDay }
+    }
+
+    LaunchedEffect(selectedDay, navigableDays) {
+        val idx = if (selectedDay == null) 0 else navigableDays.indexOf(selectedDay)
+        if (idx >= 0) {
+            dayNavState.animateScrollToItem(idx)
+        }
     }
 
     var showYesterday by remember { mutableStateOf(false) }
@@ -93,30 +87,23 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (dayKeys.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp, horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            if (navigableDays.isNotEmpty()) {
+                LazyRow(
+                    state = dayNavState,
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
                 ) {
-                    val isToday = selectedDay == null
-                    DayChip("HOY", isToday) { selectedDay = null }
-
-                    Spacer(Modifier.width(6.dp))
-
-                    LazyRow(
-                        state = dayNavState,
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        itemsIndexed(visibleDayKeys) { _, day ->
-                            val sel = selectedDay == day
-                            DayChip(day, sel) { selectedDay = day }
+                    itemsIndexed(navigableDays) { _, day ->
+                        val isSelected = if (day == "HOY") selectedDay == null else selectedDay == day
+                        DayChip(day, isSelected) {
+                            selectedDay = if (day == "HOY") null else day
                         }
                     }
                 }
             }
 
-            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(visibleDayKeys, selectedDay) {
+            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(navigableDays, selectedDay) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val isTopHalf = down.position.y < size.height * 0.55f
@@ -132,18 +119,18 @@ fun HomeScreen(
                     val threshold = 200f
                     if (totalDrag > threshold) {
                         when {
-                            selectedDay == null && visibleDayKeys.isNotEmpty() -> selectedDay = visibleDayKeys.last()
+                            selectedDay == null && navigableDays.size > 1 -> selectedDay = navigableDays.last()
                             selectedDay != null -> {
-                                val idx = visibleDayKeys.indexOf(selectedDay) - 1
-                                selectedDay = if (idx >= 0) visibleDayKeys[idx] else null
+                                val idx = navigableDays.indexOf(selectedDay) - 1
+                                selectedDay = if (idx >= 0) navigableDays[idx] else null
                             }
                         }
                     } else if (totalDrag < -threshold) {
                         when {
-                            selectedDay == null && visibleDayKeys.isNotEmpty() -> selectedDay = visibleDayKeys.first()
+                            selectedDay == null && navigableDays.size > 1 -> selectedDay = navigableDays[1]
                             selectedDay != null -> {
-                                val idx = visibleDayKeys.indexOf(selectedDay) + 1
-                                selectedDay = if (idx < visibleDayKeys.size) visibleDayKeys[idx] else null
+                                val idx = navigableDays.indexOf(selectedDay) + 1
+                                selectedDay = if (idx < navigableDays.size) navigableDays[idx] else null
                             }
                         }
                     }

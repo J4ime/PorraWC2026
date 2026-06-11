@@ -37,14 +37,14 @@ data class NavItem(val label: String, val icon: ImageVector)
 fun PorraNavGraph() {
     val homeVM: HomeViewModel = hiltViewModel()
     val totalPoints by homeVM.totalPoints.collectAsState()
-    val pagerState = rememberPagerState(initialPage = 1, pageCount = { 5 })
+    val pagerState = rememberPagerState(initialPage = 2, pageCount = { 5 })
     val scope = rememberCoroutineScope()
-    val pageTitles = listOf("GOLEADORES", "INICIO", "PARTIDOS", "PREGUNTAS", "AJUSTES")
+    val pageTitles = listOf("GOLEADORES", "PARTIDOS", "INICIO", "PREGUNTAS", "AJUSTES")
 
     val navItems = listOf(
         NavItem("Goleadores", Icons.Filled.SportsSoccer),
-        NavItem("Inicio", Icons.Filled.Home),
         NavItem("Partidos", Icons.Filled.Scoreboard),
+        NavItem("Inicio", Icons.Filled.Home),
         NavItem("Preguntas", Icons.AutoMirrored.Filled.LiveHelp),
         NavItem("Ajustes", Icons.Filled.Settings)
     )
@@ -53,8 +53,8 @@ fun PorraNavGraph() {
         Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().height(56.dp).padding(horizontal = 12.dp)) {
             val headerTitle = when (pagerState.currentPage) {
                 0 -> "GOLEADORES"
-                 1 -> "PORRA WC 2026"
-                2 -> "PARTIDOS"
+                1 -> "PARTIDOS"
+                2 -> "PORRA WC 2026"
                 3 -> "PREGUNTAS"
                 4 -> "AJUSTES"
                 else -> "PORRA WC 2026"
@@ -70,8 +70,8 @@ fun PorraNavGraph() {
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                 when (page) {
                     0 -> GoalscorersScreen()
-                    1 -> HomeScreen()
-                    2 -> MatchesScreen()
+                    1 -> MatchesScreen()
+                    2 -> HomeScreen()
                     3 -> QuestionsScreen()
                     4 -> AjustesScreen()
                 }

@@ -4,11 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -56,26 +54,37 @@ fun HomeScreen(
             pullRefreshState.endRefresh()
         }
     }
-    val dayNavState = rememberLazyListState()
 
-    val todayDayKey = if (allMatches.isNotEmpty()) allMatches.firstOrNull { it.dateLabel == "HOY" }?.dayKey else null
-    val navigableDays = remember(dayKeys, todayDayKey) {
-        val filtered = dayKeys.filter { it != todayDayKey }
-        listOf("HOY") + filtered
+    val todayDayKey = allMatches.firstOrNull { it.dateLabel == "HOY" }?.dayKey ?: ""
+    val yesterdayDayKey = allMatches.firstOrNull { it.dateLabel == "AYER" }?.dayKey ?: ""
+
+    fun sortNum(dayKey: String): Int = allMatches.firstOrNull { it.dayKey == dayKey }?.sortKey?.toIntOrNull() ?: 0
+    val todaySort = sortNum(todayDayKey)
+
+    val prevDays = remember(dayKeys, todayDayKey) {
+        dayKeys.filter { sortNum(it) < todaySort && sortNum(it) > 0 }.sortedByDescending { sortNum(it) }
+    }
+    val nextDays = remember(dayKeys, todayDayKey) {
+        dayKeys.filter { sortNum(it) > todaySort }.sortedBy { sortNum(it) }
     }
 
-    val visibleMatches = if (selectedDay == null) {
-        upcomingMatches
-    } else {
-        allMatches.filter { it.dayKey == selectedDay }
-    }
-
-    LaunchedEffect(selectedDay, navigableDays) {
-        val idx = if (selectedDay == null) 0 else navigableDays.indexOf(selectedDay)
-        if (idx >= 0) {
-            dayNavState.animateScrollToItem(idx)
+    val visiblePrev = remember(prevDays, selectedDay) {
+        if (selectedDay == null || selectedDay !in prevDays) prevDays.take(2)
+        else {
+            val idx = prevDays.indexOf(selectedDay)
+            if (idx <= 1) prevDays.take(2) else prevDays.drop(idx - 1)
         }
     }
+    val visibleNext = remember(nextDays, selectedDay) {
+        if (selectedDay == null || selectedDay !in nextDays) nextDays.take(3)
+        else {
+            val idx = nextDays.indexOf(selectedDay)
+            if (idx <= 2) nextDays.take(3) else nextDays.drop(idx - 2)
+        }
+    }
+
+    val visibleMatches = if (selectedDay == null) upcomingMatches
+    else allMatches.filter { it.dayKey == selectedDay }
 
     var showYesterday by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -87,23 +96,41 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (navigableDays.isNotEmpty()) {
-                LazyRow(
-                    state = dayNavState,
-                    modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
+            // Day navigation bar
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: previous days (max 2 visible)
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    itemsIndexed(navigableDays) { _, day ->
-                        val isSelected = if (day == "HOY") selectedDay == null else selectedDay == day
-                        DayChip(day, isSelected) {
-                            selectedDay = if (day == "HOY") null else day
-                        }
+                    visiblePrev.take(2).reversed().forEachIndexed { i, day ->
+                        DayChip(
+                            if (day == yesterdayDayKey) "AYER" else day,
+                            selectedDay == day
+                        ) { selectedDay = day }
+                        if (i < minOf(2, visiblePrev.size) - 1) Spacer(Modifier.width(4.dp))
+                    }
+                }
+
+                // Center: HOY
+                DayChip("HOY", selectedDay == null) { selectedDay = null }
+
+                // Right: next days (max 3 visible)
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    visibleNext.take(3).forEachIndexed { i, day ->
+                        Spacer(Modifier.width(4.dp))
+                        DayChip(day, selectedDay == day) { selectedDay = day }
                     }
                 }
             }
 
-            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(navigableDays, selectedDay) {
+            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(nextDays, prevDays, selectedDay) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val isTopHalf = down.position.y < size.height * 0.55f
@@ -119,18 +146,26 @@ fun HomeScreen(
                     val threshold = 200f
                     if (totalDrag > threshold) {
                         when {
-                            selectedDay == null && navigableDays.size > 1 -> selectedDay = navigableDays.last()
-                            selectedDay != null -> {
-                                val idx = navigableDays.indexOf(selectedDay) - 1
-                                selectedDay = if (idx >= 0) navigableDays[idx] else null
+                            selectedDay == null && prevDays.isNotEmpty() -> selectedDay = prevDays.last()
+                            selectedDay in prevDays -> {
+                                val idx = prevDays.indexOf(selectedDay) - 1
+                                selectedDay = if (idx >= 0) prevDays[idx] else null
+                            }
+                            selectedDay in nextDays -> {
+                                val idx = nextDays.indexOf(selectedDay) - 1
+                                selectedDay = if (idx >= 0) nextDays[idx] else null
                             }
                         }
                     } else if (totalDrag < -threshold) {
                         when {
-                            selectedDay == null && navigableDays.size > 1 -> selectedDay = navigableDays[1]
-                            selectedDay != null -> {
-                                val idx = navigableDays.indexOf(selectedDay) + 1
-                                selectedDay = if (idx < navigableDays.size) navigableDays[idx] else null
+                            selectedDay == null && nextDays.isNotEmpty() -> selectedDay = nextDays.first()
+                            selectedDay in nextDays -> {
+                                val idx = nextDays.indexOf(selectedDay) + 1
+                                selectedDay = if (idx < nextDays.size) nextDays[idx] else null
+                            }
+                            selectedDay in prevDays -> {
+                                val idx = prevDays.indexOf(selectedDay) + 1
+                                selectedDay = if (idx < prevDays.size) prevDays[idx] else null
                             }
                         }
                     }
@@ -149,26 +184,16 @@ fun HomeScreen(
                                 Icon(if (showYesterday) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = Color(0xFF777777), modifier = Modifier.size(18.dp))
                             }
                             AnimatedVisibility(visible = showYesterday) {
-                                Column {
-                                    Spacer(Modifier.height(4.dp))
-                                    yesterdayMatches.forEach { match ->
-                                        MatchRow(match)
-                                        if (match != yesterdayMatches.last()) Spacer(Modifier.height(4.dp))
-                                    }
-                                }
+                                Column { Spacer(Modifier.height(4.dp)); yesterdayMatches.forEach { MatchRow(it); if (it != yesterdayMatches.last()) Spacer(Modifier.height(4.dp)) } }
                             }
                         }
                     }
                     item { Spacer(Modifier.height(4.dp)) }
                 }
-
                 if (visibleMatches.isNotEmpty()) {
                     item {
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                            visibleMatches.take(12).forEach { match ->
-                                MatchRow(match)
-                                if (match != visibleMatches.take(12).last()) Spacer(Modifier.height(6.dp))
-                            }
+                            visibleMatches.take(12).forEach { MatchRow(it); if (it != visibleMatches.take(12).last()) Spacer(Modifier.height(6.dp)) }
                         }
                     }
                 } else if (hasData) {
@@ -203,14 +228,9 @@ fun HomeScreen(
 private fun DayChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(
         label,
-        modifier = Modifier
-            .clickable { onClick() }
-            .background(if (selected) Color(0xFFE65100) else Color(0xFF333333), RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        fontSize = 11.sp,
-        color = if (selected) Color.White else Color(0xFFAAAAAA),
-        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-        maxLines = 1
+        modifier = Modifier.clickable { onClick() }.background(if (selected) Color(0xFFE65100) else Color(0xFF333333), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
+        fontSize = 11.sp, color = if (selected) Color.White else Color(0xFFAAAAAA),
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, maxLines = 1
     )
 }
 
@@ -221,85 +241,43 @@ private fun MatchRow(match: MatchDisplay) {
     val isLive = match.status == MatchStatus.LIVE
     val isFinished = hasResult && !isLive
     val hasLiveMinute = match.liveMinute != null
-
-    val timeColor = when {
-        isLive -> Color(0xFF4CAF50)
-        isFinished -> Color(0xFF888888)
-        else -> Color.White
-    }
+    val timeColor = when { isLive -> Color(0xFF4CAF50); isFinished -> Color(0xFF888888); else -> Color.White }
 
     Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).padding(vertical = 3.dp, horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        // Time column - 20%
-        Column(
-            modifier = Modifier.weight(0.20f),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            val liveText = hasLiveMinute?.let { match.liveMinute }
-            val statusText = when {
-                isFinished -> "FINAL"
-                liveText != null -> liveText
-                else -> match.time.ifBlank { "?" }
-            }
+        Column(modifier = Modifier.weight(0.20f), horizontalAlignment = Alignment.CenterHorizontally) {
+            val statusText = when { isFinished -> "FINAL"; hasLiveMinute -> match.liveMinute ?: "?"; else -> match.time.ifBlank { "?" } }
             Text(statusText, fontSize = 14.sp, color = timeColor, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
         }
-
-        // Teams + Score column - 50%
         Row(modifier = Modifier.weight(0.50f), verticalAlignment = Alignment.CenterVertically) {
-            // Score column
-            Column(
-                modifier = Modifier.width(22.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                val homeGoals = if (hasResult || isLive) match.homeGoals?.toString() ?: "0" else "-"
-                val awayGoals = if (hasResult || isLive) match.awayGoals?.toString() ?: "0" else "-"
-                val scoreColor = when {
-                    isLive -> Color(0xFF4CAF50)
-                    hasResult -> Color.White
-                    else -> Color(0xFF777777)
-                }
-                Text(homeGoals, fontSize = 15.sp, color = scoreColor, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center)
+            Column(modifier = Modifier.width(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                val h = if (hasResult || isLive) match.homeGoals?.toString() ?: "0" else "-"
+                val a = if (hasResult || isLive) match.awayGoals?.toString() ?: "0" else "-"
+                val sc = when { isLive -> Color(0xFF4CAF50); hasResult -> Color.White; else -> Color(0xFF777777) }
+                Text(h, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(4.dp))
-                Text(awayGoals, fontSize = 15.sp, color = scoreColor, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center)
+                Text(a, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center)
             }
-
             Spacer(Modifier.width(6.dp))
-
-            // Teams
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(match.homeFlag, fontSize = 13.sp)
-                    Spacer(Modifier.width(3.dp))
+                    Text(match.homeFlag, fontSize = 13.sp); Spacer(Modifier.width(3.dp))
                     Text(match.homeTeam, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    if (isLive) {
-                        Spacer(Modifier.width(4.dp))
-                        Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFF4CAF50)))
-                    }
+                    if (isLive) { Spacer(Modifier.width(4.dp)); Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFF4CAF50))) }
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(match.awayFlag, fontSize = 13.sp)
-                    Spacer(Modifier.width(3.dp))
+                    Text(match.awayFlag, fontSize = 13.sp); Spacer(Modifier.width(3.dp))
                     Text(match.awayTeam, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 }
                 if (hasPred && (isLive || hasResult)) {
                     Spacer(Modifier.height(2.dp))
                     val pts = if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0"
-                    val ptsColor = when {
-                        isLive -> Color(0xFF4CAF50)
-                        match.pointsEarned > 0 -> Color(0xFF4CAF50)
-                        else -> Color(0xFF666666)
-                    }
-                    Text(pts, fontSize = 10.sp, color = ptsColor, fontWeight = FontWeight.Bold)
+                    val pc = when { isLive -> Color(0xFF4CAF50); match.pointsEarned > 0 -> Color(0xFF4CAF50); else -> Color(0xFF666666) }
+                    Text(pts, fontSize = 10.sp, color = pc, fontWeight = FontWeight.Bold)
                 }
             }
         }
-
-        // TV column - 30%
-        Column(
-            modifier = Modifier.weight(0.30f).padding(start = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+        Column(modifier = Modifier.weight(0.30f).padding(start = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             if (!isLive && !hasResult) {
                 val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {

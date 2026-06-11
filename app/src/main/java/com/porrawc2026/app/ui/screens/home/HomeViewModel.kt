@@ -50,7 +50,8 @@ data class MatchDisplay(
     val liveMinute: String? = null,
     val homeScorers: List<GoalEvent> = emptyList(),
     val awayScorers: List<GoalEvent> = emptyList(),
-    val dayKey: String = ""
+    val dayKey: String = "",
+    val sortKey: String = ""
 )
 
 @HiltViewModel
@@ -388,25 +389,6 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun enrichScheduleFromApi() {
         enrichScheduleFallback()
-        try {
-            _isBusy.value = true
-            val response = apiService.getWorldCupMatches()
-            Log.d("HomeVM", "API schedule: ${response.matches.size} matches, overlaying dates")
-            val sortedApi = response.matches.sortedBy { it.utcDate }
-            cachedMatches = cachedMatches.map { match ->
-                val apiMatch = sortedApi.firstOrNull {
-                    it.homeTeam?.name?.contains(match.homeTeam, ignoreCase = true) == true ||
-                    match.homeTeam.contains(it.homeTeam?.name ?: "", ignoreCase = true)
-                }
-                if (apiMatch != null) {
-                    match.copy(dateTime = apiMatch.utcDate)
-                } else match
-            }
-        } catch (e: Exception) {
-            Log.d("HomeVM", "API schedule failed: ${e.message}")
-        } finally {
-            _isBusy.value = false
-        }
     }
 
     private fun startAutoRefresh() {
@@ -580,10 +562,8 @@ class HomeViewModel @Inject constructor(
         val nowCal = Calendar.getInstance(madridTZ)
         val todayDoy = nowCal.get(Calendar.DAY_OF_YEAR)
         val thisYear = nowCal.get(Calendar.YEAR)
-        _dayKeys.value = allDisplay.mapNotNull { d ->
-            if (d.dayKey.isBlank()) return@mapNotNull null
-            d.dayKey
-        }.distinct()
+        _dayKeys.value = allDisplay.mapNotNull { d -> if (d.dayKey.isBlank()) null else d.dayKey }.distinct()
+            .sortedBy { d -> allDisplay.firstOrNull { it.dayKey == d }?.sortKey ?: d }
         Log.d("HomeVM", "refresh: today=${todayMatches.size} future=${
             allDisplay.count { d ->
                 val dateStr = cachedMatches.firstOrNull { it.id == d.id }?.dateTime ?: ""
@@ -624,6 +604,7 @@ class HomeViewModel @Inject constructor(
         val dayAbbrFmt = SimpleDateFormat("EEE", Locale("es", "ES")).apply { timeZone = madridTZ }
         val dayNumFmt = SimpleDateFormat("dd", Locale.US).apply { timeZone = madridTZ }
         val dayKey = if (date != null) "${dayAbbrFmt.format(date).replace(".", "").uppercase()} ${dayNumFmt.format(date)}" else ""
+        val sortKey = if (date != null) dayNumFmt.format(date) else ""
 
         return MatchDisplay(
             id = match.id, dateLabel = dateLabel, time = time,
@@ -638,7 +619,8 @@ class HomeViewModel @Inject constructor(
             liveMinute = liveMin,
             homeScorers = homeScr,
             awayScorers = awayScr,
-            dayKey = dayKey
+            dayKey = dayKey,
+            sortKey = sortKey
         )
     }
 

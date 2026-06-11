@@ -18,8 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +53,14 @@ fun HomeScreen(
     }
 
     var selectedDay by remember { mutableStateOf<String?>(null) }
+    val dayNavState = rememberLazyListState()
+
+    LaunchedEffect(selectedDay) {
+        val idx = if (selectedDay == null) 0 else dayKeys.indexOf(selectedDay) + 1
+        if (idx in 0 until dayKeys.size + 1) {
+            dayNavState.animateScrollToItem(idx)
+        }
+    }
 
     val visibleMatches = if (selectedDay == null) {
         upcomingMatches
@@ -69,6 +80,7 @@ fun HomeScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             if (dayKeys.isNotEmpty()) {
                 LazyRow(
+                    state = dayNavState,
                     modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp)
@@ -85,33 +97,37 @@ fun HomeScreen(
             }
 
             LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(dayKeys, selectedDay) {
-                var totalDrag = 0f
-                detectHorizontalDragGestures(
-                    onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                    onDragEnd = {
-                        val threshold = 150f
-                        if (totalDrag > threshold) {
-                            // Swipe right -> previous day
-                            when {
-                                selectedDay == null && dayKeys.isNotEmpty() -> selectedDay = dayKeys.last()
-                                selectedDay != null -> {
-                                    val idx = dayKeys.indexOf(selectedDay) - 1
-                                    selectedDay = if (idx >= 0) dayKeys[idx] else null
-                                }
-                            }
-                        } else if (totalDrag < -threshold) {
-                            // Swipe left -> next day
-                            when {
-                                selectedDay == null && dayKeys.isNotEmpty() -> selectedDay = dayKeys.first()
-                                selectedDay != null -> {
-                                    val idx = dayKeys.indexOf(selectedDay) + 1
-                                    selectedDay = if (idx < dayKeys.size) dayKeys[idx] else null
-                                }
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val isTopHalf = down.position.y < size.height * 0.55f
+                    if (!isTopHalf) return@awaitEachGesture
+                    var totalDrag = 0f
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+                        if (!change.pressed) break
+                        totalDrag += change.position.x - change.previousPosition.x
+                        if (Math.abs(totalDrag) > 10f) change.consume()
+                    }
+                    val threshold = 200f
+                    if (totalDrag > threshold) {
+                        when {
+                            selectedDay == null && dayKeys.isNotEmpty() -> selectedDay = dayKeys.last()
+                            selectedDay != null -> {
+                                val idx = dayKeys.indexOf(selectedDay) - 1
+                                selectedDay = if (idx >= 0) dayKeys[idx] else null
                             }
                         }
-                        totalDrag = 0f
+                    } else if (totalDrag < -threshold) {
+                        when {
+                            selectedDay == null && dayKeys.isNotEmpty() -> selectedDay = dayKeys.first()
+                            selectedDay != null -> {
+                                val idx = dayKeys.indexOf(selectedDay) + 1
+                                selectedDay = if (idx < dayKeys.size) dayKeys[idx] else null
+                            }
+                        }
                     }
-                )
+                }
             }, contentPadding = PaddingValues(bottom = 8.dp)) {
                 if (selectedDay == null && yesterdayMatches.isNotEmpty()) {
                     item {

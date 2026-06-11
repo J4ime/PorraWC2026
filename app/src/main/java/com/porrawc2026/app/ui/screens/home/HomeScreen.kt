@@ -38,7 +38,6 @@ fun HomeScreen(
     val totalPoints by viewModel.totalPoints.collectAsState()
     val hasData by viewModel.hasData.collectAsState()
     val upcomingMatches by viewModel.upcomingMatches.collectAsState()
-    val yesterdayMatches by viewModel.yesterdayMatches.collectAsState()
     val allMatches by viewModel.allMatches.collectAsState()
     val dayKeys by viewModel.dayKeys.collectAsState()
     val isBusy by viewModel.isBusy.collectAsState()
@@ -128,25 +127,6 @@ fun HomeScreen(
                     }
                 }
             }, contentPadding = PaddingValues(bottom = 8.dp)) {
-                if (selectedDay == null && yesterdayMatches.isNotEmpty()) {
-                    item {
-                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                            Row(
-                                Modifier.fillMaxWidth().clickable { showYesterday = !showYesterday }.padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("AYER", style = MaterialTheme.typography.titleSmall, color = Color(0xFF777777), fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.width(6.dp))
-                                Icon(if (showYesterday) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, null, tint = Color(0xFF777777), modifier = Modifier.size(18.dp))
-                            }
-                            AnimatedVisibility(visible = showYesterday) {
-                                Column { Spacer(Modifier.height(4.dp)); yesterdayMatches.forEach { MatchRow(it); if (it != yesterdayMatches.last()) Spacer(Modifier.height(4.dp)) } }
-                            }
-                        }
-                    }
-                    item { Spacer(Modifier.height(4.dp)) }
-                }
                 if (visibleMatches.isNotEmpty()) {
                     item {
                         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {

@@ -61,26 +61,23 @@ fun HomeScreen(
     fun sortNum(dayKey: String): Int = allMatches.firstOrNull { it.dayKey == dayKey }?.sortKey?.toIntOrNull() ?: 0
     val todaySort = sortNum(todayDayKey)
 
-    val prevDays = remember(dayKeys, todayDayKey) {
-        dayKeys.filter { sortNum(it) < todaySort && sortNum(it) > 0 }.sortedByDescending { sortNum(it) }
+    val allDaysSorted = remember(dayKeys) {
+        dayKeys.sortedBy { sortNum(it) }
     }
-    val nextDays = remember(dayKeys, todayDayKey) {
-        dayKeys.filter { sortNum(it) > todaySort }.sortedBy { sortNum(it) }
-    }
+    val todayIdx = allDaysSorted.indexOf(todayDayKey)
 
-    val visiblePrev = remember(prevDays, selectedDay) {
-        if (selectedDay == null || selectedDay !in prevDays) prevDays.take(2)
-        else {
-            val idx = prevDays.indexOf(selectedDay)
-            if (idx <= 1) prevDays.take(2) else prevDays.drop(idx - 1)
-        }
-    }
-    val visibleNext = remember(nextDays, selectedDay) {
-        if (selectedDay == null || selectedDay !in nextDays) nextDays.take(3)
-        else {
-            val idx = nextDays.indexOf(selectedDay)
-            if (idx <= 2) nextDays.take(3) else nextDays.drop(idx - 2)
-        }
+    val leftCount = 2
+    val rightCount = 3
+    val totalSlots = leftCount + 1 + rightCount
+
+    val (visibleLeft, visibleRight) = remember(allDaysSorted, todayIdx, selectedDay) {
+        val selIdx = if (selectedDay == null) todayIdx else allDaysSorted.indexOf(selectedDay)
+        val minIdx = maxOf(0, selIdx - leftCount)
+        val maxIdx = minOf(allDaysSorted.size, selIdx + rightCount + 1)
+        val window = allDaysSorted.subList(minIdx, maxIdx)
+        val left = window.takeWhile { sortNum(it) < sortNum(allDaysSorted[selIdx]) }
+        val right = window.dropWhile { sortNum(it) <= sortNum(allDaysSorted[selIdx]) }
+        Pair(left.takeLast(leftCount), right.take(rightCount))
     }
 
     val visibleMatches = if (selectedDay == null) upcomingMatches
@@ -99,38 +96,27 @@ fun HomeScreen(
             // Day navigation bar
             Row(
                 modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
             ) {
-                // Left: previous days (max 2 visible)
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    visiblePrev.take(2).reversed().forEachIndexed { i, day ->
-                        DayChip(
-                            if (day == yesterdayDayKey) "AYER" else day,
-                            selectedDay == day
-                        ) { selectedDay = day }
-                        if (i < minOf(2, visiblePrev.size) - 1) Spacer(Modifier.width(4.dp))
-                    }
+                visibleLeft.forEachIndexed { i, day ->
+                    DayChip(
+                        if (day == yesterdayDayKey && selectedDay == null) "AYER" else day,
+                        selectedDay == day
+                    ) { selectedDay = day }
+                    Spacer(Modifier.width(4.dp))
                 }
 
-                // Center: HOY
-                DayChip("HOY", selectedDay == null) { selectedDay = null }
+                val centerSelected = if (selectedDay in visibleRight || selectedDay in visibleLeft) null else selectedDay
+                DayChip("HOY", centerSelected == null) { selectedDay = null }
 
-                // Right: next days (max 3 visible)
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.Start
-                ) {
-                    visibleNext.take(3).forEachIndexed { i, day ->
-                        Spacer(Modifier.width(4.dp))
-                        DayChip(day, selectedDay == day) { selectedDay = day }
-                    }
+                visibleRight.forEachIndexed { i, day ->
+                    Spacer(Modifier.width(4.dp))
+                    DayChip(day, selectedDay == day) { selectedDay = day }
                 }
             }
 
-            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(nextDays, prevDays, selectedDay) {
+            LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(allDaysSorted, selectedDay) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val isTopHalf = down.position.y < size.height * 0.55f
@@ -145,29 +131,11 @@ fun HomeScreen(
                     }
                     val threshold = 200f
                     if (totalDrag > threshold) {
-                        when {
-                            selectedDay == null && prevDays.isNotEmpty() -> selectedDay = prevDays.last()
-                            selectedDay in prevDays -> {
-                                val idx = prevDays.indexOf(selectedDay) - 1
-                                selectedDay = if (idx >= 0) prevDays[idx] else null
-                            }
-                            selectedDay in nextDays -> {
-                                val idx = nextDays.indexOf(selectedDay) - 1
-                                selectedDay = if (idx >= 0) nextDays[idx] else null
-                            }
-                        }
+                        val selIdx = if (selectedDay == null) allDaysSorted.indexOf(todayDayKey) else allDaysSorted.indexOf(selectedDay)
+                        if (selIdx > 0) selectedDay = allDaysSorted[selIdx - 1]
                     } else if (totalDrag < -threshold) {
-                        when {
-                            selectedDay == null && nextDays.isNotEmpty() -> selectedDay = nextDays.first()
-                            selectedDay in nextDays -> {
-                                val idx = nextDays.indexOf(selectedDay) + 1
-                                selectedDay = if (idx < nextDays.size) nextDays[idx] else null
-                            }
-                            selectedDay in prevDays -> {
-                                val idx = prevDays.indexOf(selectedDay) + 1
-                                selectedDay = if (idx < prevDays.size) prevDays[idx] else null
-                            }
-                        }
+                        val selIdx = if (selectedDay == null) allDaysSorted.indexOf(todayDayKey) else allDaysSorted.indexOf(selectedDay)
+                        if (selIdx < allDaysSorted.size - 1) selectedDay = allDaysSorted[selIdx + 1]
                     }
                 }
             }, contentPadding = PaddingValues(bottom = 8.dp)) {

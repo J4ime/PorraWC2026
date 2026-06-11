@@ -99,6 +99,8 @@ class HomeViewModel @Inject constructor(
     val allMatches: StateFlow<List<MatchDisplay>> = _allMatches.asStateFlow()
     private val _dayKeys = MutableStateFlow<List<String>>(emptyList())
     val dayKeys: StateFlow<List<String>> = _dayKeys.asStateFlow()
+    private val _autoRefreshEnabled = MutableStateFlow(false)
+    val autoRefreshEnabled: StateFlow<Boolean> = _autoRefreshEnabled.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
@@ -234,6 +236,22 @@ class HomeViewModel @Inject constructor(
 
     fun toggleNotifications() {
         _notificationsEnabled.value = !_notificationsEnabled.value
+    }
+
+    fun toggleAutoRefresh() {
+        _autoRefreshEnabled.value = !_autoRefreshEnabled.value
+    }
+
+    fun refreshLiveScores() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isBusy.value = true
+            try {
+                fetchLiveResults()
+                refreshUpcomingMatches()
+            } finally {
+                _isBusy.value = false
+            }
+        }
     }
 
     fun installUpdate() {
@@ -399,6 +417,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun checkLiveWindow() {
+        if (!_autoRefreshEnabled.value) { livePollJob?.cancel(); return }
         val todayWithDates = getTodayMatchesWithDates()
         if (todayWithDates.isEmpty()) { livePollJob?.cancel(); return }
         val now = Date()

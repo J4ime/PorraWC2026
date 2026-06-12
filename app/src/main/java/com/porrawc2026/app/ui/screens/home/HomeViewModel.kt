@@ -474,37 +474,40 @@ class HomeViewModel @Inject constructor(
                 allFixtures.addAll(resp.response.filter { it.league.id == 1 })
             }
             allFixtures.forEach { fix ->
-                val h = fix.goals.home ?: return@forEach
-                val a = fix.goals.away ?: return@forEach
                 val entities = cachedMatches.filter {
                     normalize(it.homeTeam) == normalize(fix.teams.home.name ?: "") &&
                     normalize(it.awayTeam) == normalize(fix.teams.away.name ?: "")
                 }
-                if (entities.size == 1) {
-                    val entity = entities.first()
-                    val prev = lastWrittenScores[entity.id]
-                    val st = fix.fixture.status
-                    if (st?.long == "Match Finished") liveMinutes[entity.id] = "FINAL"
-                    else if (st?.elapsed != null && st.elapsed > 0) liveMinutes[entity.id] = "${st.elapsed}'"
-                    if (prev == null || prev.first != h || prev.second != a) {
-                        lastWrittenScores[entity.id] = h to a
-                        repository.updateMatchResults(entity.id, h, a)
-                        cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
-                        try {
-                            val detail = apiFootball.getFixtureById(id = fix.fixture.id)
-                            val events = detail.response.firstOrNull()?.events
-                            if (events != null) {
-                                val homeScr = events.filter { it.type == "Goal" && it.team?.name == fix.teams.home.name }
-                                    .mapNotNull { e -> val n = e.player?.name ?: return@mapNotNull null; GoalEvent(n, e.time?.elapsed ?: 0) }
-                                val awayScr = events.filter { it.type == "Goal" && it.team?.name == fix.teams.away.name }
-                                    .mapNotNull { e -> val n = e.player?.name ?: return@mapNotNull null; GoalEvent(n, e.time?.elapsed ?: 0) }
-                                if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
-                                    goalScorers[entity.id] = Pair(homeScr, awayScr)
-                                }
+                if (entities.size != 1) return@forEach
+                val entity = entities.first()
+                // Update date from API
+                if (fix.fixture.date != null && fix.fixture.date != entity.dateTime) {
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = fix.fixture.date!!) else it }
+                }
+                val h = fix.goals.home ?: return@forEach
+                val a = fix.goals.away ?: return@forEach
+                val prev = lastWrittenScores[entity.id]
+                val st = fix.fixture.status
+                if (st?.long == "Match Finished") liveMinutes[entity.id] = "FINAL"
+                else if (st?.elapsed != null && st.elapsed > 0) liveMinutes[entity.id] = "${st.elapsed}'"
+                if (prev == null || prev.first != h || prev.second != a) {
+                    lastWrittenScores[entity.id] = h to a
+                    repository.updateMatchResults(entity.id, h, a)
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
+                    try {
+                        val detail = apiFootball.getFixtureById(id = fix.fixture.id)
+                        val events = detail.response.firstOrNull()?.events
+                        if (events != null) {
+                            val homeScr = events.filter { it.type == "Goal" && it.team?.name == fix.teams.home.name }
+                                .mapNotNull { e -> val n = e.player?.name ?: return@mapNotNull null; GoalEvent(n, e.time?.elapsed ?: 0) }
+                            val awayScr = events.filter { it.type == "Goal" && it.team?.name == fix.teams.away.name }
+                                .mapNotNull { e -> val n = e.player?.name ?: return@mapNotNull null; GoalEvent(n, e.time?.elapsed ?: 0) }
+                            if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
+                                goalScorers[entity.id] = Pair(homeScr, awayScr)
                             }
-                        } catch (_: Exception) {}
-                        recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
-                    }
+                        }
+                    } catch (_: Exception) {}
+                    recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
                 }
             }
         } catch (_: Exception) { }
@@ -785,7 +788,8 @@ class HomeViewModel @Inject constructor(
             val fb = fallbackDates[match.id]
             val date = fb?.getOrNull(0) ?: match.dateTime
             val hardcodedTv = fb?.getOrNull(1) ?: "DAZN"
-            match.copy(dateTime = date, tvChannel = hardcodedTv)
+            val tv = if (hardcodedTv.contains("RTVE")) "DAZN,RTVE" else "DAZN"
+            match.copy(dateTime = date, tvChannel = tv)
         }
     }
 

@@ -486,12 +486,15 @@ class HomeViewModel @Inject constructor(
             var datesChanged = false
             resp.data.forEach { m ->
                 if (m.kickoffUtc == null) return@forEach
-                val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
-                utcFmt.timeZone = TimeZone.getTimeZone("UTC")
-                val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                madridFmt.timeZone = madridTZ
-                val parsed = utcFmt.parse(m.kickoffUtc) ?: return@forEach
-                val madridDate = madridFmt.format(parsed)
+                val madridDate = try {
+                    val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
+                    utcFmt.timeZone = TimeZone.getTimeZone("UTC")
+                    val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                    madridFmt.timeZone = madridTZ
+                    val parsed = utcFmt.parse(m.kickoffUtc)
+                    if (parsed != null) madridFmt.format(parsed) else null
+                } catch (_: Exception) { null }
+                if (madridDate == null) return@forEach
                 // Match by normalized team names
                 val entities = cachedMatches.filter {
                     normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&

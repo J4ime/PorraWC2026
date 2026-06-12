@@ -127,7 +127,6 @@ class HomeViewModel @Inject constructor(
         _autoRefreshEnabled.value = prefs.getBoolean("auto_refresh", true)
         refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
         forceCheckUpdate()
-        viewModelScope.launch(Dispatchers.IO) { fetchLiveResults(); refreshUpcomingMatches() }
     }
 
     private fun precachePhotos() {
@@ -144,14 +143,16 @@ class HomeViewModel @Inject constructor(
             val dbMatches = repository.getAllMatches().first()
             if (dbMatches.isNotEmpty()) {
                 cachedMatches = dbMatches
-                _hasData.value = true
-                enrichScheduleFromApi()
-                recalcAllPoints()
-                refreshPoints()
-                loadPlayers()
-                downloadPlayerPhotos()
-                startAutoRefresh()
-                refreshUpcomingMatches()
+                    _hasData.value = true
+                    enrichScheduleFromApi()
+                    recalcAllPoints()
+                    refreshPoints()
+                    loadPlayers()
+                    downloadPlayerPhotos()
+                    startAutoRefresh()
+                    refreshUpcomingMatches()
+                    fetchLiveResults()
+                    refreshUpcomingMatches()
             } else {
                 _hasData.value = true
                 enrichScheduleFromApi()

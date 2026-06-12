@@ -37,6 +37,7 @@ fun AjustesScreen(
     val excelFileName by viewModel.excelFileName.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val autoRefreshEnabled by viewModel.autoRefreshEnabled.collectAsState()
+    val pdfResult by viewModel.pdfResult.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -126,6 +127,15 @@ fun AjustesScreen(
                         color = Color(0xFF444444),
                         loading = false,
                         onClick = { viewModel.refreshCache() }
+                    )
+                }
+                item {
+                    SquareButton(
+                        icon = Icons.Filled.Assessment,
+                        label = if (pdfResult != null) "Res: $pdfResult" else "Cargar result",
+                        color = Color(0xFF444444),
+                        loading = false,
+                        onClick = { viewModel.loadPdfResult() }
                     )
                 }
             }

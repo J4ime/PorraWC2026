@@ -101,6 +101,9 @@ dependencies {
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
 
+    // PDF
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 

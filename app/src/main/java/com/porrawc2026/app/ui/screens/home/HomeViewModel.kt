@@ -792,12 +792,15 @@ class HomeViewModel @Inject constructor(
 
     private fun enrichScheduleFallback() {
         val fallbackDates = hardcodedMatchDates()
+        // Only these specific matches + all Spain matches have RTVE
+        val rtveMatchIds = setOf(1, 7, 13, 25, 43, 49, 67, 9, 21, 33, 45, 57, 69, 17, 30, 48, 65)
+        val spainTeams = setOf("España")
 
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
             val date = fb?.getOrNull(0) ?: match.dateTime
-            val hardcodedTv = match.tvChannel.ifBlank { fb?.getOrNull(1) ?: "DAZN" }
-            val tv = if (hardcodedTv.contains("RTVE")) "DAZN,RTVE" else "DAZN"
+            val isSpainMatch = spainTeams.any { match.homeTeam == it || match.awayTeam == it }
+            val tv = if (match.id in rtveMatchIds || isSpainMatch) "DAZN,RTVE" else "DAZN"
             match.copy(dateTime = date, tvChannel = tv)
         }
     }

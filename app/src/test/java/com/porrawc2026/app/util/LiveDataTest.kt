@@ -13,10 +13,10 @@ class LiveDataTest {
     // ── Date format tests ───────────────────────────────────────
 
     @Test
-    fun `Zafronix kickoffUtc format parsing`() {
-        val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
+    fun `Zafronix kickoffUtc ISO format`() {
+        val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
         utcFmt.timeZone = TimeZone.getTimeZone("UTC")
-        val parsed = utcFmt.parse("06/20/2026 00:30:00")
+        val parsed = utcFmt.parse("2026-06-20T00:30:00.000Z")
         assertNotNull(parsed)
         val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
         madridFmt.timeZone = TimeZone.getTimeZone("Europe/Madrid")

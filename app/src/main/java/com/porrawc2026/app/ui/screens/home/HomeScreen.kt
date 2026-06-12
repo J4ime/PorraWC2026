@@ -252,7 +252,7 @@ private fun MatchRow(match: MatchDisplay) {
                 var runningA = 0
                 sortedScorers.forEach { (goal, isHome, team) ->
                     if (isHome) runningH++ else runningA++
-                    Row(Modifier.padding(start = 36.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(start = 36.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                         Text("\u26BD", fontSize = 10.sp); Spacer(Modifier.width(4.dp))
                         Text(goal.playerName.split(" ").last(), fontSize = 10.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         Text("${goal.minute}' [$runningH-$runningA]", fontSize = 9.sp, color = Color(0xFF888888))

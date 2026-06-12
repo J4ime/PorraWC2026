@@ -122,8 +122,9 @@ private fun TopScorerRow(scorer: TopScorerDisplay) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("#${scorer.rank} ", fontSize = 10.sp, color = Color(0xFF777777))
-        Text(scorer.name, Modifier.weight(1f), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1)
-        if (scorer.flagEmoji.isNotBlank()) { Text(scorer.flagEmoji, fontSize = 14.sp); Spacer(Modifier.width(4.dp)) }
+        Text(scorer.name, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1)
+        if (scorer.flagEmoji.isNotBlank()) { Text(scorer.flagEmoji, fontSize = 14.sp); Spacer(Modifier.width(2.dp)) }
+        Spacer(Modifier.weight(1f))
         Text("${scorer.goals} ${if (scorer.goals == 1) "gol" else "goles"}", fontSize = 11.sp, color = Color(0xFFE65100), fontWeight = FontWeight.Bold)
     }
 }

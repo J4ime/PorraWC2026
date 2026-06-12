@@ -480,13 +480,37 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
-        // Cache-first: only call API if more than 5 min since last update
         val now = System.currentTimeMillis()
         if (now - lastCacheUpdate < 300_000) return
         try {
             val resp = zafronix.getMatches()
             lastCacheUpdate = now
+            var datesChanged = false
             resp.data.forEach { m ->
+                // Update date from kickoffUtc (convert to Madrid time)
+                if (m.kickoffUtc != null) {
+                    val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+                    utcFmt.timeZone = TimeZone.getTimeZone("UTC")
+                    val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                    madridFmt.timeZone = madridTZ
+                    try {
+                        val parsed = utcFmt.parse(m.kickoffUtc)
+                        if (parsed != null) {
+                            val madridDate = madridFmt.format(parsed)
+                            val entities = cachedMatches.filter {
+                                normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
+                                normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
+                            }
+                            if (entities.size == 1) {
+                                val entity = entities.first()
+                                if (madridDate != entity.dateTime) {
+                                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
+                                    datesChanged = true
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
                 val h = m.homeScore ?: return@forEach
                 val a = m.awayScore ?: return@forEach
                 val entities = cachedMatches.filter {
@@ -501,7 +525,6 @@ class HomeViewModel @Inject constructor(
                     lastWrittenScores[entity.id] = h to a
                     repository.updateMatchResults(entity.id, h, a)
                     cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
-                    // Extract goals
                     val goals = m.goals
                     if (goals != null && goals.isNotEmpty()) {
                         val homeScr = goals.filter { it.team == "home" }
@@ -513,6 +536,7 @@ class HomeViewModel @Inject constructor(
                     recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
                 }
             }
+            if (datesChanged) refreshUpcomingMatches()
         } catch (_: Exception) { }
     }
 

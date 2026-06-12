@@ -480,55 +480,48 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
-        try {
-            val resp = zafronix.getMatches()
-            lastCacheUpdate = System.currentTimeMillis()
-            var datesChanged = false
-            resp.data.forEach { m ->
-                if (m.kickoffUtc == null) return@forEach
-                val madridDate = try {
-                    val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
-                    utcFmt.timeZone = TimeZone.getTimeZone("UTC")
-                    val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                    madridFmt.timeZone = madridTZ
-                    val parsed = utcFmt.parse(m.kickoffUtc)
-                    if (parsed != null) madridFmt.format(parsed) else null
-                } catch (_: Exception) { null }
-                if (madridDate == null) return@forEach
-                // Match by normalized team names
-                val entities = cachedMatches.filter {
-                    normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
-                    normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
+        val resp = zafronix.getMatches()
+        lastCacheUpdate = System.currentTimeMillis()
+        var datesChanged = false
+        resp.data.forEach { m ->
+            if (m.kickoffUtc == null) return@forEach
+            val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
+            utcFmt.timeZone = TimeZone.getTimeZone("UTC")
+            val parsed = utcFmt.parse(m.kickoffUtc)
+            val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+            madridFmt.timeZone = madridTZ
+            val madridDate = madridFmt.format(parsed)
+            val entities = cachedMatches.filter {
+                normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
+                normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
+            }
+            if (entities.size != 1) return@forEach
+            val entity = entities.first()
+            if (madridDate != entity.dateTime) {
+                cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
+                datesChanged = true
+            }
+            val h = m.homeScore ?: return@forEach
+            val a = m.awayScore ?: return@forEach
+            if (m.status == "finished") liveMinutes[entity.id] = "FINAL"
+            val prev = lastWrittenScores[entity.id]
+            if (prev == null || prev.first != h || prev.second != a) {
+                lastWrittenScores[entity.id] = h to a
+                repository.updateMatchResults(entity.id, h, a)
+                cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
+                val goals = m.goals
+                if (goals != null && goals.isNotEmpty()) {
+                    val homeScr = goals.filter { it.team == "home" }.map { GoalEvent(it.scorer ?: "?", it.minute ?: 0) }
+                    val awayScr = goals.filter { it.team == "away" }.map { GoalEvent(it.scorer ?: "?", it.minute ?: 0) }
+                    goalScorers[entity.id] = Pair(homeScr, awayScr)
                 }
-                if (entities.size != 1) return@forEach
-                val entity = entities.first()
-                if (madridDate != entity.dateTime) {
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
-                    datesChanged = true
-                }
-                val h = m.homeScore ?: return@forEach
-                val a = m.awayScore ?: return@forEach
-                if (m.status == "finished") liveMinutes[entity.id] = "FINAL"
-                val prev = lastWrittenScores[entity.id]
-                if (prev == null || prev.first != h || prev.second != a) {
-                    lastWrittenScores[entity.id] = h to a
-                    repository.updateMatchResults(entity.id, h, a)
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
-                    val goals = m.goals
-                    if (goals != null && goals.isNotEmpty()) {
-                        val homeScr = goals.filter { it.team == "home" }.mapNotNull { g -> GoalEvent(g.scorer ?: "?", g.minute ?: 0) }
-                        val awayScr = goals.filter { it.team == "away" }.mapNotNull { g -> GoalEvent(g.scorer ?: "?", g.minute ?: 0) }
-                        goalScorers[entity.id] = Pair(homeScr, awayScr)
-                    }
-                    recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
-                }
+                recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
+            }
             }
             if (datesChanged) refreshUpcomingMatches()
-        } catch (e: Exception) {
-            Log.w("HomeVM", "fetchLiveResults failed: ${e.message}")
-            _errorMessage.emit("Error al actualizar: ${e.message}")
+            // Always refresh display after data update
+            refreshUpcomingMatches()
         }
-    }
 
     private fun normalize(name: String): String {
         val map = mapOf(

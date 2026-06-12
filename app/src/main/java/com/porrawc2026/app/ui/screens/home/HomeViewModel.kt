@@ -541,29 +541,28 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun normalize(name: String): String {
-        // Map English API names to Spanish hardcoded names
         val map = mapOf(
             "southafrica" to "sudafrica", "southkorea" to "coreadelsur",
             "korearepublic" to "coreadelsur", "czechia" to "republicacheca",
-            "czechrepublic" to "republicacheca", "bosnia-herzegovina" to "bosniayherzegovina",
-            "bosnia-h." to "bosniayherzegovina", "unitedstates" to "estadosunidos",
-            "usa" to "estadosunidos", "netherlands" to "paisesbajos",
-            "ivorycoast" to "costademarfil", "saudiarabia" to "arabiasaudita",
-            "newzealand" to "nuevazelanda", "capeverde" to "caboverde",
-            "southsudan" to "suddelsur", "congodr" to "rdcongo",
-            "northkorea" to "coreadelnorte", "unitedarabemirates" to "emiratosarabesunidos",
+            "czechrepublic" to "republicacheca", "bosniaandherzegovina" to "bosniayherzegovina",
+            "bosnia-herzegovina" to "bosniayherzegovina", "bosnia-h." to "bosniayherzegovina",
+            "unitedstates" to "estadosunidos", "usa" to "estadosunidos",
+            "netherlands" to "paisesbajos", "ivorycoast" to "costademarfil",
+            "saudiarabia" to "arabiasaudita", "newzealand" to "nuevazelanda",
+            "capeverde" to "caboverde", "congodr" to "rdcongo",
             "turkey" to "turquia", "japan" to "japon", "sweden" to "suecia",
-            "belgium" to "belgica", "egypt" to "egipto", "iran" to "iran",
-            "spain" to "espana", "france" to "francia", "senegal" to "senegal",
-            "england" to "inglaterra", "croatia" to "croacia", "ghana" to "ghana",
-            "algeria" to "argelia", "austria" to "austria", "jordan" to "jordania",
-            "morocco" to "marruecos", "scotland" to "escocia", "haiti" to "haiti",
-            "paraguay" to "paraguay", "australia" to "australia", "germany" to "alemania",
+            "belgium" to "belgica", "egypt" to "egipto", "spain" to "espana",
+            "france" to "francia", "england" to "inglaterra", "croatia" to "croacia",
+            "algeria" to "argelia", "morocco" to "marruecos", "scotland" to "escocia",
+            "haiti" to "haiti", "brazil" to "brasil", "germany" to "alemania",
             "ecuador" to "ecuador", "tunisia" to "tunez", "uruguay" to "uruguay",
             "norway" to "noruega", "iraq" to "irak", "uzbekistan" to "uzbekistan",
             "colombia" to "colombia", "portugal" to "portugal", "panama" to "panama",
-            "brazil" to "brasil", "canada" to "canada", "qatar" to "catar",
-            "switzerland" to "suiza", "mexico" to "mexico", "argentina" to "argentina"
+            "canada" to "canada", "qatar" to "catar", "switzerland" to "suiza",
+            "mexico" to "mexico", "argentina" to "argentina", "senegal" to "senegal",
+            "ghana" to "ghana", "jordan" to "jordania", "austria" to "austria",
+            "australia" to "australia", "paraguay" to "paraguay", "iran" to "iran",
+            "curacao" to "curazao", "curaçao" to "curazao"
         )
         val clean = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD)
             .replace(Regex("\\p{M}"), "")

@@ -116,7 +116,7 @@ class HomeViewModel @Inject constructor(
     private val goalScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
     private val liveMinutes = mutableMapOf<Int, String>()
-    private val fixtureCache = mutableMapOf<String, Pair<Long, List<ApiFootballFixture>>>()
+    private var lastCacheUpdate = 0L
 
     companion object {
         val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
@@ -265,6 +265,20 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             try {
+                lastCacheUpdate = 0 // Force API call
+                fetchLiveResults()
+                refreshUpcomingMatches()
+            } finally {
+                _isBusy.value = false
+            }
+        }
+    }
+
+    fun refreshCache() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isBusy.value = true
+            try {
+                lastCacheUpdate = 0
                 fetchLiveResults()
                 refreshUpcomingMatches()
             } finally {
@@ -466,8 +480,12 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
+        // Cache-first: only call API if more than 5 min since last update
+        val now = System.currentTimeMillis()
+        if (now - lastCacheUpdate < 300_000) return
         try {
             val resp = zafronix.getMatches()
+            lastCacheUpdate = now
             resp.data.forEach { m ->
                 val home = m.homeScore ?: return@forEach
                 val away = m.awayScore ?: return@forEach

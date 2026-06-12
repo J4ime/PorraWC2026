@@ -119,6 +119,15 @@ fun AjustesScreen(
                         onClick = { viewModel.toggleAutoRefresh() }
                     )
                 }
+                item {
+                    SquareButton(
+                        icon = Icons.Filled.Cached,
+                        label = "Cache",
+                        color = Color(0xFF444444),
+                        loading = false,
+                        onClick = { viewModel.refreshCache() }
+                    )
+                }
             }
 
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

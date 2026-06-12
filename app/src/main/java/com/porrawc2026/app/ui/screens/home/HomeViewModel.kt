@@ -117,6 +117,7 @@ class HomeViewModel @Inject constructor(
     private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
     private val liveMinutes = mutableMapOf<Int, String>()
     private var lastCacheUpdate = 0L
+    private var zafronixEtag: String? = null
 
     companion object {
         val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
@@ -480,11 +481,9 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
-        val now = System.currentTimeMillis()
-        if (now - lastCacheUpdate < 300_000) return
         try {
             val resp = zafronix.getMatches()
-            lastCacheUpdate = now
+            lastCacheUpdate = System.currentTimeMillis()
             var datesChanged = false
             resp.data.forEach { m ->
                 // Update date from kickoffUtc (convert to Madrid time)
@@ -537,7 +536,10 @@ class HomeViewModel @Inject constructor(
                 }
             }
             if (datesChanged) refreshUpcomingMatches()
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            Log.w("HomeVM", "fetchLiveResults failed: ${e.message}")
+            _errorMessage.emit("Error al actualizar datos: ${e.message}")
+        }
     }
 
     private fun normalize(name: String): String {

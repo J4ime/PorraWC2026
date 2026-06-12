@@ -484,9 +484,13 @@ class HomeViewModel @Inject constructor(
         try {
             val resp = zafronix.getMatches()
             lastCacheUpdate = System.currentTimeMillis()
+            val sortedZaf = resp.data.sortedBy { it.kickoffUtc ?: "z" }
+            val sortedCached = cachedMatches.filter { !it.isKnockout && it.id < 900 }.sortedBy { it.dateTime }
             var datesChanged = false
-            resp.data.forEach { m ->
-                // Update date from kickoffUtc (convert to Madrid time)
+            sortedZaf.forEachIndexed { idx, m ->
+                if (idx >= sortedCached.size) return@forEachIndexed
+                val entity = sortedCached[idx]
+                // Update date from kickoffUtc
                 if (m.kickoffUtc != null) {
                     val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
                     utcFmt.timeZone = TimeZone.getTimeZone("UTC")
@@ -496,28 +500,16 @@ class HomeViewModel @Inject constructor(
                         val parsed = utcFmt.parse(m.kickoffUtc)
                         if (parsed != null) {
                             val madridDate = madridFmt.format(parsed)
-                            val entities = cachedMatches.filter {
-                                normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
-                                normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
-                            }
-                            if (entities.size == 1) {
-                                val entity = entities.first()
-                                if (madridDate != entity.dateTime) {
-                                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
-                                    datesChanged = true
-                                }
+                            if (madridDate != entity.dateTime) {
+                                cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
+                                datesChanged = true
                             }
                         }
                     } catch (_: Exception) {}
                 }
-                val h = m.homeScore ?: return@forEach
-                val a = m.awayScore ?: return@forEach
-                val entities = cachedMatches.filter {
-                    normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
-                    normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
-                }
-                if (entities.size != 1) return@forEach
-                val entity = entities.first()
+                // Update scores
+                val h = m.homeScore ?: return@forEachIndexed
+                val a = m.awayScore ?: return@forEachIndexed
                 if (m.status == "finished") liveMinutes[entity.id] = "FINAL"
                 val prev = lastWrittenScores[entity.id]
                 if (prev == null || prev.first != h || prev.second != a) {
@@ -526,10 +518,8 @@ class HomeViewModel @Inject constructor(
                     cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
                     val goals = m.goals
                     if (goals != null && goals.isNotEmpty()) {
-                        val homeScr = goals.filter { it.team == "home" }
-                            .mapNotNull { g -> GoalEvent(g.scorer ?: "?", g.minute ?: 0) }
-                        val awayScr = goals.filter { it.team == "away" }
-                            .mapNotNull { g -> GoalEvent(g.scorer ?: "?", g.minute ?: 0) }
+                        val homeScr = goals.filter { it.team == "home" }.mapNotNull { g -> GoalEvent(g.scorer ?: "?", g.minute ?: 0) }
+                        val awayScr = goals.filter { it.team == "away" }.mapNotNull { g -> GoalEvent(g.scorer ?: "?", g.minute ?: 0) }
                         goalScorers[entity.id] = Pair(homeScr, awayScr)
                     }
                     recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()

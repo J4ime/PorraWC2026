@@ -67,6 +67,68 @@ object LiveScoreScraper {
     }
 
     fun fetchGoalDetails(eventId: Long): Pair<List<GoalDetail>, List<GoalDetail>> {
+        // Try livescore.com first
+        val lscGoals = fetchLiveScoreComGoalDetails(eventId)
+        if (lscGoals.first.isNotEmpty() || lscGoals.second.isNotEmpty()) return lscGoals
+        // Fallback to Sofascore
+        return fetchSofaScoreGoalDetails(eventId)
+    }
+
+    private fun fetchLiveScoreComGoalDetails(eventId: Long): Pair<List<GoalDetail>, List<GoalDetail>> {
+        val home = mutableListOf<GoalDetail>()
+        val away = mutableListOf<GoalDetail>()
+        try {
+            val urlStr = "https://www.livescore.com/es/futbol/internacional/world-cup-2026/n-a/$eventId/"
+            val url = URL(urlStr)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+            conn.connectTimeout = 8000; conn.readTimeout = 8000
+            val html = conn.inputStream.bufferedReader().readText().also { conn.disconnect() }
+            val idx = html.indexOf("__NEXT_DATA__")
+            if (idx < 0) return Pair(home, away)
+            val jsonStr = html.substring(idx + 48).substringBefore("</script>")
+            val root = JSONObject(jsonStr)
+            val incs = root.optJSONObject("props")?.optJSONObject("pageProps")
+                ?.optJSONObject("initialEventData")?.optJSONObject("event")
+                ?.optJSONObject("incidents")?.optJSONObject("incs")
+                ?.optJSONObject("football1") ?: return Pair(home, away)
+            val keys = incs.keys()
+            while (keys.hasNext()) {
+                val minuteKey = keys.next()
+                val minuteArr = incs.optJSONArray(minuteKey) ?: continue
+                for (i in 0 until minuteArr.length()) {
+                    val entry = minuteArr.getJSONObject(i)
+                    val homeArr = entry.optJSONArray("HOME")
+                    val awayArr = entry.optJSONArray("AWAY")
+                    if (homeArr != null) {
+                        for (j in 0 until homeArr.length()) {
+                            val inc = homeArr.getJSONObject(j)
+                            if (inc.optString("type") == "FootballGoal") {
+                                val name = inc.optString("shortName", inc.optString("name", ""))
+                                val time = inc.optString("time", "0").replace("'", "").toIntOrNull() ?: 0
+                                home.add(GoalDetail(name, time))
+                            }
+                        }
+                    }
+                    if (awayArr != null) {
+                        for (j in 0 until awayArr.length()) {
+                            val inc = awayArr.getJSONObject(j)
+                            if (inc.optString("type") == "FootballGoal") {
+                                val name = inc.optString("shortName", inc.optString("name", ""))
+                                val time = inc.optString("time", "0").replace("'", "").toIntOrNull() ?: 0
+                                away.add(GoalDetail(name, time))
+                            }
+                        }
+                    }
+                }
+            }
+            home.reverse(); away.reverse()
+            if (home.isNotEmpty() || away.isNotEmpty()) Log.d(TAG, "LSC goals for $eventId: H=$home A=$away")
+        } catch (e: Exception) { Log.d(TAG, "LSC goals failed: ${e.message}") }
+        return Pair(home, away)
+    }
+
+    private fun fetchSofaScoreGoalDetails(eventId: Long): Pair<List<GoalDetail>, List<GoalDetail>> {
         val home = mutableListOf<GoalDetail>()
         val away = mutableListOf<GoalDetail>()
         try {

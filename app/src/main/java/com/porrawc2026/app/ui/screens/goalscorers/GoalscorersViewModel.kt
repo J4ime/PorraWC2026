@@ -64,7 +64,7 @@ class GoalscorersViewModel @Inject constructor(
                         assists = s.assists,
                         matches = s.playedMatches,
                         minutesPlayed = null,
-                        flagEmoji = ""
+                        flagEmoji = com.porrawc2026.app.util.ExcelParser.getFlagEmoji(s.team.name ?: "")
                     )
                 }
                 _topScorers.value = scorers

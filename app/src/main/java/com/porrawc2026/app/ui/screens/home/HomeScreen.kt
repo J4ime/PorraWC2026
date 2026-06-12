@@ -182,7 +182,7 @@ private fun MatchRow(match: MatchDisplay) {
     Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Minute + Score column
-            Column(modifier = Modifier.width(36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(modifier = Modifier.width(44.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 val timeText = when {
                     isFinished -> "FINAL"
                     hasLiveMinute -> match.liveMinute ?: "?"

@@ -14,13 +14,22 @@ data class ZafronixMatch(
     val id: String?,
     val date: String?,
     val kickoff: String?,
+    val kickoffUtc: String?,
     val stage: String?,
     val homeTeam: String?,
     val awayTeam: String?,
     val homeScore: Int?,
     val awayScore: Int?,
     val result: String?,
-    val extraTime: Boolean? = false
+    val extraTime: Boolean? = false,
+    val status: String? = null,
+    val goals: List<ZafronixGoal>? = null
+)
+
+data class ZafronixGoal(
+    val minute: Int?,
+    val team: String?,
+    val scorer: String?
 )
 
 interface ZafronixService {

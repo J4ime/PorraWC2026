@@ -484,10 +484,10 @@ class HomeViewModel @Inject constructor(
         lastCacheUpdate = System.currentTimeMillis()
         var datesChanged = false
         resp.data.forEach { m ->
-                if (m.kickoffUtc == null) return@forEach
-                val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-                utcFmt.timeZone = TimeZone.getTimeZone("UTC")
-                val parsed = utcFmt.parse(m.kickoffUtc)
+            if (m.kickoffUtc == null) return@forEach
+            val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+            utcFmt.timeZone = TimeZone.getTimeZone("UTC")
+            val parsed = utcFmt.parse(m.kickoffUtc)
             val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
             madridFmt.timeZone = madridTZ
             val madridDate = madridFmt.format(parsed)
@@ -497,12 +497,16 @@ class HomeViewModel @Inject constructor(
             }
             if (entities.size != 1) return@forEach
             val entity = entities.first()
-            if (madridDate != entity.dateTime) {
-                cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
-                datesChanged = true
+            // Always clear stale live minute for unplayed matches
+            if (m.homeScore == null) {
+                liveMinutes.remove(entity.id)
+                if (madridDate != entity.dateTime) {
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
+                    datesChanged = true
+                }
+                return@forEach
             }
-            val h = m.homeScore ?: return@forEach
-            val a = m.awayScore ?: return@forEach
+            val h = m.homeScore!!; val a = m.awayScore!!
             if (m.status == "finished") liveMinutes[entity.id] = "FINAL"
             val prev = lastWrittenScores[entity.id]
             if (prev == null || prev.first != h || prev.second != a) {

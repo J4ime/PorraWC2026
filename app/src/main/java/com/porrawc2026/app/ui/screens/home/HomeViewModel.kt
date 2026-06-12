@@ -564,8 +564,8 @@ class HomeViewModel @Inject constructor(
         val map = mapOf(
             "southafrica" to "sudafrica", "southkorea" to "coreadelsur",
             "korearepublic" to "coreadelsur", "czechia" to "republicacheca",
-            "czechrepublic" to "republicacheca", "bosniaandherzegovina" to "bosniayherzegovina",
-            "bosnia-herzegovina" to "bosniayherzegovina", "bosnia-h." to "bosniayherzegovina",
+            "czechrepublic" to "republicacheca",             "bosniaandherzegovina" to "bosniayherzegovina",
+            "bosnia-herzegovina" to "bosniayherzegovina", "bosniaherzegovina" to "bosniayherzegovina",
             "unitedstates" to "estadosunidos", "usa" to "estadosunidos",
             "netherlands" to "paisesbajos", "ivorycoast" to "costademarfil",
             "saudiarabia" to "arabiasaudita", "newzealand" to "nuevazelanda",

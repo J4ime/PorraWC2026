@@ -490,10 +490,6 @@ class HomeViewModel @Inject constructor(
                 }
                 if (entities.size != 1) return@forEach
                 val entity = entities.first()
-                // Update date from API
-                if (fix.fixture.date != null && fix.fixture.date != entity.dateTime) {
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = fix.fixture.date!!) else it }
-                }
                 val h = fix.goals.home ?: return@forEach
                 val a = fix.goals.away ?: return@forEach
                 val prev = lastWrittenScores[entity.id]

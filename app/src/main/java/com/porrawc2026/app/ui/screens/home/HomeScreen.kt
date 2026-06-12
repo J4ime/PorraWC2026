@@ -120,10 +120,16 @@ fun HomeScreen(
                     val threshold = 200f
                     if (totalDrag > threshold) {
                         val selIdx = if (selectedDay == null) allDaysSorted.indexOf(todayDayKey) else allDaysSorted.indexOf(selectedDay)
-                        if (selIdx > 0) selectedDay = allDaysSorted[selIdx - 1]
+                        if (selIdx > 0) {
+                            val prev = allDaysSorted[selIdx - 1]
+                            selectedDay = if (prev == todayDayKey) null else prev
+                        }
                     } else if (totalDrag < -threshold) {
                         val selIdx = if (selectedDay == null) allDaysSorted.indexOf(todayDayKey) else allDaysSorted.indexOf(selectedDay)
-                        if (selIdx < allDaysSorted.size - 1) selectedDay = allDaysSorted[selIdx + 1]
+                        if (selIdx < allDaysSorted.size - 1) {
+                            val next = allDaysSorted[selIdx + 1]
+                            selectedDay = if (next == todayDayKey) null else next
+                        }
                     }
                 }
             }, contentPadding = PaddingValues(bottom = 8.dp)) {

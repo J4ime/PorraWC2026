@@ -67,7 +67,7 @@ fun GoalscorersScreen(
                 ) {
                     Column {
                         Box(modifier = Modifier.fillMaxWidth().background(Color(0xFFE65100)).padding(horizontal = 14.dp, vertical = 6.dp)) {
-                            Text("TOP 10 GOLEADORES MUNDIAL", fontSize = 12.sp, color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
+                            Text("PICHICHI", fontSize = 12.sp, color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
                         }
                         Column(modifier = Modifier.padding(14.dp)) {
                             topScorers.forEach { scorer -> TopScorerRow(scorer) }
@@ -124,6 +124,6 @@ private fun TopScorerRow(scorer: TopScorerDisplay) {
         Text("#${scorer.rank} ", fontSize = 10.sp, color = Color(0xFF777777))
         Text(scorer.name, Modifier.weight(1f), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Medium, maxLines = 1)
         if (scorer.flagEmoji.isNotBlank()) { Text(scorer.flagEmoji, fontSize = 14.sp); Spacer(Modifier.width(4.dp)) }
-        Text("${scorer.goals} goles", fontSize = 11.sp, color = Color(0xFFE65100), fontWeight = FontWeight.Bold)
+        Text("${scorer.goals} ${if (scorer.goals == 1) "gol" else "goles"}", fontSize = 11.sp, color = Color(0xFFE65100), fontWeight = FontWeight.Bold)
     }
 }

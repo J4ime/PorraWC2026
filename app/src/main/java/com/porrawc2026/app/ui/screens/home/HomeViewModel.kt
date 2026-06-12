@@ -158,7 +158,6 @@ class HomeViewModel @Inject constructor(
                     loadPlayers()
                     downloadPlayerPhotos()
                     startAutoRefresh()
-                    refreshUpcomingMatches()
                     fetchLiveResults()
                     refreshUpcomingMatches()
             } else {
@@ -484,31 +483,28 @@ class HomeViewModel @Inject constructor(
         try {
             val resp = zafronix.getMatches()
             lastCacheUpdate = System.currentTimeMillis()
-            val sortedZaf = resp.data.sortedBy { it.kickoffUtc ?: "z" }
-            val sortedCached = cachedMatches.filter { !it.isKnockout && it.id < 900 }.sortedBy { it.dateTime }
             var datesChanged = false
-            sortedZaf.forEachIndexed { idx, m ->
-                if (idx >= sortedCached.size) return@forEachIndexed
-                val entity = sortedCached[idx]
-                // Update date from kickoffUtc
-                if (m.kickoffUtc != null) {
-                    val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
-                    utcFmt.timeZone = TimeZone.getTimeZone("UTC")
-                    val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                    madridFmt.timeZone = madridTZ
-                    try {
-                        val parsed = utcFmt.parse(m.kickoffUtc)
-                        if (parsed != null) {
-                            val madridDate = madridFmt.format(parsed)
-                            cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
-                            datesChanged = true
-                            Log.d("HomeVM", "Date update: id=${entity.id} ${entity.homeTeam} vs ${entity.awayTeam} → $madridDate")
-                        }
-                    } catch (_: Exception) {}
+            resp.data.forEach { m ->
+                if (m.kickoffUtc == null) return@forEach
+                val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
+                utcFmt.timeZone = TimeZone.getTimeZone("UTC")
+                val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                madridFmt.timeZone = madridTZ
+                val parsed = utcFmt.parse(m.kickoffUtc) ?: return@forEach
+                val madridDate = madridFmt.format(parsed)
+                // Match by normalized team names
+                val entities = cachedMatches.filter {
+                    normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
+                    normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
                 }
-                // Update scores
-                val h = m.homeScore ?: return@forEachIndexed
-                val a = m.awayScore ?: return@forEachIndexed
+                if (entities.size != 1) return@forEach
+                val entity = entities.first()
+                if (madridDate != entity.dateTime) {
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
+                    datesChanged = true
+                }
+                val h = m.homeScore ?: return@forEach
+                val a = m.awayScore ?: return@forEach
                 if (m.status == "finished") liveMinutes[entity.id] = "FINAL"
                 val prev = lastWrittenScores[entity.id]
                 if (prev == null || prev.first != h || prev.second != a) {
@@ -527,7 +523,7 @@ class HomeViewModel @Inject constructor(
             if (datesChanged) refreshUpcomingMatches()
         } catch (e: Exception) {
             Log.w("HomeVM", "fetchLiveResults failed: ${e.message}")
-            _errorMessage.emit("Error al actualizar datos: ${e.message}")
+            _errorMessage.emit("Error al actualizar: ${e.message}")
         }
     }
 

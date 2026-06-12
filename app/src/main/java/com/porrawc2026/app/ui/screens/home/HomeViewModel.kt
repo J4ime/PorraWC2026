@@ -737,7 +737,7 @@ class HomeViewModel @Inject constructor(
         data[35] = Md("2026-06-26T01:00:00", "DAZN", "Japón", "Suecia")
         data[36] = Md("2026-06-26T01:00:00", "DAZN", "Túnez", "Países Bajos")
 
-        data[37] = Md("2026-06-15T21:00:00", "RTVE", "Bélgica", "Egipto")
+        data[37] = Md("2026-06-15T21:00:00", "DAZN", "Bélgica", "Egipto")
         data[38] = Md("2026-06-16T03:00:00", "DAZN", "Irán", "Nueva Zelanda")
         data[39] = Md("2026-06-21T21:00:00", "RTVE", "Bélgica", "Irán")
         data[40] = Md("2026-06-22T03:00:00", "DAZN", "Nueva Zelanda", "Egipto")

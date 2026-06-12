@@ -528,10 +528,35 @@ class HomeViewModel @Inject constructor(
                 recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
             }
             }
-            if (datesChanged) refreshUpcomingMatches()
-            // Always refresh display after data update
-            refreshUpcomingMatches()
-        }
+        if (datesChanged) refreshUpcomingMatches()
+        // Football-data.org for live scores (free tier updates frequently)
+        updateLiveScores()
+        refreshUpcomingMatches()
+    }
+
+    private suspend fun updateLiveScores() {
+        try {
+            val response = apiService.getWorldCupMatches()
+            response.matches.forEach { fm ->
+                val home = fm.score?.fullTime?.home ?: fm.score?.halfTime?.home ?: return@forEach
+                val away = fm.score?.fullTime?.away ?: fm.score?.halfTime?.away ?: return@forEach
+                val entities = cachedMatches.filter {
+                    normalize(it.homeTeam) == normalize(fm.homeTeam?.name ?: "") &&
+                    normalize(it.awayTeam) == normalize(fm.awayTeam?.name ?: "")
+                }
+                if (entities.size != 1) return@forEach
+                val entity = entities.first()
+                val prev = lastWrittenScores[entity.id]
+                if (prev == null || prev.first != home || prev.second != away) {
+                    lastWrittenScores[entity.id] = home to away
+                    repository.updateMatchResults(entity.id, home, away)
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
+                    if (fm.status == "FINISHED") liveMinutes[entity.id] = "FINAL"
+                    recalcAllPoints(); refreshPoints()
+                }
+            }
+        } catch (_: Exception) { }
+    }
 
     private fun normalize(name: String): String {
         val map = mapOf(

@@ -483,7 +483,6 @@ class HomeViewModel @Inject constructor(
                     allFixtures.addAll(wcFixtures)
                 }
             }
-            var datesChanged = false
             allFixtures.forEach { fix ->
                 val entities = cachedMatches.filter {
                     normalize(it.homeTeam) == normalize(fix.teams.home.name ?: "") &&
@@ -491,24 +490,6 @@ class HomeViewModel @Inject constructor(
                 }
                 if (entities.size != 1) return@forEach
                 val entity = entities.first()
-                // Update date from API (convert UTC to Madrid time)
-                val apiDate = fix.fixture.date
-                if (apiDate != null) {
-                    val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
-                    utcFmt.timeZone = TimeZone.getTimeZone("UTC")
-                    val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                    madridFmt.timeZone = madridTZ
-                    try {
-                        val parsed = utcFmt.parse(apiDate)
-                        if (parsed != null) {
-                            val madridDate = madridFmt.format(parsed)
-                            if (madridDate != entity.dateTime) {
-                                cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
-                                datesChanged = true
-                            }
-                        }
-                    } catch (_: Exception) {}
-                }
                 val h = fix.goals.home ?: return@forEach
                 val a = fix.goals.away ?: return@forEach
                 val prev = lastWrittenScores[entity.id]
@@ -535,7 +516,6 @@ class HomeViewModel @Inject constructor(
                     recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
                 }
             }
-            if (datesChanged) refreshUpcomingMatches()
         } catch (_: Exception) { }
     }
 
@@ -729,16 +709,16 @@ class HomeViewModel @Inject constructor(
         data[11] = Md("2026-06-25T03:00:00", "DAZN", "Suiza", "Canadá")
         data[12] = Md("2026-06-25T03:00:00", "DAZN", "Bosnia y Herzegovina", "Catar")
 
-        data[13] = Md("2026-06-14T00:00:00", "DAZN", "Brasil", "Marruecos")
+        data[13] = Md("2026-06-14T00:00:00", "RTVE", "Brasil", "Marruecos")
         data[14] = Md("2026-06-20T00:00:00", "RTVE", "Escocia", "Marruecos")
         data[15] = Md("2026-06-20T02:30:00", "DAZN", "Brasil", "Haití")
         data[16] = Md("2026-06-14T03:00:00", "DAZN", "Haití", "Escocia")
-        data[17] = Md("2026-06-25T00:00:00", "DAZN", "Escocia", "Brasil")
+        data[17] = Md("2026-06-25T00:00:00", "RTVE", "Escocia", "Brasil")
         data[18] = Md("2026-06-25T00:00:00", "DAZN", "Marruecos", "Haití")
 
         data[19] = Md("2026-06-13T03:00:00", "RTVE", "Estados Unidos", "Paraguay")
         data[20] = Md("2026-06-14T06:00:00", "DAZN", "Australia", "Turquía")
-        data[21] = Md("2026-06-19T21:00:00", "DAZN", "Estados Unidos", "Australia")
+        data[21] = Md("2026-06-19T21:00:00", "RTVE", "Estados Unidos", "Australia")
         data[22] = Md("2026-06-20T05:00:00", "RTVE", "Turquía", "Paraguay")
         data[23] = Md("2026-06-26T04:00:00", "DAZN", "Turquía", "Estados Unidos")
         data[24] = Md("2026-06-26T04:00:00", "RTVE", "Paraguay", "Australia")
@@ -748,7 +728,7 @@ class HomeViewModel @Inject constructor(
         data[27] = Md("2026-06-20T22:00:00", "RTVE", "Alemania", "Costa de Marfil")
         data[28] = Md("2026-06-21T02:00:00", "DAZN", "Ecuador", "Curazao")
         data[29] = Md("2026-06-25T22:00:00", "DAZN", "Curazao", "Costa de Marfil")
-        data[30] = Md("2026-06-25T22:00:00", "DAZN", "Ecuador", "Alemania")
+        data[30] = Md("2026-06-25T22:00:00", "RTVE", "Ecuador", "Alemania")
 
         data[31] = Md("2026-06-14T22:00:00", "DAZN", "Países Bajos", "Japón")
         data[32] = Md("2026-06-15T04:00:00", "DAZN", "Suecia", "Túnez")
@@ -764,7 +744,7 @@ class HomeViewModel @Inject constructor(
         data[41] = Md("2026-06-27T05:00:00", "DAZN", "Egipto", "Irán")
         data[42] = Md("2026-06-27T05:00:00", "DAZN", "Nueva Zelanda", "Bélgica")
 
-        data[43] = Md("2026-06-15T18:00:00", "DAZN", "España", "Cabo Verde")
+        data[43] = Md("2026-06-15T18:00:00", "RTVE", "España", "Cabo Verde")
         data[44] = Md("2026-06-16T00:00:00", "DAZN", "Arabia Saudita", "Uruguay")
         data[45] = Md("2026-06-21T18:00:00", "RTVE", "España", "Arabia Saudita")
         data[46] = Md("2026-06-22T00:00:00", "DAZN", "Uruguay", "Cabo Verde")
@@ -789,7 +769,7 @@ class HomeViewModel @Inject constructor(
         data[62] = Md("2026-06-18T04:00:00", "RTVE", "Uzbekistán", "Colombia")
         data[63] = Md("2026-06-23T19:00:00", "RTVE", "Portugal", "Uzbekistán")
         data[64] = Md("2026-06-24T04:00:00", "DAZN", "Colombia", "RD Congo")
-        data[65] = Md("2026-06-28T01:30:00", "DAZN", "Colombia", "Portugal")
+        data[65] = Md("2026-06-28T01:30:00", "RTVE", "Colombia", "Portugal")
         data[66] = Md("2026-06-28T01:30:00", "RTVE", "RD Congo", "Uzbekistán")
 
         data[67] = Md("2026-06-17T22:00:00", "RTVE", "Inglaterra", "Croacia")

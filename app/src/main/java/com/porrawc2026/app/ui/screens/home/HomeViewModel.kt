@@ -567,8 +567,6 @@ class HomeViewModel @Inject constructor(
         // Football-data.org for live scores
         updateLiveScores()
         refreshUpcomingMatches()
-        // Evaluate questions after score updates
-        evaluateQuestions()
     }
 
     private suspend fun updateLiveScores() {
@@ -592,49 +590,6 @@ class HomeViewModel @Inject constructor(
                     else if (fm.status == "PAUSED") liveMinutes[entity.id] = "HT"
                     else liveMinutes.remove(entity.id)
                     recalcAllPoints(); refreshPoints()
-                }
-            }
-        } catch (_: Exception) { }
-    }
-
-    private suspend fun evaluateQuestions() {
-        try {
-            val questions = repository.getAllQuestions().first()
-            val allMatches = cachedMatches.filter { !it.isKnockout && it.id < 900 }
-            val finishedMatches = allMatches.filter { it.homeGoals != null && it.awayGoals != null }
-            val totalGoals = finishedMatches.sumOf { (it.homeGoals ?: 0) + (it.awayGoals ?: 0) }
-            val matchesPlayed = finishedMatches.size
-            val totalMatches = 104 // 72 group + 32 knockout
-
-            questions.filter { it.correctAnswer == null }.forEach { q ->
-                val text = q.text.lowercase()
-                val result = when {
-                    // "¿habrá X o más goles en total?"
-                    text.contains("goles") && text.contains("total") -> {
-                        val target = text.split(" ").firstNotNullOfOrNull { it.replace(".", "").toIntOrNull() }
-                        if (target != null && matchesPlayed >= totalMatches) target <= totalGoals
-                        else null
-                    }
-                    // "¿habrá más de X goles?"
-                    text.contains("más de") && text.contains("goles") -> {
-                        val target = text.split(" ").firstNotNullOfOrNull { it.replace(".", "").toIntOrNull() }
-                        if (target != null && matchesPlayed >= totalMatches) target < totalGoals else null
-                    }
-                    // "¿ganará [team] el mundial?"
-                    text.contains("ganar") && text.contains("mundial") -> {
-                        null // Can't determine until tournament ends
-                    }
-                    // "¿llegará [team] a [round]?"
-                    text.contains("llegar") || text.contains("alcanzar") || text.contains("semifinal") || text.contains("final") -> {
-                        null // Too complex for now
-                    }
-                    else -> null
-                }
-                if (result != null) {
-                    val updated = q.copy(correctAnswer = result, pointsEarned = if (q.predictedAnswer == result) 20 else 0)
-                    repository.updateQuestionPrediction(updated)
-                    val msg = if (result) "Pregunta ${q.id}: SÍ - ${q.text.take(50)}..." else "Pregunta ${q.id}: NO - ${q.text.take(50)}..."
-                    _errorMessage.emit(msg)
                 }
             }
         } catch (_: Exception) { }

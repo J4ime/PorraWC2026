@@ -23,7 +23,15 @@ data class ZafronixMatch(
     val result: String?,
     val extraTime: Boolean? = false,
     val status: String? = null,
-    val goals: List<ZafronixGoal>? = null
+    val goals: List<ZafronixGoal>? = null,
+    val cards: List<ZafronixCard>? = null
+)
+
+data class ZafronixCard(
+    val minute: Int?,
+    val team: String?,
+    val player: String?,
+    val color: String?
 )
 
 data class ZafronixGoal(

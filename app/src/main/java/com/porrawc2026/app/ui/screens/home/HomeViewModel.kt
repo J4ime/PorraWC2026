@@ -492,7 +492,7 @@ class HomeViewModel @Inject constructor(
                 val entity = sortedCached[idx]
                 // Update date from kickoffUtc
                 if (m.kickoffUtc != null) {
-                    val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+                    val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
                     utcFmt.timeZone = TimeZone.getTimeZone("UTC")
                     val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
                     madridFmt.timeZone = madridTZ

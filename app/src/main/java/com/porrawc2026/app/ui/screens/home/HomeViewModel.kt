@@ -484,10 +484,10 @@ class HomeViewModel @Inject constructor(
         lastCacheUpdate = System.currentTimeMillis()
         var datesChanged = false
         resp.data.forEach { m ->
-            if (m.kickoffUtc == null) return@forEach
-            val utcFmt = SimpleDateFormat("MM/dd/yyyy HH:mm:ss", Locale.US)
-            utcFmt.timeZone = TimeZone.getTimeZone("UTC")
-            val parsed = utcFmt.parse(m.kickoffUtc)
+                if (m.kickoffUtc == null) return@forEach
+                val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+                utcFmt.timeZone = TimeZone.getTimeZone("UTC")
+                val parsed = utcFmt.parse(m.kickoffUtc)
             val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
             madridFmt.timeZone = madridTZ
             val madridDate = madridFmt.format(parsed)

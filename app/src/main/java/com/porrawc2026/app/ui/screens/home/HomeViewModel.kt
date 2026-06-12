@@ -552,6 +552,8 @@ class HomeViewModel @Inject constructor(
                     repository.updateMatchResults(entity.id, home, away)
                     cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
                     if (fm.status == "FINISHED") liveMinutes[entity.id] = "FINAL"
+                    else if (fm.status == "PAUSED") liveMinutes[entity.id] = "HT"
+                    else liveMinutes.remove(entity.id) // let toDisplay compute from time
                     recalcAllPoints(); refreshPoints()
                 }
             }

@@ -500,10 +500,9 @@ class HomeViewModel @Inject constructor(
                         val parsed = utcFmt.parse(m.kickoffUtc)
                         if (parsed != null) {
                             val madridDate = madridFmt.format(parsed)
-                            if (madridDate != entity.dateTime) {
-                                cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
-                                datesChanged = true
-                            }
+                            cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
+                            datesChanged = true
+                            Log.d("HomeVM", "Date update: id=${entity.id} ${entity.homeTeam} vs ${entity.awayTeam} → $madridDate")
                         }
                     } catch (_: Exception) {}
                 }

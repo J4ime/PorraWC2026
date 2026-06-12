@@ -483,6 +483,7 @@ class HomeViewModel @Inject constructor(
                     allFixtures.addAll(wcFixtures)
                 }
             }
+            var datesChanged = false
             allFixtures.forEach { fix ->
                 val entities = cachedMatches.filter {
                     normalize(it.homeTeam) == normalize(fix.teams.home.name ?: "") &&
@@ -490,6 +491,24 @@ class HomeViewModel @Inject constructor(
                 }
                 if (entities.size != 1) return@forEach
                 val entity = entities.first()
+                // Update date from API (convert UTC to Madrid time)
+                val apiDate = fix.fixture.date
+                if (apiDate != null) {
+                    val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
+                    utcFmt.timeZone = TimeZone.getTimeZone("UTC")
+                    val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                    madridFmt.timeZone = madridTZ
+                    try {
+                        val parsed = utcFmt.parse(apiDate)
+                        if (parsed != null) {
+                            val madridDate = madridFmt.format(parsed)
+                            if (madridDate != entity.dateTime) {
+                                cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
+                                datesChanged = true
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
                 val h = fix.goals.home ?: return@forEach
                 val a = fix.goals.away ?: return@forEach
                 val prev = lastWrittenScores[entity.id]
@@ -516,6 +535,7 @@ class HomeViewModel @Inject constructor(
                     recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
                 }
             }
+            if (datesChanged) refreshUpcomingMatches()
         } catch (_: Exception) { }
     }
 

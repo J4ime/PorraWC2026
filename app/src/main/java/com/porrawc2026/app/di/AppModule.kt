@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import com.porrawc2026.app.data.local.AppDatabase
 import com.porrawc2026.app.data.local.dao.*
+import com.porrawc2026.app.data.remote.ApiFootballConfig
+import com.porrawc2026.app.data.remote.SofascoreConfig
+import com.porrawc2026.app.data.remote.ApiFootballService
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.remote.SofascoreApiService
 import dagger.Module
@@ -95,5 +98,22 @@ object AppModule {
     @Singleton
     fun provideSofascoreApiService(@Named("sofascore") retrofit: Retrofit): SofascoreApiService {
         return retrofit.create(SofascoreApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @Named("apifootball")
+    fun provideApiFootballRetrofit(client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(ApiFootballConfig.BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideApiFootballService(@Named("apifootball") retrofit: Retrofit): ApiFootballService {
+        return retrofit.create(ApiFootballService::class.java)
     }
 }

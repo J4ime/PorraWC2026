@@ -473,7 +473,8 @@ class HomeViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             dates.forEach { date ->
                 val cached = fixtureCache[date]
-                if (cached != null && (now - cached.first) < 300_000) { // 5 min TTL
+                val ttl = if (date == SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)) 300_000L else 3_600_000L
+                if (cached != null && (now - cached.first) < ttl) {
                     allFixtures.addAll(cached.second)
                 } else {
                     val resp = apiFootball.getFixtures(date = date)
@@ -792,13 +793,12 @@ class HomeViewModel @Inject constructor(
 
     private fun enrichScheduleFallback() {
         val fallbackDates = hardcodedMatchDates()
-        TvScraper.clearCache()
 
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
             val date = fb?.getOrNull(0) ?: match.dateTime
-            val scrapedTv = TvScraper.lookupTv(match.homeTeam, match.awayTeam, context.filesDir)
-            val tv = if (scrapedTv.contains("RTVE")) "DAZN,RTVE" else "DAZN"
+            val hardcodedTv = match.tvChannel.ifBlank { fb?.getOrNull(1) ?: "DAZN" }
+            val tv = if (hardcodedTv.contains("RTVE")) "DAZN,RTVE" else "DAZN"
             match.copy(dateTime = date, tvChannel = tv)
         }
     }

@@ -8,6 +8,8 @@ import com.porrawc2026.app.data.remote.ApiFootballConfig
 import com.porrawc2026.app.data.remote.SofascoreConfig
 import com.porrawc2026.app.data.remote.ApiFootballService
 import com.porrawc2026.app.data.remote.ApiService
+import com.porrawc2026.app.data.remote.ZafronixService
+import com.porrawc2026.app.data.remote.ZafronixConfig
 import com.porrawc2026.app.data.remote.SofascoreApiService
 import dagger.Module
 import dagger.Provides
@@ -115,5 +117,22 @@ object AppModule {
     @Singleton
     fun provideApiFootballService(@Named("apifootball") retrofit: Retrofit): ApiFootballService {
         return retrofit.create(ApiFootballService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @Named("zafronix")
+    fun provideZafronixRetrofit(client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(ZafronixConfig.BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideZafronixService(@Named("zafronix") retrofit: Retrofit): ZafronixService {
+        return retrofit.create(ZafronixService::class.java)
     }
 }

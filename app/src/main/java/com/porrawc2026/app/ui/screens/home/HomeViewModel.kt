@@ -11,6 +11,8 @@ import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.ApiFootballFixture
 import com.porrawc2026.app.data.remote.ApiFootballService
 import com.porrawc2026.app.data.remote.ApiService
+import com.porrawc2026.app.data.remote.ZafronixService
+import com.porrawc2026.app.data.remote.ZafronixMatch
 import com.porrawc2026.app.data.remote.LiveMatchDetail
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.util.TvScraper
@@ -61,6 +63,7 @@ class HomeViewModel @Inject constructor(
     private val repository: PorraRepository,
     private val apiService: ApiService,
     private val apiFootball: ApiFootballService,
+    private val zafronix: ZafronixService,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -464,55 +467,22 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun fetchLiveResults() {
         try {
-            val cal = Calendar.getInstance(madridTZ)
-            val dates = (-2..2).map { offset ->
-                val c = cal.clone() as Calendar; c.add(Calendar.DAY_OF_YEAR, offset)
-                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.time)
-            }
-            val allFixtures = mutableListOf<ApiFootballFixture>()
-            val now = System.currentTimeMillis()
-            dates.forEach { date ->
-                val cached = fixtureCache[date]
-                val ttl = if (date == SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)) 300_000L else 3_600_000L
-                if (cached != null && (now - cached.first) < ttl) {
-                    allFixtures.addAll(cached.second)
-                } else {
-                    val resp = apiFootball.getFixtures(date = date)
-                    val wcFixtures = resp.response.filter { it.league.id == 1 }
-                    fixtureCache[date] = now to wcFixtures
-                    allFixtures.addAll(wcFixtures)
-                }
-            }
-            allFixtures.forEach { fix ->
+            val resp = zafronix.getMatches()
+            resp.data.forEach { m ->
+                val home = m.homeScore ?: return@forEach
+                val away = m.awayScore ?: return@forEach
                 val entities = cachedMatches.filter {
-                    normalize(it.homeTeam) == normalize(fix.teams.home.name ?: "") &&
-                    normalize(it.awayTeam) == normalize(fix.teams.away.name ?: "")
+                    normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
+                    normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
                 }
                 if (entities.size != 1) return@forEach
                 val entity = entities.first()
-                val h = fix.goals.home ?: return@forEach
-                val a = fix.goals.away ?: return@forEach
+                liveMinutes[entity.id] = if (m.result != null) "FINAL" else "${m.kickoff ?: "?"}"
                 val prev = lastWrittenScores[entity.id]
-                val st = fix.fixture.status
-                if (st?.long == "Match Finished") liveMinutes[entity.id] = "FINAL"
-                else if (st?.elapsed != null && st.elapsed > 0) liveMinutes[entity.id] = "${st.elapsed}'"
-                if (prev == null || prev.first != h || prev.second != a) {
-                    lastWrittenScores[entity.id] = h to a
-                    repository.updateMatchResults(entity.id, h, a)
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
-                    try {
-                        val detail = apiFootball.getFixtureById(id = fix.fixture.id)
-                        val events = detail.response.firstOrNull()?.events
-                        if (events != null) {
-                            val homeScr = events.filter { it.type == "Goal" && it.team?.name == fix.teams.home.name }
-                                .mapNotNull { e -> val n = e.player?.name ?: return@mapNotNull null; GoalEvent(n, e.time?.elapsed ?: 0) }
-                            val awayScr = events.filter { it.type == "Goal" && it.team?.name == fix.teams.away.name }
-                                .mapNotNull { e -> val n = e.player?.name ?: return@mapNotNull null; GoalEvent(n, e.time?.elapsed ?: 0) }
-                            if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
-                                goalScorers[entity.id] = Pair(homeScr, awayScr)
-                            }
-                        }
-                    } catch (_: Exception) {}
+                if (prev == null || prev.first != home || prev.second != away) {
+                    lastWrittenScores[entity.id] = home to away
+                    repository.updateMatchResults(entity.id, home, away)
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
                     recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
                 }
             }

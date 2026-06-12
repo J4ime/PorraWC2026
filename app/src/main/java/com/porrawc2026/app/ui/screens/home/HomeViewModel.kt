@@ -113,6 +113,7 @@ class HomeViewModel @Inject constructor(
     private val goalScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
     private val liveMinutes = mutableMapOf<Int, String>()
+    private val fixtureCache = mutableMapOf<String, Pair<Long, List<ApiFootballFixture>>>()
 
     companion object {
         val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
@@ -469,9 +470,17 @@ class HomeViewModel @Inject constructor(
                 SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.time)
             }
             val allFixtures = mutableListOf<ApiFootballFixture>()
+            val now = System.currentTimeMillis()
             dates.forEach { date ->
-                val resp = apiFootball.getFixtures(date = date)
-                allFixtures.addAll(resp.response.filter { it.league.id == 1 })
+                val cached = fixtureCache[date]
+                if (cached != null && (now - cached.first) < 300_000) { // 5 min TTL
+                    allFixtures.addAll(cached.second)
+                } else {
+                    val resp = apiFootball.getFixtures(date = date)
+                    val wcFixtures = resp.response.filter { it.league.id == 1 }
+                    fixtureCache[date] = now to wcFixtures
+                    allFixtures.addAll(wcFixtures)
+                }
             }
             allFixtures.forEach { fix ->
                 val entities = cachedMatches.filter {
@@ -783,12 +792,13 @@ class HomeViewModel @Inject constructor(
 
     private fun enrichScheduleFallback() {
         val fallbackDates = hardcodedMatchDates()
+        TvScraper.clearCache()
 
         cachedMatches = cachedMatches.map { match ->
             val fb = fallbackDates[match.id]
             val date = fb?.getOrNull(0) ?: match.dateTime
-            val hardcodedTv = fb?.getOrNull(1) ?: "DAZN"
-            val tv = if (hardcodedTv.contains("RTVE")) "DAZN,RTVE" else "DAZN"
+            val scrapedTv = TvScraper.lookupTv(match.homeTeam, match.awayTeam, context.filesDir)
+            val tv = if (scrapedTv.contains("RTVE")) "DAZN,RTVE" else "DAZN"
             match.copy(dateTime = date, tvChannel = tv)
         }
     }

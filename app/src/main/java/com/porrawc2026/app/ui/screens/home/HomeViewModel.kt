@@ -473,7 +473,7 @@ class HomeViewModel @Inject constructor(
                 if (firstStart != null && now.before(firstStart)) break
                 if (lastEnd != null && now.after(lastEnd)) break
                 try { fetchLiveResults() } catch (e: Exception) { Log.d("HomeVM", "Live fetch: ${e.message}") }
-                delay(5 * 60_000L)
+                delay(24 * 60_000L)
             }
             Log.d("HomeVM", "Live polling stopped")
         }

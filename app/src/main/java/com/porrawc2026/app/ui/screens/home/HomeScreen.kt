@@ -214,7 +214,6 @@ private fun MatchRow(match: MatchDisplay) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(match.homeFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
                     Text(match.homeTeam, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    if (isLive) { Spacer(Modifier.width(4.dp)); Box(Modifier.size(6.dp).clip(RoundedCornerShape(3.dp)).background(Color(0xFF4CAF50))) }
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {

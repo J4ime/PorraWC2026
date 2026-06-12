@@ -43,6 +43,10 @@ fun AjustesScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let { viewModel.importExcel(it) } }
 
+    val pdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? -> uri?.let { viewModel.loadPdfResult(it) } }
+
     validationResult?.let { result ->
         ValidationDialog(result = result, onDismiss = { viewModel.dismissValidation() })
     }
@@ -135,7 +139,7 @@ fun AjustesScreen(
                         label = if (pdfResult != null) "Res: $pdfResult" else "Cargar result",
                         color = Color(0xFF444444),
                         loading = false,
-                        onClick = { viewModel.loadPdfResult() }
+                        onClick = { pdfLauncher.launch(arrayOf("application/pdf")) }
                     )
                 }
             }

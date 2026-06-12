@@ -290,51 +290,35 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun loadPdfResult() {
+    fun loadPdfResult(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             try {
                 val fileName = _excelFileName.value ?: return@launch
                 val prefix = fileName.substringBefore(".").take(6)
-                if (prefix.length < 3) {
-                    _pdfResult.value = "Nombre muy corto"
-                    return@launch
-                }
-                val pdfFile = java.io.File(context.getExternalFilesDir(null)?.parentFile?.parentFile, "ClasificacionMundial_2026.pdf")
-                val inputStream = if (pdfFile.exists()) pdfFile.inputStream() else context.assets.open("ClasificacionMundial_2026.pdf")
-                val document = com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
+                if (prefix.length < 3) { _pdfResult.value = "Nombre corto"; return@launch }
+                val inputStream = context.contentResolver.openInputStream(uri) ?: return@launch
                 val pddoc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
                 inputStream.close()
                 val stripper = com.tom_roush.pdfbox.text.PDFTextStripper()
                 var result: String? = null
-                for (page in 1..pddoc.numberOfPages.coerceAtMost(3)) {
+                for (page in 1..pddoc.numberOfPages.coerceAtMost(5)) {
                     stripper.startPage = page; stripper.endPage = page
                     val text = stripper.getText(pddoc)
                     for (line in text.lines()) {
                         if (line.contains(prefix, ignoreCase = true)) {
                             val parts = line.trim().split(Regex("\\s+"))
-                            for (p in parts) {
-                                if (p.contains(prefix, ignoreCase = true) && p.length > prefix.length) {
-                                    val num = p.substring(prefix.length).trim().toIntOrNull()
-                                    if (num != null) { result = "$num"; break }
-                                }
-                            }
-                            if (result == null) {
-                                val num = parts.firstOrNull { it.toIntOrNull() != null }
-                                if (num != null) result = num
-                            }
+                            val num = parts.firstOrNull { it.toIntOrNull() != null }
+                            if (num != null) { result = num; break }
                         }
-                        if (result != null) break
                     }
                     if (result != null) break
                 }
                 pddoc.close()
                 _pdfResult.value = result ?: "No encontrado"
             } catch (e: Exception) {
-                _pdfResult.value = "Error: ${e.message?.take(30)}"
-            } finally {
-                _isBusy.value = false
-            }
+                _pdfResult.value = "Error: ${e.message?.take(20)}"
+            } finally { _isBusy.value = false }
         }
     }
 

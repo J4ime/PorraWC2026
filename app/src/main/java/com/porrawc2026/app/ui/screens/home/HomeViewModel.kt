@@ -500,6 +500,12 @@ class HomeViewModel @Inject constructor(
             // Always clear stale live minute for unplayed matches
             if (m.homeScore == null) {
                 liveMinutes.remove(entity.id)
+                // Also clear any stale score from cachedMatches
+                if (entity.homeGoals != null || entity.awayGoals != null) {
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = null, awayGoals = null) else it }
+                    lastWrittenScores.remove(entity.id)
+                    datesChanged = true
+                }
                 if (madridDate != entity.dateTime) {
                     cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
                     datesChanged = true

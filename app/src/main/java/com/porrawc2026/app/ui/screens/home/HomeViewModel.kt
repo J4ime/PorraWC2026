@@ -525,6 +525,8 @@ class HomeViewModel @Inject constructor(
         try {
             val resp = wc26.getGames()
             resp.games.forEach { g ->
+                // Only process finished matches
+                if (g.finished != "TRUE") return@forEach
                 val hScore = g.home_score?.toIntOrNull() ?: return@forEach
                 val aScore = g.away_score?.toIntOrNull() ?: return@forEach
                 val entities = cachedMatches.filter {

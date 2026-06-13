@@ -205,8 +205,10 @@ class QuestionsViewModel @Inject constructor(
                             null
                         }
                         36 -> {
-                            // 4+ direct red cards during tournament
-                            totalRedCards >= 4 && groupFinished.size >= 72
+                            // 4+ direct red cards during ENTIRE tournament
+                            if (totalRedCards >= 4) true
+                            else if (finished.size >= totalMatches) false
+                            else null
                         }
                         37 -> {
                             // 10+ headed goals - need goal type data

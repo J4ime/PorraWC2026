@@ -84,13 +84,11 @@ data class ApiFootballPlayerInfo(
 interface ApiFootballService {
     @GET("fixtures")
     suspend fun getFixtures(
-        @Header("x-apisports-key") apiKey: String = "11ad7e440abb1ffc7f7d97ca5c3d23e3",
         @Query("date") date: String
     ): ApiFootballFixtureResponse
 
     @GET("fixtures/statistics")
     suspend fun getFixtureStatistics(
-        @Header("x-apisports-key") apiKey: String = "11ad7e440abb1ffc7f7d97ca5c3d23e3",
         @Query("fixture") fixture: Long
     ): ApiFootballStatsResponse
 }

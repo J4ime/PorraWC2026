@@ -1,7 +1,6 @@
 package com.porrawc2026.app.data.remote
 
 import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.Query
 
 data class ZafronixMatchesResponse(
@@ -43,7 +42,6 @@ data class ZafronixGoal(
 interface ZafronixService {
     @GET("matches")
     suspend fun getMatches(
-        @Header("X-API-Key") apiKey: String = "zwc_free_90b800ad63b19b2d4c60c23d",
         @Query("year") year: Int = 2026
     ): ZafronixMatchesResponse
 }

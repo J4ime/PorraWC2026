@@ -8,16 +8,22 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.porrawc2026.app.ui.navigation.PorraNavGraph
+import com.porrawc2026.app.ui.screens.home.HomeViewModel
 import com.porrawc2026.app.ui.theme.WC2026Theme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private val homeViewModel: HomeViewModel by viewModels()
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -27,6 +33,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         requestNotificationPermission()
         enableEdgeToEdge()
+        
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onResume(owner: LifecycleOwner) {
+                homeViewModel.setForegroundState(true)
+            }
+            
+            override fun onPause(owner: LifecycleOwner) {
+                homeViewModel.setForegroundState(false)
+            }
+        })
+        
         setContent {
             WC2026Theme {
                 Surface(modifier = Modifier.fillMaxSize()) {

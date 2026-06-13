@@ -1,5 +1,6 @@
 package com.porrawc2026.app.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -24,14 +25,25 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.R
 import com.porrawc2026.app.ui.screens.goalscorers.GoalscorersScreen
+import com.porrawc2026.app.ui.screens.groups.GroupDetailScreen
 import com.porrawc2026.app.ui.screens.groups.MatchesScreen
 import com.porrawc2026.app.ui.screens.home.AjustesScreen
 import com.porrawc2026.app.ui.screens.home.HomeScreen
 import com.porrawc2026.app.ui.screens.home.HomeViewModel
+import com.porrawc2026.app.ui.screens.knockout.KnockoutScreen
+import com.porrawc2026.app.ui.screens.players.PlayersScreen
 import com.porrawc2026.app.ui.screens.questions.QuestionsScreen
+import com.porrawc2026.app.ui.screens.results.ResultsScreen
 import kotlinx.coroutines.launch
 
 data class NavItem(val label: String, val icon: ImageVector)
+
+sealed class DetailScreen {
+    data object Results : DetailScreen()
+    data object Knockout : DetailScreen()
+    data object Players : DetailScreen()
+    data class GroupDetail(val groupLetter: String) : DetailScreen()
+}
 
 @Composable
 fun PorraNavGraph() {
@@ -39,7 +51,8 @@ fun PorraNavGraph() {
     val totalPoints by homeVM.totalPoints.collectAsState()
     val pagerState = rememberPagerState(initialPage = 2, pageCount = { 5 })
     val scope = rememberCoroutineScope()
-    val pageTitles = listOf("GOLEADORES", "PARTIDOS", "INICIO", "PREGUNTAS", "AJUSTES")
+
+    var detailScreen by remember { mutableStateOf<DetailScreen?>(null) }
 
     val navItems = listOf(
         NavItem("Goleadores", Icons.Filled.SportsSoccer),
@@ -51,13 +64,22 @@ fun PorraNavGraph() {
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
         Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).statusBarsPadding().height(56.dp).padding(horizontal = 12.dp)) {
-            val headerTitle = when (pagerState.currentPage) {
-                0 -> "GOLEADORES"
-                1 -> "PARTIDOS"
-                2 -> "PORRA WC 2026"
-                3 -> "PREGUNTAS"
-                4 -> "AJUSTES"
-                else -> "PORRA WC 2026"
+            val headerTitle = when {
+                detailScreen != null -> when (detailScreen) {
+                    is DetailScreen.Results -> "RESULTADOS"
+                    is DetailScreen.Knockout -> "ELIMINATORIAS"
+                    is DetailScreen.Players -> "JUGADORES"
+                    is DetailScreen.GroupDetail -> "GRUPO ${(detailScreen as DetailScreen.GroupDetail).groupLetter}"
+                    null -> "PORRA WC 2026"
+                }
+                else -> when (pagerState.currentPage) {
+                    0 -> "GOLEADORES"
+                    1 -> "PARTIDOS"
+                    2 -> "PORRA WC 2026"
+                    3 -> "PREGUNTAS"
+                    4 -> "AJUSTES"
+                    else -> "PORRA WC 2026"
+                }
             }
             Image(painter = painterResource(R.drawable.logo_porra), contentDescription = "WC2026", modifier = Modifier.size(36.dp).align(Alignment.CenterStart), contentScale = ContentScale.Fit)
             Text(headerTitle, Modifier.align(Alignment.Center).padding(horizontal = 48.dp), style = MaterialTheme.typography.titleLarge, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
@@ -67,13 +89,27 @@ fun PorraNavGraph() {
         }
 
         Box(modifier = Modifier.weight(1f)) {
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                when (page) {
-                    0 -> GoalscorersScreen()
-                    1 -> MatchesScreen()
-                    2 -> HomeScreen()
-                    3 -> QuestionsScreen()
-                    4 -> AjustesScreen()
+            if (detailScreen != null) {
+                BackHandler { detailScreen = null }
+                when (val screen = detailScreen) {
+                    is DetailScreen.Results -> ResultsScreen(onBackClick = { detailScreen = null })
+                    is DetailScreen.Knockout -> KnockoutScreen(onBackClick = { detailScreen = null })
+                    is DetailScreen.Players -> PlayersScreen(onBackClick = { detailScreen = null })
+                    is DetailScreen.GroupDetail -> GroupDetailScreen(
+                        groupLetter = screen.groupLetter,
+                        onBackClick = { detailScreen = null }
+                    )
+                    null -> {}
+                }
+            } else {
+                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                    when (page) {
+                        0 -> GoalscorersScreen()
+                        1 -> MatchesScreen()
+                        2 -> HomeScreen()
+                        3 -> QuestionsScreen()
+                        4 -> AjustesScreen()
+                    }
                 }
             }
         }
@@ -83,10 +119,13 @@ fun PorraNavGraph() {
             contentColor = Color(0xFF555555)
         ) {
             navItems.forEachIndexed { index, item ->
-                val selected = pagerState.currentPage == index
+                val selected = pagerState.currentPage == index && detailScreen == null
                 NavigationBarItem(
                     selected = selected,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    onClick = {
+                        detailScreen = null
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                    },
                     icon = {
                         Icon(
                             item.icon,

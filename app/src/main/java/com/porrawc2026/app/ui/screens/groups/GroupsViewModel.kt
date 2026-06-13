@@ -6,6 +6,7 @@ import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.TeamEntity
 import com.porrawc2026.app.data.repository.PorraRepository
+import com.porrawc2026.app.domain.model.PointsCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -31,37 +32,10 @@ class GroupsViewModel @Inject constructor(
 
     fun savePrediction(match: MatchEntity) {
         viewModelScope.launch {
-            val existing = allMatches.value.find { it.id == match.id }
             val updated = match.copy(
-                pointsEarned = calculateGroupPoints(match)
+                pointsEarned = PointsCalculator.calculateMatchPoints(match)
             )
             repository.updateMatchPrediction(updated)
         }
-    }
-
-    private fun calculateGroupPoints(match: MatchEntity): Int {
-        val predHome = match.predictedHomeGoals ?: return 0
-        val predAway = match.predictedAwayGoals ?: return 0
-        val realHome = match.homeGoals ?: return 0
-        val realAway = match.awayGoals ?: return 0
-
-        var points = 0
-        if (predHome == realHome) points += 10
-        if (predAway == realAway) points += 10
-
-        val predResult = when {
-            predHome > predAway -> "home"
-            predHome < predAway -> "away"
-            else -> "draw"
-        }
-        val realResult = when {
-            realHome > realAway -> "home"
-            realHome < realAway -> "away"
-            else -> "draw"
-        }
-
-        if (predResult == realResult) points += 30
-
-        return points
     }
 }

@@ -26,11 +26,18 @@ object LiveScoreScraper {
 
     private const val TAG = "LiveScoreScraper"
 
+    private val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
+        "Switzerland", "Qatar", "Bosnia-Herzegovina", "Brazil", "Morocco", "Haiti", "Scotland",
+        "United States", "Paraguay", "Turkey", "Australia", "Germany", "Curacao", "Ivory Coast",
+        "Ecuador", "Netherlands", "Japan", "Sweden", "Tunisia", "Belgium", "Egypt", "Iran",
+        "New Zealand", "Spain", "Cape Verde", "Saudi Arabia", "Uruguay", "France", "Senegal",
+        "Norway", "Iraq", "Argentina", "Jordan", "Austria", "Algeria", "Portugal", "Uzbekistan",
+        "Colombia", "Congo DR", "England", "Croatia", "Panama", "Ghana")
+
     fun fetchMatches(): List<ScrapedMatch> {
         return fetchWithFilter { match ->
-            val wcTeams = com.porrawc2026.app.ui.screens.home.HomeViewModel.WC_TEAMS
-            (wcTeams.any { match.homeTeam.contains(it, true) || it.contains(match.homeTeam, true) } ||
-             wcTeams.any { match.awayTeam.contains(it, true) || it.contains(match.awayTeam, true) }) &&
+            (WC_TEAMS.any { match.homeTeam.contains(it, true) || it.contains(match.homeTeam, true) } ||
+             WC_TEAMS.any { match.awayTeam.contains(it, true) || it.contains(match.awayTeam, true) }) &&
             isSeniorNational(match.homeTeam) && isSeniorNational(match.awayTeam)
         }
     }

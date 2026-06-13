@@ -121,7 +121,6 @@ interface ApiService {
 
     @GET("competitions/WC/matches")
     suspend fun getWorldCupMatches(
-        @Header("X-Auth-Token") apiKey: String = "2a91da71f2384b659a3bf57e444eacd8",
         @Query("dateFrom") dateFrom: String? = null,
         @Query("dateTo") dateTo: String? = null,
         @Query("stage") stage: String? = null,
@@ -129,30 +128,23 @@ interface ApiService {
     ): MatchesResponse
 
     @GET("competitions/WC/standings")
-    suspend fun getWorldCupStandings(
-        @Header("X-Auth-Token") apiKey: String = "YOUR_API_KEY_HERE"
-    ): StandingsResponse
+    suspend fun getWorldCupStandings(): StandingsResponse
 
     @GET("competitions/WC/teams")
-    suspend fun getWorldCupTeams(
-        @Header("X-Auth-Token") apiKey: String = "YOUR_API_KEY_HERE"
-    ): TeamsResponse
+    suspend fun getWorldCupTeams(): TeamsResponse
 
     @GET("competitions/WC/scorers")
     suspend fun getWorldCupScorers(
-        @Header("X-Auth-Token") apiKey: String = "2a91da71f2384b659a3bf57e444eacd8",
         @Query("limit") limit: Int = 10
     ): ScorersResponse
 
     @GET("matches/{id}")
     suspend fun getMatchDetail(
-        @Header("X-Auth-Token") apiKey: String = "2a91da71f2384b659a3bf57e444eacd8",
         @Path("id") matchId: Int
     ): LiveMatchDetail
 
     @GET("matches")
     suspend fun getMatches(
-        @Header("X-Auth-Token") apiKey: String = "2a91da71f2384b659a3bf57e444eacd8",
         @Query("dateFrom") dateFrom: String,
         @Query("dateTo") dateTo: String,
         @Query("status") status: String? = null

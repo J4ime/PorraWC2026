@@ -8,22 +8,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
-import com.porrawc2026.app.data.remote.ApiFootballFixture
-import com.porrawc2026.app.data.remote.ApiFootballService
-import com.porrawc2026.app.data.remote.ApiService
-import com.porrawc2026.app.data.remote.WorldCup26Service
-import com.porrawc2026.app.data.remote.ZafronixService
-import com.porrawc2026.app.data.remote.ZafronixMatch
-import com.porrawc2026.app.data.remote.LiveMatchDetail
+import com.porrawc2026.app.data.remote.LiveScoreService
+import com.porrawc2026.app.data.remote.MatchScheduleProvider
 import com.porrawc2026.app.data.repository.PorraRepository
-import com.porrawc2026.app.util.TvScraper
+import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.util.ExcelParser
-import com.porrawc2026.app.util.PlayerPhotoDownloader
-import com.porrawc2026.app.util.ValidationResult
-import com.porrawc2026.app.util.LiveScoreScraper
-import com.porrawc2026.app.util.ScrapedMatch
-import com.porrawc2026.app.util.UpdateManager
 import com.porrawc2026.app.util.GoalNotifier
+import com.porrawc2026.app.util.PlayerPhotoDownloader
+import com.porrawc2026.app.util.PrefsManager
+import com.porrawc2026.app.util.UpdateManager
+import com.porrawc2026.app.util.ValidationResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -62,10 +56,8 @@ data class MatchDisplay(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: PorraRepository,
-    private val apiService: ApiService,
-    private val apiFootball: ApiFootballService,
-    private val zafronix: ZafronixService,
-    private val wc26: WorldCup26Service,
+    private val liveScoreService: LiveScoreService,
+    private val prefsManager: PrefsManager,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -110,6 +102,8 @@ class HomeViewModel @Inject constructor(
     val dayKeys: StateFlow<List<String>> = _dayKeys.asStateFlow()
     private val _autoRefreshEnabled = MutableStateFlow(true)
     val autoRefreshEnabled: StateFlow<Boolean> = _autoRefreshEnabled.asStateFlow()
+    private val _pdfResult = MutableStateFlow<String?>(null)
+    val pdfResult: StateFlow<String?> = _pdfResult.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
@@ -118,26 +112,15 @@ class HomeViewModel @Inject constructor(
     private val goalScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
     private val liveMinutes = mutableMapOf<Int, String>()
-    private var lastCacheUpdate = 0L
-    private var zafronixEtag: String? = null
-    private val _pdfResult = MutableStateFlow<String?>(null)
-    val pdfResult: StateFlow<String?> = _pdfResult.asStateFlow()
-
-    companion object {
-        val WC_TEAMS = setOf("Mexico", "South Africa", "South Korea", "Czech Republic", "Canada",
-            "Switzerland", "Qatar", "Bosnia-Herzegovina", "Brazil", "Morocco", "Haiti", "Scotland",
-            "United States", "Paraguay", "Turkey", "Australia", "Germany", "Curacao", "Ivory Coast",
-            "Ecuador", "Netherlands", "Japan", "Sweden", "Tunisia", "Belgium", "Egypt", "Iran",
-            "New Zealand", "Spain", "Cape Verde", "Saudi Arabia", "Uruguay", "France", "Senegal",
-            "Norway", "Iraq", "Argentina", "Jordan", "Austria", "Algeria", "Portugal", "Uzbekistan",
-            "Colombia", "Congo DR", "England", "Croatia", "Panama", "Ghana")
-    }
+    private var isInForeground = false
 
     init {
         com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
-        val prefs = context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE)
-        _excelFileName.value = prefs.getString("excel_filename", null)
-        _autoRefreshEnabled.value = prefs.getBoolean("auto_refresh", true)
+        viewModelScope.launch {
+            _excelFileName.value = prefsManager.getExcelFileNameSync()
+            _autoRefreshEnabled.value = prefsManager.getAutoRefreshSync()
+            _notificationsEnabled.value = prefsManager.getNotificationsSync()
+        }
         refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
         forceCheckUpdate()
     }
@@ -156,21 +139,20 @@ class HomeViewModel @Inject constructor(
             val dbMatches = repository.getAllMatches().first()
             if (dbMatches.isNotEmpty()) {
                 cachedMatches = dbMatches
-                    _hasData.value = true
-                    enrichScheduleFromApi()
-                    recalcAllPoints()
-                    refreshPoints()
-                    loadPlayers()
-                    downloadPlayerPhotos()
-                    startAutoRefresh()
-                    // Clear stale scores then re-fetch
-                    cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null) }
-                    lastWrittenScores.clear()
-                    fetchLiveResults()
-                    refreshUpcomingMatches()
+                _hasData.value = true
+                enrichSchedule()
+                recalcAllPoints()
+                refreshPoints()
+                loadPlayers()
+                downloadPlayerPhotos()
+                startAutoRefresh()
+                cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null) }
+                lastWrittenScores.clear()
+                fetchLiveResults()
+                refreshUpcomingMatches()
             } else {
                 _hasData.value = true
-                enrichScheduleFromApi()
+                enrichSchedule()
                 refreshUpcomingMatches()
                 fetchLiveResults()
                 refreshUpcomingMatches()
@@ -180,21 +162,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun loadHardcodedMatches() {
-        val scheduleDates = hardcodedMatchDates()
-        val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
-        cachedMatches = scheduleDates.map { (id, list) ->
-            val date = list[0]
-            val tv = list[1]
-            val home = list[2]
-            val away = list[3]
-            val groupIndex = (id - 1) / 6
-            MatchEntity(
-                id = id, groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
-                matchday = "J${(id - 1) % 6 + 1}", dateTime = date,
-                homeTeam = home, awayTeam = away,
-                tvChannel = tv, isKnockout = false
-            )
-        }
+        cachedMatches = MatchScheduleProvider.buildMatchEntities()
     }
 
     private fun loadPlayers() {
@@ -218,14 +186,13 @@ class HomeViewModel @Inject constructor(
                         if (nameIndex >= 0) {
                             val name = it.getString(nameIndex)
                             _excelFileName.value = name
-                            context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE).edit().putString("excel_filename", name).apply()
+                            prefsManager.setExcelFileName(name)
                         }
                     }
                 }
                 val data = ExcelParser.parse(context, uri)
                 val validation = ExcelParser.validate()
                 _validationResult.value = validation
-                Log.w("HomeVM", "===== IMPORT: isValid=${validation.isValid} errors=[${validation.errors.joinToString("; ")}] =====")
                 if (validation.isValid) {
                     repository.insertAllData(
                         data.teams, data.matches, data.questions,
@@ -234,8 +201,7 @@ class HomeViewModel @Inject constructor(
                     _hasData.value = true
                     cachedMatches = data.matches
                     lastWrittenScores.clear()
-                    Log.w("HomeVM", "===== IMPORT: data inserted, hasData=true, ${cachedMatches.size} matches =====")
-                    enrichScheduleFromApi()
+                    enrichSchedule()
                     recalcAllPoints()
                     refreshPoints()
                     refreshUpcomingMatches()
@@ -246,7 +212,6 @@ class HomeViewModel @Inject constructor(
                     refreshUpcomingMatches()
                 }
             } catch (e: Exception) {
-                Log.w("HomeVM", "===== IMPORT ERROR: ${e.message} =====", e)
                 _errorMessage.emit("Error al cargar el Excel: ${e.message}")
             } finally {
                 _isLoading.value = false
@@ -266,18 +231,18 @@ class HomeViewModel @Inject constructor(
 
     fun toggleNotifications() {
         _notificationsEnabled.value = !_notificationsEnabled.value
+        viewModelScope.launch { prefsManager.setNotificationsEnabled(_notificationsEnabled.value) }
     }
 
     fun toggleAutoRefresh() {
         _autoRefreshEnabled.value = !_autoRefreshEnabled.value
-        context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE).edit().putBoolean("auto_refresh", _autoRefreshEnabled.value).apply()
+        viewModelScope.launch { prefsManager.setAutoRefresh(_autoRefreshEnabled.value) }
     }
 
     fun refreshLiveScores() {
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             try {
-                lastCacheUpdate = 0 // Force API call
                 fetchLiveResults()
                 refreshUpcomingMatches()
             } finally {
@@ -290,7 +255,6 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             try {
-                lastCacheUpdate = 0
                 fetchLiveResults()
                 refreshUpcomingMatches()
             } finally {
@@ -365,7 +329,7 @@ class HomeViewModel @Inject constructor(
             _totalPoints.value = 0
             _players.value = emptyList()
             _excelFileName.value = null
-            context.getSharedPreferences("porra_prefs", Context.MODE_PRIVATE).edit().putString("excel_filename", null).apply()
+            prefsManager.setExcelFileName(null)
             refreshUpcomingMatches()
             _isBusy.value = false
         }
@@ -398,38 +362,12 @@ class HomeViewModel @Inject constructor(
             val realHome = match.homeGoals
             val realAway = match.awayGoals
             if (realHome != null && realAway != null) {
-                val predHome = match.predictedHomeGoals
-                val predAway = match.predictedAwayGoals
-                var pts = 0
-                if (predHome != null && predAway != null) {
-                    if (predHome == realHome) pts += 10
-                    if (predAway == realAway) pts += 10
-                    val predRes = when { predHome > predAway -> "h"; predHome < predAway -> "a"; else -> "d" }
-                    val realRes = when { realHome > realAway -> "h"; realHome < realAway -> "a"; else -> "d" }
-                    if (predRes == realRes) pts += 30
-                }
+                val pts = PointsCalculator.calculateMatchPoints(match)
                 val updated = match.copy(pointsEarned = pts)
                 repository.updateMatchPrediction(updated)
                 updated
             } else match
         }
-    }
-
-    private fun recalcPlayerPoints() {
-        val allScorers = goalScorers.values.flatMap { it.first + it.second }
-        val updated = _players.value.map { player ->
-            val matchingScorers = allScorers.count { scorer ->
-                val pName = player.predictedName ?: player.playerName
-                scorer.playerName.contains(pName, ignoreCase = true) ||
-                pName.contains(scorer.playerName, ignoreCase = true)
-            }
-            if (matchingScorers > 0) {
-                val newGoals = player.goalsScored + matchingScorers
-                player.copy(goalsScored = newGoals, pointsEarned = newGoals * player.pointsPerGoal)
-            } else player
-        }
-        _players.value = updated
-        refreshPoints()
     }
 
     private fun checkGoalNotifications() {
@@ -455,8 +393,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun enrichScheduleFromApi() {
-        enrichScheduleFallback()
+    private fun enrichSchedule() {
+        cachedMatches = MatchScheduleProvider.enrichSchedule(cachedMatches)
     }
 
     private fun startAutoRefresh() {
@@ -481,7 +419,7 @@ class HomeViewModel @Inject constructor(
         if (livePollJob?.isActive != true) startLivePolling()
     }
 
-    private fun parseMadridDate(dateTime: String): Date? {
+    fun parseMadridDate(dateTime: String): Date? {
         if (dateTime.isBlank()) return null
         return try {
             if (dateTime.endsWith("Z")) {
@@ -506,7 +444,6 @@ class HomeViewModel @Inject constructor(
     private fun startLivePolling() {
         livePollJob?.cancel()
         livePollJob = viewModelScope.launch(Dispatchers.IO) {
-            Log.d("HomeVM", "Live polling started")
             while (isActive) {
                 val todayMatches = getTodayMatchesWithDates()
                 if (todayMatches.isEmpty()) break
@@ -519,112 +456,45 @@ class HomeViewModel @Inject constructor(
                 try { fetchLiveResults() } catch (e: Exception) { Log.d("HomeVM", "Live fetch: ${e.message}") }
                 delay(24 * 60_000L)
             }
-            Log.d("HomeVM", "Live polling stopped")
         }
     }
 
     private suspend fun fetchLiveResults() {
-        // Primary: worldcup26.ir for scores + scorers (free, real-time)
-        try {
-            val resp = wc26.getGames()
-            resp.games.forEach { g ->
-                // Only process finished matches
-                if (g.finished != "TRUE") return@forEach
-                val hScore = g.home_score?.toIntOrNull() ?: return@forEach
-                val aScore = g.away_score?.toIntOrNull() ?: return@forEach
-                val entities = cachedMatches.filter {
-                    normalize(it.homeTeam) == normalize(g.home_team_name_en ?: "") &&
-                    normalize(it.awayTeam) == normalize(g.away_team_name_en ?: "")
-                }
-                if (entities.size != 1) return@forEach
-                val entity = entities.first()
-                if (g.finished == "TRUE") liveMinutes[entity.id] = "FINAL"
-                val prev = lastWrittenScores[entity.id]
-                if (prev == null || prev.first != hScore || prev.second != aScore) {
-                    lastWrittenScores[entity.id] = hScore to aScore
-                    repository.updateMatchResults(entity.id, hScore, aScore)
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = hScore, awayGoals = aScore) else it }
-                    val homeScr = parseScorers(g.home_scorers)
-                    val awayScr = parseScorers(g.away_scorers)
-                    if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) goalScorers[entity.id] = Pair(homeScr, awayScr)
-                    recalcAllPoints(); refreshPoints()
-                }
-            }
-            refreshUpcomingMatches()
-        } catch (_: Exception) { }
+        val (scoreUpdates, cardUpdates) = liveScoreService.fetchScoreUpdates(cachedMatches)
 
-        // Secondary: Zafronix for card data + dates
-        try {
-            val zaf = zafronix.getMatches()
-            zaf.data.forEach { m ->
-                val entities = cachedMatches.filter {
-                    normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
-                    normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
+        scoreUpdates.forEach { update ->
+            if (update.isFinished) liveMinutes[update.matchId] = "FINAL"
+            val prev = lastWrittenScores[update.matchId]
+            if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
+                lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
+                repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+                cachedMatches = cachedMatches.map {
+                    if (it.id == update.matchId) it.copy(homeGoals = update.homeGoals, awayGoals = update.awayGoals) else it
                 }
-                if (entities.size != 1) return@forEach
-                val entity = entities.first()
-                val cards = m.cards
-                if (cards != null && (entity.homeRedCards == null || entity.homeRedCards == 0)) {
-                    val homeReds = cards.count { c -> c.team == "home" && c.color == "red" }
-                    val awayReds = cards.count { c -> c.team == "away" && c.color == "red" }
-                    val homeYellows = cards.count { c -> c.team == "home" && c.color == "yellow" }
-                    val awayYellows = cards.count { c -> c.team == "away" && c.color == "yellow" }
-                    cachedMatches = cachedMatches.map {
-                        if (it.id == entity.id) it.copy(homeRedCards = homeReds, awayRedCards = awayReds, homeYellowCards = homeYellows, awayYellowCards = awayYellows) else it
-                    }
-                    // Also save to Room
-                    repository.updateMatchCards(entity.id, homeReds, awayReds, homeYellows, awayYellows)
+                val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
+                val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+                if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
+                    goalScorers[update.matchId] = Pair(homeScr, awayScr)
                 }
+                recalcAllPoints(); refreshPoints()
             }
-        } catch (_: Exception) { }
-    }
-
-    private fun parseScorers(scorers: Any?): List<GoalEvent> {
-        if (scorers == null || scorers.toString() == "null") return emptyList()
-        val s = scorers.toString().trim().replace("{", "").replace("}", "").replace("\"", "")
-        if (s.isEmpty() || s == "[]") return emptyList()
-        return s.split(",").mapNotNull { entry ->
-            val clean = entry.trim()
-            val minuteStr = clean.substringAfterLast(" ").replace("'", "")
-            val minute = minuteStr.toIntOrNull() ?: return@mapNotNull null
-            val name = clean.substringBeforeLast(" ").trim()
-            if (name.isBlank() || name == "null") null else GoalEvent(name, minute)
         }
+
+        cardUpdates.forEach { card ->
+            cachedMatches = cachedMatches.map {
+                if (it.id == card.matchId) it.copy(
+                    homeRedCards = card.homeReds, awayRedCards = card.awayReds,
+                    homeYellowCards = card.homeYellows, awayYellowCards = card.awayYellows
+                ) else it
+            }
+            repository.updateMatchCards(card.matchId, card.homeReds, card.awayReds, card.homeYellows, card.awayYellows)
+        }
+
+        checkGoalNotifications()
+        refreshUpcomingMatches()
     }
 
-    private fun normalize(name: String): String {
-        val map = mapOf(
-            "southafrica" to "sudafrica", "southkorea" to "coreadelsur",
-            "korearepublic" to "coreadelsur", "czechia" to "republicacheca",
-            "czechrepublic" to "republicacheca",             "bosniaandherzegovina" to "bosniayherzegovina",
-            "bosnia-herzegovina" to "bosniayherzegovina", "bosniaherzegovina" to "bosniayherzegovina",
-            "unitedstates" to "estadosunidos", "usa" to "estadosunidos",
-            "netherlands" to "paisesbajos", "ivorycoast" to "costademarfil",
-            "saudiarabia" to "arabiasaudita", "newzealand" to "nuevazelanda",
-            "capeverde" to "caboverde", "congodr" to "rdcongo",
-            "turkey" to "turquia", "japan" to "japon", "sweden" to "suecia",
-            "belgium" to "belgica", "egypt" to "egipto", "spain" to "espana",
-            "france" to "francia", "england" to "inglaterra", "croatia" to "croacia",
-            "algeria" to "argelia", "morocco" to "marruecos", "scotland" to "escocia",
-            "haiti" to "haiti", "brazil" to "brasil", "germany" to "alemania",
-            "ecuador" to "ecuador", "tunisia" to "tunez", "uruguay" to "uruguay",
-            "norway" to "noruega", "iraq" to "irak", "uzbekistan" to "uzbekistan",
-            "colombia" to "colombia", "portugal" to "portugal", "panama" to "panama",
-            "canada" to "canada", "qatar" to "catar", "switzerland" to "suiza",
-            "mexico" to "mexico", "argentina" to "argentina", "senegal" to "senegal",
-            "ghana" to "ghana", "jordan" to "jordania", "austria" to "austria",
-            "australia" to "australia", "paraguay" to "paraguay", "iran" to "iran",
-            "curacao" to "curazao", "curaçao" to "curazao"
-        )
-        val clean = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD)
-            .replace(Regex("\\p{M}"), "")
-            .replace(" ", "")
-            .replace("-", "")
-            .lowercase()
-        return map[clean] ?: clean
-    }
-
-    private fun refreshUpcomingMatches() {
+    fun refreshUpcomingMatches() {
         val cal = Calendar.getInstance(madridTZ)
         val today = cal.get(Calendar.DAY_OF_YEAR)
         val year = cal.get(Calendar.YEAR)
@@ -669,21 +539,11 @@ class HomeViewModel @Inject constructor(
             }
         }
         _allMatches.value = allDisplay
-        val nowCal = Calendar.getInstance(madridTZ)
-        val todayDoy = nowCal.get(Calendar.DAY_OF_YEAR)
-        val thisYear = nowCal.get(Calendar.YEAR)
         _dayKeys.value = allDisplay.mapNotNull { d -> if (d.dayKey.isBlank()) null else d.dayKey }.distinct()
             .sortedBy { d -> allDisplay.firstOrNull { it.dayKey == d }?.sortKey ?: d }
-        Log.d("HomeVM", "refresh: today=${todayMatches.size} future=${
-            allDisplay.count { d ->
-                val dateStr = cachedMatches.firstOrNull { it.id == d.id }?.dateTime ?: ""
-                if (dateStr.isBlank()) false
-                else { val pd = parseMadridDate(dateStr); pd != null && pd.after(Date()) }
-            }
-        } total=${allDisplay.size}")
     }
 
-    private fun toDisplay(match: MatchEntity): MatchDisplay {
+    fun toDisplay(match: MatchEntity): MatchDisplay {
         val date = parseMadridDate(match.dateTime)
         val timeFmt = SimpleDateFormat("HH:mm", Locale.US).apply { timeZone = madridTZ }
         val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "ES")).apply { timeZone = madridTZ }
@@ -739,7 +599,7 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    private fun matchStatus(match: MatchEntity): MatchStatus {
+    fun matchStatus(match: MatchEntity): MatchStatus {
         if (match.homeGoals != null && match.awayGoals != null) return MatchStatus.FINISHED
         val start = parseMadridDate(match.dateTime) ?: return MatchStatus.UPCOMING
         val now = Date()
@@ -747,136 +607,72 @@ class HomeViewModel @Inject constructor(
         return if (now.after(start) && now.before(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
     }
 
-    private fun hardcodedMatchDates(): Map<Int, List<String>> {
-        val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        fmt.timeZone = madridTZ
-
-        data class Md(val date: String, val tv: String, val home: String, val away: String)
-        val data = mutableMapOf<Int, Md>()
-
-        // Group A: Mexico (A), South Korea (A), South Africa (A), Czech Republic (A)
-        // Group B: Canada (B), Switzerland (B), Qatar (B), Bosnia-Herzegovina (B)
-        // Group C: Brazil (C), Scotland (C), Morocco (C), Haiti (C)
-        // Group D: United States (D), Paraguay (D), Turkey (D), Australia (D)
-        // Group E: Germany (E), Curacao (E), Ivory Coast (E), Ecuador (E)
-        // Group F: Netherlands (F), Japan (F), Sweden (F), Tunisia (F)
-        // Group G: Belgium (G), Egypt (G), Iran (G), New Zealand (G)
-        // Group H: Spain (H), Cape Verde (H), Saudi Arabia (H), Uruguay (H)
-        // Group I: France (I), Senegal (I), Norway (I), Iraq (I)
-        // Group J: Argentina (J), Jordan (J), Austria (J), Algeria (J)
-        // Group K: Portugal (K), Uzbekistan (K), Colombia (K), Congo DR (K)
-        // Group L: England (L), Croatia (L), Panama (L), Ghana (L)
-
-        data[1] = Md("2026-06-11T21:00:00", "RTVE", "México", "Sudáfrica")
-        data[2] = Md("2026-06-12T04:00:00", "DAZN", "Corea del Sur", "República Checa")
-        data[3] = Md("2026-06-18T18:00:00", "DAZN", "República Checa", "Sudáfrica")
-        data[4] = Md("2026-06-19T03:00:00", "DAZN", "México", "Corea del Sur")
-        data[5] = Md("2026-06-25T03:00:00", "DAZN", "República Checa", "México")
-        data[6] = Md("2026-06-25T03:00:00", "DAZN", "Sudáfrica", "Corea del Sur")
-
-        data[7] = Md("2026-06-12T21:00:00", "RTVE", "Canadá", "Bosnia y Herzegovina")
-        data[8] = Md("2026-06-13T21:00:00", "DAZN", "Catar", "Suiza")
-        data[9] = Md("2026-06-18T21:00:00", "RTVE", "Suiza", "Bosnia y Herzegovina")
-        data[10] = Md("2026-06-19T00:00:00", "DAZN", "Canadá", "Catar")
-        data[11] = Md("2026-06-25T03:00:00", "DAZN", "Suiza", "Canadá")
-        data[12] = Md("2026-06-25T03:00:00", "DAZN", "Bosnia y Herzegovina", "Catar")
-
-        data[13] = Md("2026-06-14T00:00:00", "RTVE", "Brasil", "Marruecos")
-        data[14] = Md("2026-06-20T00:00:00", "RTVE", "Escocia", "Marruecos")
-        data[15] = Md("2026-06-20T02:30:00", "DAZN", "Brasil", "Haití")
-        data[16] = Md("2026-06-14T03:00:00", "DAZN", "Haití", "Escocia")
-        data[17] = Md("2026-06-25T00:00:00", "RTVE", "Escocia", "Brasil")
-        data[18] = Md("2026-06-25T00:00:00", "DAZN", "Marruecos", "Haití")
-
-        data[19] = Md("2026-06-13T03:00:00", "RTVE", "Estados Unidos", "Paraguay")
-        data[20] = Md("2026-06-14T06:00:00", "DAZN", "Australia", "Turquía")
-        data[21] = Md("2026-06-19T21:00:00", "RTVE", "Estados Unidos", "Australia")
-        data[22] = Md("2026-06-20T05:00:00", "RTVE", "Turquía", "Paraguay")
-        data[23] = Md("2026-06-26T04:00:00", "DAZN", "Turquía", "Estados Unidos")
-        data[24] = Md("2026-06-26T04:00:00", "RTVE", "Paraguay", "Australia")
-
-        data[25] = Md("2026-06-14T19:00:00", "RTVE", "Alemania", "Curazao")
-        data[26] = Md("2026-06-15T01:00:00", "DAZN", "Costa de Marfil", "Ecuador")
-        data[27] = Md("2026-06-20T22:00:00", "RTVE", "Alemania", "Costa de Marfil")
-        data[28] = Md("2026-06-21T02:00:00", "DAZN", "Ecuador", "Curazao")
-        data[29] = Md("2026-06-25T22:00:00", "DAZN", "Curazao", "Costa de Marfil")
-        data[30] = Md("2026-06-25T22:00:00", "RTVE", "Ecuador", "Alemania")
-
-        data[31] = Md("2026-06-14T22:00:00", "DAZN", "Países Bajos", "Japón")
-        data[32] = Md("2026-06-15T04:00:00", "DAZN", "Suecia", "Túnez")
-        data[33] = Md("2026-06-20T19:00:00", "RTVE", "Países Bajos", "Suecia")
-        data[34] = Md("2026-06-21T06:00:00", "DAZN", "Túnez", "Japón")
-        data[35] = Md("2026-06-26T01:00:00", "DAZN", "Japón", "Suecia")
-        data[36] = Md("2026-06-26T01:00:00", "DAZN", "Túnez", "Países Bajos")
-
-        data[37] = Md("2026-06-15T21:00:00", "DAZN", "Bélgica", "Egipto")
-        data[38] = Md("2026-06-16T03:00:00", "DAZN", "Irán", "Nueva Zelanda")
-        data[39] = Md("2026-06-21T21:00:00", "RTVE", "Bélgica", "Irán")
-        data[40] = Md("2026-06-22T03:00:00", "DAZN", "Nueva Zelanda", "Egipto")
-        data[41] = Md("2026-06-27T05:00:00", "DAZN", "Egipto", "Irán")
-        data[42] = Md("2026-06-27T05:00:00", "DAZN", "Nueva Zelanda", "Bélgica")
-
-        data[43] = Md("2026-06-15T18:00:00", "RTVE", "España", "Cabo Verde")
-        data[44] = Md("2026-06-16T00:00:00", "DAZN", "Arabia Saudita", "Uruguay")
-        data[45] = Md("2026-06-21T18:00:00", "RTVE", "España", "Arabia Saudita")
-        data[46] = Md("2026-06-22T00:00:00", "DAZN", "Uruguay", "Cabo Verde")
-        data[47] = Md("2026-06-27T02:00:00", "DAZN", "Cabo Verde", "Arabia Saudita")
-        data[48] = Md("2026-06-27T02:00:00", "RTVE", "Uruguay", "España")
-
-        data[49] = Md("2026-06-16T21:00:00", "RTVE", "Francia", "Senegal")
-        data[50] = Md("2026-06-17T00:00:00", "DAZN", "Irak", "Noruega")
-        data[51] = Md("2026-06-22T23:00:00", "RTVE", "Francia", "Irak")
-        data[52] = Md("2026-06-23T02:00:00", "DAZN", "Noruega", "Senegal")
-        data[53] = Md("2026-06-26T21:00:00", "DAZN", "Noruega", "Francia")
-        data[54] = Md("2026-06-26T21:00:00", "DAZN", "Senegal", "Irak")
-
-        data[55] = Md("2026-06-17T03:00:00", "RTVE", "Argentina", "Argelia")
-        data[56] = Md("2026-06-17T06:00:00", "DAZN", "Austria", "Jordania")
-        data[57] = Md("2026-06-22T19:00:00", "RTVE", "Argentina", "Austria")
-        data[58] = Md("2026-06-23T05:00:00", "DAZN", "Jordania", "Argelia")
-        data[59] = Md("2026-06-28T04:00:00", "DAZN", "Argelia", "Austria")
-        data[60] = Md("2026-06-28T04:00:00", "RTVE", "Jordania", "Argentina")
-
-        data[61] = Md("2026-06-17T19:00:00", "DAZN", "Portugal", "RD Congo")
-        data[62] = Md("2026-06-18T04:00:00", "RTVE", "Uzbekistán", "Colombia")
-        data[63] = Md("2026-06-23T19:00:00", "RTVE", "Portugal", "Uzbekistán")
-        data[64] = Md("2026-06-24T04:00:00", "DAZN", "Colombia", "RD Congo")
-        data[65] = Md("2026-06-28T01:30:00", "RTVE", "Colombia", "Portugal")
-        data[66] = Md("2026-06-28T01:30:00", "RTVE", "RD Congo", "Uzbekistán")
-
-        data[67] = Md("2026-06-17T22:00:00", "RTVE", "Inglaterra", "Croacia")
-        data[68] = Md("2026-06-18T01:00:00", "DAZN", "Ghana", "Panamá")
-        data[69] = Md("2026-06-23T22:00:00", "RTVE", "Inglaterra", "Ghana")
-        data[70] = Md("2026-06-24T01:00:00", "DAZN", "Panamá", "Croacia")
-        data[71] = Md("2026-06-27T23:00:00", "RTVE", "Panamá", "Inglaterra")
-        data[72] = Md("2026-06-27T23:00:00", "DAZN", "Croacia", "Ghana")
-
-        val result = mutableMapOf<Int, List<String>>()
-        for (id in 1..72) {
-            val md = data[id]
-            if (md != null) result[id] = listOf(md.date, md.tv, md.home, md.away)
-        }
-        return result
-    }
-
-    private fun enrichScheduleFallback() {
-        val fallbackDates = hardcodedMatchDates()
-        // Only these specific matches + all Spain matches have RTVE
-        val rtveMatchIds = setOf(1, 7, 13, 25, 43, 49, 67, 9, 21, 33, 45, 57, 69, 17, 30, 48, 65)
-        val spainTeams = setOf("España")
-
-        cachedMatches = cachedMatches.map { match ->
-            val fb = fallbackDates[match.id]
-            val date = fb?.getOrNull(0) ?: match.dateTime
-            val isSpainMatch = spainTeams.any { match.homeTeam == it || match.awayTeam == it }
-            val tv = if (match.id in rtveMatchIds || isSpainMatch) "DAZN,RTVE" else "DAZN"
-            match.copy(dateTime = date, tvChannel = tv)
-        }
-    }
-
     override fun onCleared() {
         refreshJob?.cancel()
         livePollJob?.cancel()
         super.onCleared()
+    }
+
+    fun setForegroundState(isForeground: Boolean) {
+        isInForeground = isForeground
+        if (isForeground) {
+            startLiveMinutePolling()
+        } else {
+            stopLiveMinutePolling()
+        }
+    }
+
+    private var liveMinutePollJob: Job? = null
+
+    private fun startLiveMinutePolling() {
+        liveMinutePollJob?.cancel()
+        liveMinutePollJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive && isInForeground) {
+                try {
+                    val liveUpdates = liveScoreService.fetchLiveMatchDetails(cachedMatches)
+                    liveUpdates.forEach { update ->
+                        if (update.liveMinute != null) {
+                            liveMinutes[update.matchId] = update.liveMinute
+                        }
+                        
+                        val homeScorers = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
+                        val awayScorers = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+                        if (homeScorers.isNotEmpty() || awayScorers.isNotEmpty()) {
+                            goalScorers[update.matchId] = Pair(homeScorers, awayScorers)
+                        }
+                        
+                        if (update.homeGoals > 0 || update.awayGoals > 0) {
+                            val prev = lastWrittenScores[update.matchId]
+                            if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
+                                lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
+                                cachedMatches = cachedMatches.map {
+                                    if (it.id == update.matchId) it.copy(
+                                        homeGoals = update.homeGoals, 
+                                        awayGoals = update.awayGoals
+                                    ) else it
+                                }
+                                if (update.isFinished) {
+                                    repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+                                    recalcAllPoints()
+                                    refreshPoints()
+                                }
+                            }
+                        }
+                    }
+                    if (liveUpdates.isNotEmpty()) {
+                        checkGoalNotifications()
+                        refreshUpcomingMatches()
+                    }
+                } catch (e: Exception) {
+                    Log.d("HomeVM", "Live minute polling error: ${e.message}")
+                }
+                delay(60_000L)
+            }
+        }
+    }
+
+    private fun stopLiveMinutePolling() {
+        liveMinutePollJob?.cancel()
+        liveMinutePollJob = null
     }
 }

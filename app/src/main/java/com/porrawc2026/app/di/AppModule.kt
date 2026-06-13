@@ -2,22 +2,17 @@ package com.porrawc2026.app.di
 
 import android.content.Context
 import androidx.room.Room
+import com.porrawc2026.app.BuildConfig
 import com.porrawc2026.app.data.local.AppDatabase
 import com.porrawc2026.app.data.local.dao.*
-import com.porrawc2026.app.data.remote.ApiFootballConfig
-import com.porrawc2026.app.data.remote.SofascoreConfig
-import com.porrawc2026.app.data.remote.WorldCup26Config
-import com.porrawc2026.app.data.remote.WorldCup26Service
-import com.porrawc2026.app.data.remote.ApiFootballService
-import com.porrawc2026.app.data.remote.ApiService
-import com.porrawc2026.app.data.remote.ZafronixService
-import com.porrawc2026.app.data.remote.ZafronixConfig
-import com.porrawc2026.app.data.remote.SofascoreApiService
+import com.porrawc2026.app.data.remote.*
+import com.porrawc2026.app.util.PrefsManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -60,12 +55,29 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+    fun providePrefsManager(@ApplicationContext context: Context): PrefsManager = PrefsManager(context)
+
+    private fun loggingInterceptor(): HttpLoggingInterceptor {
+        return HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                    else HttpLoggingInterceptor.Level.NONE
         }
+    }
+
+    private fun apiKeyInterceptor(headerName: String, apiKey: String): Interceptor {
+        return Interceptor { chain ->
+            val request = chain.request().newBuilder()
+                .header(headerName, apiKey)
+                .build()
+            chain.proceed(request)
+        }
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(): OkHttpClient {
         return OkHttpClient.Builder()
-            .addInterceptor(logging)
+            .addInterceptor(loggingInterceptor())
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
@@ -73,9 +85,45 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideRetrofit(client: OkHttpClient): Retrofit {
+    @Named("football-data")
+    fun provideFootballDataClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(apiKeyInterceptor("X-Auth-Token", BuildConfig.FOOTBALL_DATA_API_KEY))
+            .addInterceptor(loggingInterceptor())
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("api-sports")
+    fun provideApiSportsClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(apiKeyInterceptor("x-apisports-key", BuildConfig.API_SPORTS_KEY))
+            .addInterceptor(loggingInterceptor())
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("zafronix")
+    fun provideZafronixClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(apiKeyInterceptor("X-API-Key", BuildConfig.ZAFRONIX_API_KEY))
+            .addInterceptor(loggingInterceptor())
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideRetrofit(@Named("football-data") client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://api.football-data.org/v4/")
+            .baseUrl(ApiConfig.BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -92,7 +140,7 @@ object AppModule {
     @Named("sofascore")
     fun provideSofascoreRetrofit(client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://api.sofascore.com/api/v1/")
+            .baseUrl(SofascoreConfig.BASE_URL)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -107,7 +155,7 @@ object AppModule {
     @Provides
     @Singleton
     @Named("apifootball")
-    fun provideApiFootballRetrofit(client: OkHttpClient): Retrofit {
+    fun provideApiFootballRetrofit(@Named("api-sports") client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
             .baseUrl(ApiFootballConfig.BASE_URL)
             .client(client)
@@ -140,8 +188,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    @Named("zafronix")
-    fun provideZafronixRetrofit(client: OkHttpClient): Retrofit {
+    @Named("zafronix-retrofit")
+    fun provideZafronixRetrofit(@Named("zafronix") client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
             .baseUrl(ZafronixConfig.BASE_URL)
             .client(client)
@@ -151,7 +199,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideZafronixService(@Named("zafronix") retrofit: Retrofit): ZafronixService {
+    fun provideZafronixService(@Named("zafronix-retrofit") retrofit: Retrofit): ZafronixService {
         return retrofit.create(ZafronixService::class.java)
     }
 }

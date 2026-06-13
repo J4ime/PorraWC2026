@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
+import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -50,38 +51,13 @@ class GoalscorersViewModel @Inject constructor(
         }
     }
 
-    private fun enToEsTeamName(name: String): String {
-        val map = mapOf(
-            "Mexico" to "México", "South Africa" to "Sudáfrica", "South Korea" to "Corea del Sur",
-            "Korea Republic" to "Corea del Sur", "Czechia" to "República Checa",
-            "Canada" to "Canadá", "Bosnia-Herzegovina" to "Bosnia y Herzegovina",
-            "United States" to "Estados Unidos", "Paraguay" to "Paraguay",
-            "Australia" to "Australia", "Turkey" to "Turquía", "Germany" to "Alemania",
-            "Curaçao" to "Curazao", "Ivory Coast" to "Costa de Marfil",
-            "Ecuador" to "Ecuador", "Netherlands" to "Países Bajos", "Japan" to "Japón",
-            "Sweden" to "Suecia", "Tunisia" to "Túnez", "Belgium" to "Bélgica",
-            "Egypt" to "Egipto", "Iran" to "Irán", "New Zealand" to "Nueva Zelanda",
-            "Spain" to "España", "Cape Verde" to "Cabo Verde",
-            "Saudi Arabia" to "Arabia Saudita", "Uruguay" to "Uruguay",
-            "France" to "Francia", "Senegal" to "Senegal", "Iraq" to "Irak",
-            "Norway" to "Noruega", "Argentina" to "Argentina", "Algeria" to "Argelia",
-            "Austria" to "Austria", "Jordan" to "Jordania", "Portugal" to "Portugal",
-            "Congo DR" to "RD Congo", "Uzbekistan" to "Uzbekistán",
-            "Colombia" to "Colombia", "England" to "Inglaterra", "Croatia" to "Croacia",
-            "Panama" to "Panamá", "Ghana" to "Ghana", "Brazil" to "Brasil",
-            "Morocco" to "Marruecos", "Scotland" to "Escocia", "Haiti" to "Haití",
-            "Switzerland" to "Suiza", "Qatar" to "Catar"
-        )
-        return map[name] ?: name
-    }
-
     fun loadTopScorers() {
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             try {
                 val response = apiService.getWorldCupScorers()
                 val scorers = response.scorers.take(10).mapIndexed { idx, s ->
-                    val teamName = enToEsTeamName(s.team.name ?: "")
+                    val teamName = TeamNameNormalizer.enToEs(s.team.name ?: "")
                     TopScorerDisplay(
                         rank = idx + 1,
                         name = s.player.name ?: "?",

@@ -8,7 +8,10 @@ import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
+import com.porrawc2026.app.domain.model.PointsCalculator
+import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -45,12 +48,27 @@ class ResultsViewModel @Inject constructor(
     }
 
     fun refreshLiveScores() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isRefreshing.value = true
             try {
-                val response = apiService.getWorldCupMatches()
-                response.matches.forEach { liveMatch: com.porrawc2026.app.data.remote.FootballMatch ->
-                    // Compare and calculate points when live
+                val response = apiService.getWorldCupMatches(status = "FINISHED")
+                val currentMatches = allMatches.value
+                response.matches.forEach { liveMatch ->
+                    val homeGoals = liveMatch.score?.fullTime?.home
+                    val awayGoals = liveMatch.score?.fullTime?.away
+                    if (homeGoals == null || awayGoals == null) return@forEach
+                    val localMatch = currentMatches.firstOrNull { m ->
+                        TeamNameNormalizer.matches(m.homeTeam, liveMatch.homeTeam?.name ?: "") &&
+                        TeamNameNormalizer.matches(m.awayTeam, liveMatch.awayTeam?.name ?: "")
+                    } ?: return@forEach
+                    if (localMatch.homeGoals != homeGoals || localMatch.awayGoals != awayGoals) {
+                        repository.updateMatchResults(localMatch.id, homeGoals, awayGoals)
+                        val pts = PointsCalculator.calculateMatchPoints(
+                            localMatch.predictedHomeGoals, localMatch.predictedAwayGoals,
+                            homeGoals, awayGoals
+                        )
+                        repository.updateMatchPrediction(localMatch.copy(homeGoals = homeGoals, awayGoals = awayGoals, pointsEarned = pts))
+                    }
                 }
                 refreshPoints()
             } catch (e: Exception) {

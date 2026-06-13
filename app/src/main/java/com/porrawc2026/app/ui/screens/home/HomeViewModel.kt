@@ -565,14 +565,15 @@ class HomeViewModel @Inject constructor(
                 val entity = entities.first()
                 val cards = m.cards
                 if (cards != null && (entity.homeRedCards == null || entity.homeRedCards == 0)) {
+                    val homeReds = cards.count { c -> c.team == "home" && c.color == "red" }
+                    val awayReds = cards.count { c -> c.team == "away" && c.color == "red" }
+                    val homeYellows = cards.count { c -> c.team == "home" && c.color == "yellow" }
+                    val awayYellows = cards.count { c -> c.team == "away" && c.color == "yellow" }
                     cachedMatches = cachedMatches.map {
-                        if (it.id == entity.id) it.copy(
-                            homeRedCards = cards.count { c -> c.team == "home" && c.color == "red" },
-                            awayRedCards = cards.count { c -> c.team == "away" && c.color == "red" },
-                            homeYellowCards = cards.count { c -> c.team == "home" && c.color == "yellow" },
-                            awayYellowCards = cards.count { c -> c.team == "away" && c.color == "yellow" }
-                        ) else it
+                        if (it.id == entity.id) it.copy(homeRedCards = homeReds, awayRedCards = awayReds, homeYellowCards = homeYellows, awayYellowCards = awayYellows) else it
                     }
+                    // Also save to Room
+                    repository.updateMatchCards(entity.id, homeReds, awayReds, homeYellows, awayYellows)
                 }
             }
         } catch (_: Exception) { }

@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -63,9 +64,16 @@ fun QuestionsScreen(
 
         PullToRefreshContainer(state = pullRefreshState, modifier = Modifier.align(Alignment.TopCenter), containerColor = Color.Transparent, contentColor = TextPrimary)
 
+        // Show message only when there are new resolved questions
+        LaunchedEffect(evalMessage) {
+            delay(3000); viewModel.clearMessage()
+        }
         evalMessage?.let { msg ->
-            Snackbar(modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)) {
-                Text(msg)
+            if (msg != "Sin cambios") {
+                Snackbar(modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                    action = { TextButton(onClick = { viewModel.clearMessage() }) { Text("OK") } }) {
+                    Text(msg)
+                }
             }
         }
     }

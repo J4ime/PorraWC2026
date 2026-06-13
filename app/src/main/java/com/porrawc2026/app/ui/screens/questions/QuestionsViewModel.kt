@@ -25,6 +25,8 @@ class QuestionsViewModel @Inject constructor(
     private val _evalMessage = MutableStateFlow<String?>(null)
     val evalMessage: StateFlow<String?> = _evalMessage.asStateFlow()
 
+    fun clearMessage() { _evalMessage.value = null }
+
     fun evaluateQuestions() {
         viewModelScope.launch(Dispatchers.IO) {
             _isEvaluating.value = true

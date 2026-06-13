@@ -163,6 +163,9 @@ class HomeViewModel @Inject constructor(
                     loadPlayers()
                     downloadPlayerPhotos()
                     startAutoRefresh()
+                    // Clear stale scores then re-fetch
+                    cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null) }
+                    lastWrittenScores.clear()
                     fetchLiveResults()
                     refreshUpcomingMatches()
             } else {

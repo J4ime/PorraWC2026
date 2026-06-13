@@ -454,7 +454,7 @@ class HomeViewModel @Inject constructor(
                 if (firstStart != null && now.before(firstStart)) break
                 if (lastEnd != null && now.after(lastEnd)) break
                 try { fetchLiveResults() } catch (e: Exception) { Log.d("HomeVM", "Live fetch: ${e.message}") }
-                delay(24 * 60_000L)
+                delay(5 * 60_000L)
             }
         }
     }
@@ -464,19 +464,22 @@ class HomeViewModel @Inject constructor(
 
         scoreUpdates.forEach { update ->
             if (update.isFinished) liveMinutes[update.matchId] = "FINAL"
+            else if (update.liveMinute != null) liveMinutes[update.matchId] = update.liveMinute
             val prev = lastWrittenScores[update.matchId]
             if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
                 lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
-                repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
                 cachedMatches = cachedMatches.map {
                     if (it.id == update.matchId) it.copy(homeGoals = update.homeGoals, awayGoals = update.awayGoals) else it
+                }
+                if (update.isFinished) {
+                    repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+                    recalcAllPoints(); refreshPoints()
                 }
                 val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
                 val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
                 if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
                     goalScorers[update.matchId] = Pair(homeScr, awayScr)
                 }
-                recalcAllPoints(); refreshPoints()
             }
         }
 
@@ -600,6 +603,8 @@ class HomeViewModel @Inject constructor(
     }
 
     fun matchStatus(match: MatchEntity): MatchStatus {
+        val lm = liveMinutes[match.id]
+        if (lm != null && lm != "FINAL") return MatchStatus.LIVE
         if (match.homeGoals != null && match.awayGoals != null) return MatchStatus.FINISHED
         val start = parseMadridDate(match.dateTime) ?: return MatchStatus.UPCOMING
         val now = Date()
@@ -629,44 +634,11 @@ class HomeViewModel @Inject constructor(
         liveMinutePollJob = viewModelScope.launch(Dispatchers.IO) {
             while (isActive && isInForeground) {
                 try {
-                    val liveUpdates = liveScoreService.fetchLiveMatchDetails(cachedMatches)
-                    liveUpdates.forEach { update ->
-                        if (update.liveMinute != null) {
-                            liveMinutes[update.matchId] = update.liveMinute
-                        }
-                        
-                        val homeScorers = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
-                        val awayScorers = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
-                        if (homeScorers.isNotEmpty() || awayScorers.isNotEmpty()) {
-                            goalScorers[update.matchId] = Pair(homeScorers, awayScorers)
-                        }
-                        
-                        if (update.homeGoals > 0 || update.awayGoals > 0) {
-                            val prev = lastWrittenScores[update.matchId]
-                            if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
-                                lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
-                                cachedMatches = cachedMatches.map {
-                                    if (it.id == update.matchId) it.copy(
-                                        homeGoals = update.homeGoals, 
-                                        awayGoals = update.awayGoals
-                                    ) else it
-                                }
-                                if (update.isFinished) {
-                                    repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
-                                    recalcAllPoints()
-                                    refreshPoints()
-                                }
-                            }
-                        }
-                    }
-                    if (liveUpdates.isNotEmpty()) {
-                        checkGoalNotifications()
-                        refreshUpcomingMatches()
-                    }
+                    fetchLiveResults()
                 } catch (e: Exception) {
                     Log.d("HomeVM", "Live minute polling error: ${e.message}")
                 }
-                delay(60_000L)
+                delay(5 * 60_000L)
             }
         }
     }

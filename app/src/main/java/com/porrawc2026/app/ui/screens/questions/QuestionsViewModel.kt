@@ -29,6 +29,14 @@ class QuestionsViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isEvaluating.value = true
             try {
+                // Reset all previously resolved answers
+                val all = repository.getAllQuestions().first()
+                all.forEach { q ->
+                    if (q.correctAnswer != null || q.pointsEarned != 0) {
+                        repository.updateQuestionPrediction(q.copy(correctAnswer = null, pointsEarned = 0))
+                    }
+                }
+
                 val allMatches = repository.getAllMatches().first()
                 val groupMatches = allMatches.filter { !it.isKnockout && it.id < 900 }
                 val finished = allMatches.filter { it.homeGoals != null && it.awayGoals != null }

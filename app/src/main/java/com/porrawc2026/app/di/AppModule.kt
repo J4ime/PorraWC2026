@@ -35,7 +35,7 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "porra_wc2026.db"
-        ).addMigrations(AppDatabase.MIGRATION_2_3).build()
+        ).addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4).build()
     }
 
     @Provides

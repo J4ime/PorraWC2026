@@ -16,7 +16,7 @@ import com.porrawc2026.app.data.local.entity.*
         KnockoutPredictionEntity::class,
         GroupStandingEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +31,14 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE player_predictions ADD COLUMN photoPath TEXT")
+            }
+        }
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE matches ADD COLUMN homeRedCards INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE matches ADD COLUMN awayRedCards INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE matches ADD COLUMN homeYellowCards INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE matches ADD COLUMN awayYellowCards INTEGER DEFAULT NULL")
             }
         }
     }

@@ -19,5 +19,9 @@ data class MatchEntity(
     val knockoutRound: String? = null,
     val matchNumber: Int? = null,
     val pointsEarned: Int = 0,
-    val tvChannel: String = ""
+    val tvChannel: String = "",
+    val homeRedCards: Int? = null,
+    val awayRedCards: Int? = null,
+    val homeYellowCards: Int? = null,
+    val awayYellowCards: Int? = null
 )

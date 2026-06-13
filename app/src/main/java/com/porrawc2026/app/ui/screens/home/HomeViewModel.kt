@@ -554,6 +554,17 @@ class HomeViewModel @Inject constructor(
                 lastWrittenScores[entity.id] = h to a
                 repository.updateMatchResults(entity.id, h, a)
                 cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
+                // Save card data from Zafronix
+                val cards = m.cards
+                if (cards != null) {
+                    val homeReds = cards.count { it.team == "home" && it.color == "red" }
+                    val awayReds = cards.count { it.team == "away" && it.color == "red" }
+                    val homeYellows = cards.count { it.team == "home" && it.color == "yellow" }
+                    val awayYellows = cards.count { it.team == "away" && it.color == "yellow" }
+                    cachedMatches = cachedMatches.map {
+                        if (it.id == entity.id) it.copy(homeRedCards = homeReds, awayRedCards = awayReds, homeYellowCards = homeYellows, awayYellowCards = awayYellows) else it
+                    }
+                }
                 val goals = m.goals
                 if (goals != null && goals.isNotEmpty()) {
                     val homeScr = goals.filter { it.team == "home" }.map { GoalEvent(it.scorer ?: "?", it.minute ?: 0) }

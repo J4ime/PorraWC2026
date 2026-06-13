@@ -57,6 +57,9 @@ class QuestionsViewModel @Inject constructor(
 
                 // Tournament totals
                 val totalGoals = finished.sumOf { (it.homeGoals ?: 0) + (it.awayGoals ?: 0) }
+                val totalRedCards = finished.sumOf { (it.homeRedCards ?: 0) + (it.awayRedCards ?: 0) }
+                val totalYellowCards = finished.sumOf { (it.homeYellowCards ?: 0) + (it.awayYellowCards ?: 0) }
+                val matchesWithRed = finished.count { (it.homeRedCards ?: 0) + (it.awayRedCards ?: 0) > 0 }
                 val ownGoals = 0 // Not tracked currently
 
                 var resolved = 0
@@ -124,8 +127,8 @@ class QuestionsViewModel @Inject constructor(
                         17 -> qualifiedFromGroup("Curazao") // Group E
                         18 -> teamPoints("Brasil") > teamPoints("Argentina") && groupFinished.size >= 72
                         19 -> {
-                            // Match with >8 cards - need card data from Zafronix
-                            null
+                            // Match with >8 cards
+                            finished.any { (it.homeYellowCards ?: 0) + (it.awayYellowCards ?: 0) + (it.homeRedCards ?: 0) + (it.awayRedCards ?: 0) > 8 }
                         }
                         20 -> {
                             // Team advances without winning - need all groups done
@@ -171,8 +174,13 @@ class QuestionsViewModel @Inject constructor(
                             null
                         }
                         31 -> {
-                            // Team wins with a player sent off - need card data
-                            null
+                            // Team wins with a player sent off
+                            finished.any {
+                                val h = it.homeGoals ?: 0; val a = it.awayGoals ?: 0
+                                val homeWon = h > a && (it.homeRedCards ?: 0) > 0
+                                val awayWon = a > h && (it.awayRedCards ?: 0) > 0
+                                homeWon || awayWon
+                            }
                         }
                         32 -> {
                             // Spain reaches semifinals
@@ -197,8 +205,8 @@ class QuestionsViewModel @Inject constructor(
                             null
                         }
                         36 -> {
-                            // 4+ direct red cards during tournament - need card data
-                            null
+                            // 4+ direct red cards during tournament
+                            totalRedCards >= 4 && groupFinished.size >= 72
                         }
                         37 -> {
                             // 10+ headed goals - need goal type data

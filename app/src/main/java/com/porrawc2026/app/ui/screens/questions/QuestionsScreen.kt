@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -60,7 +61,7 @@ fun QuestionsScreen(
             item { Spacer(Modifier.height(16.dp)) }
         }
 
-        PullToRefreshContainer(state = pullRefreshState, modifier = Modifier.align(Alignment.TopCenter), containerColor = SurfaceDark, contentColor = TextPrimary)
+        PullToRefreshContainer(state = pullRefreshState, modifier = Modifier.align(Alignment.TopCenter), containerColor = Color.Transparent, contentColor = TextPrimary)
 
         evalMessage?.let { msg ->
             Snackbar(modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)) {

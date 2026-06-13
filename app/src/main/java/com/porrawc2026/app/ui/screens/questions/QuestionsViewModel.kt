@@ -65,7 +65,9 @@ class QuestionsViewModel @Inject constructor(
                         resolved++
                     }
                 }
-                _evalMessage.value = if (resolved > 0) "$resolved preguntas resueltas" else "Sin cambios"
+                // Also recalculate total points in HomeViewModel via repository
+                val pts = repository.calculateTotalPoints()
+                _evalMessage.value = if (resolved > 0) "$resolved preguntas resueltas ($pts pts total)" else "Sin cambios"
             } catch (e: Exception) {
                 _evalMessage.value = "Error: ${e.message}"
             } finally { _isEvaluating.value = false }

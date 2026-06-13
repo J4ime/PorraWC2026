@@ -11,6 +11,7 @@ import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.ApiFootballFixture
 import com.porrawc2026.app.data.remote.ApiFootballService
 import com.porrawc2026.app.data.remote.ApiService
+import com.porrawc2026.app.data.remote.WorldCup26Service
 import com.porrawc2026.app.data.remote.ZafronixService
 import com.porrawc2026.app.data.remote.ZafronixMatch
 import com.porrawc2026.app.data.remote.LiveMatchDetail
@@ -64,6 +65,7 @@ class HomeViewModel @Inject constructor(
     private val apiService: ApiService,
     private val apiFootball: ApiFootballService,
     private val zafronix: ZafronixService,
+    private val wc26: WorldCup26Service,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -519,95 +521,69 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
-        val resp = zafronix.getMatches()
-        lastCacheUpdate = System.currentTimeMillis()
-        var datesChanged = false
-        resp.data.forEach { m ->
-            if (m.kickoffUtc == null) return@forEach
-            val utcFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
-            utcFmt.timeZone = TimeZone.getTimeZone("UTC")
-            val parsed = utcFmt.parse(m.kickoffUtc)
-            val madridFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-            madridFmt.timeZone = madridTZ
-            val madridDate = madridFmt.format(parsed)
-            val entities = cachedMatches.filter {
-                normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
-                normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
-            }
-            if (entities.size != 1) return@forEach
-            val entity = entities.first()
-            // Always clear stale live minute for unplayed matches
-            if (m.homeScore == null) {
-                liveMinutes.remove(entity.id)
-                // Also clear any stale score from cachedMatches
-                if (entity.homeGoals != null || entity.awayGoals != null) {
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = null, awayGoals = null) else it }
-                    lastWrittenScores.remove(entity.id)
-                    datesChanged = true
-                }
-                if (madridDate != entity.dateTime) {
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(dateTime = madridDate) else it }
-                    datesChanged = true
-                }
-                return@forEach
-            }
-            val h = m.homeScore!!; val a = m.awayScore!!
-            if (m.status == "finished") liveMinutes[entity.id] = "FINAL"
-            val prev = lastWrittenScores[entity.id]
-            if (prev == null || prev.first != h || prev.second != a) {
-                lastWrittenScores[entity.id] = h to a
-                repository.updateMatchResults(entity.id, h, a)
-                cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = h, awayGoals = a) else it }
-                // Save card data from Zafronix
-                val cards = m.cards
-                if (cards != null) {
-                    val homeReds = cards.count { it.team == "home" && it.color == "red" }
-                    val awayReds = cards.count { it.team == "away" && it.color == "red" }
-                    val homeYellows = cards.count { it.team == "home" && it.color == "yellow" }
-                    val awayYellows = cards.count { it.team == "away" && it.color == "yellow" }
-                    cachedMatches = cachedMatches.map {
-                        if (it.id == entity.id) it.copy(homeRedCards = homeReds, awayRedCards = awayReds, homeYellowCards = homeYellows, awayYellowCards = awayYellows) else it
-                    }
-                }
-                val goals = m.goals
-                if (goals != null && goals.isNotEmpty()) {
-                    val homeScr = goals.filter { it.team == "home" }.map { GoalEvent(it.scorer ?: "?", it.minute ?: 0) }
-                    val awayScr = goals.filter { it.team == "away" }.map { GoalEvent(it.scorer ?: "?", it.minute ?: 0) }
-                    goalScorers[entity.id] = Pair(homeScr, awayScr)
-                }
-                recalcAllPoints(); refreshPoints(); refreshUpcomingMatches()
-            }
-            }
-        if (datesChanged) refreshUpcomingMatches()
-        // Football-data.org for live scores
-        updateLiveScores()
-        refreshUpcomingMatches()
-    }
-
-    private suspend fun updateLiveScores() {
+        // Primary: worldcup26.ir for scores + scorers (free, real-time)
         try {
-            val response = apiService.getWorldCupMatches()
-            response.matches.forEach { fm ->
-                val home = fm.score?.fullTime?.home ?: fm.score?.halfTime?.home ?: return@forEach
-                val away = fm.score?.fullTime?.away ?: fm.score?.halfTime?.away ?: return@forEach
+            val resp = wc26.getGames()
+            resp.games.forEach { g ->
+                val hScore = g.home_score?.toIntOrNull() ?: return@forEach
+                val aScore = g.away_score?.toIntOrNull() ?: return@forEach
                 val entities = cachedMatches.filter {
-                    normalize(it.homeTeam) == normalize(fm.homeTeam?.name ?: "") &&
-                    normalize(it.awayTeam) == normalize(fm.awayTeam?.name ?: "")
+                    normalize(it.homeTeam) == normalize(g.home_team_name_en ?: "") &&
+                    normalize(it.awayTeam) == normalize(g.away_team_name_en ?: "")
                 }
                 if (entities.size != 1) return@forEach
                 val entity = entities.first()
+                if (g.finished == "TRUE") liveMinutes[entity.id] = "FINAL"
                 val prev = lastWrittenScores[entity.id]
-                if (prev == null || prev.first != home || prev.second != away) {
-                    lastWrittenScores[entity.id] = home to away
-                    repository.updateMatchResults(entity.id, home, away)
-                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = home, awayGoals = away) else it }
-                    if (fm.status == "FINISHED") liveMinutes[entity.id] = "FINAL"
-                    else if (fm.status == "PAUSED") liveMinutes[entity.id] = "HT"
-                    else liveMinutes.remove(entity.id)
+                if (prev == null || prev.first != hScore || prev.second != aScore) {
+                    lastWrittenScores[entity.id] = hScore to aScore
+                    repository.updateMatchResults(entity.id, hScore, aScore)
+                    cachedMatches = cachedMatches.map { if (it.id == entity.id) it.copy(homeGoals = hScore, awayGoals = aScore) else it }
+                    val homeScr = parseScorers(g.home_scorers)
+                    val awayScr = parseScorers(g.away_scorers)
+                    if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) goalScorers[entity.id] = Pair(homeScr, awayScr)
                     recalcAllPoints(); refreshPoints()
                 }
             }
+            refreshUpcomingMatches()
         } catch (_: Exception) { }
+
+        // Secondary: Zafronix for card data + dates
+        try {
+            val zaf = zafronix.getMatches()
+            zaf.data.forEach { m ->
+                val entities = cachedMatches.filter {
+                    normalize(it.homeTeam) == normalize(m.homeTeam ?: "") &&
+                    normalize(it.awayTeam) == normalize(m.awayTeam ?: "")
+                }
+                if (entities.size != 1) return@forEach
+                val entity = entities.first()
+                val cards = m.cards
+                if (cards != null && (entity.homeRedCards == null || entity.homeRedCards == 0)) {
+                    cachedMatches = cachedMatches.map {
+                        if (it.id == entity.id) it.copy(
+                            homeRedCards = cards.count { c -> c.team == "home" && c.color == "red" },
+                            awayRedCards = cards.count { c -> c.team == "away" && c.color == "red" },
+                            homeYellowCards = cards.count { c -> c.team == "home" && c.color == "yellow" },
+                            awayYellowCards = cards.count { c -> c.team == "away" && c.color == "yellow" }
+                        ) else it
+                    }
+                }
+            }
+        } catch (_: Exception) { }
+    }
+
+    private fun parseScorers(scorers: Any?): List<GoalEvent> {
+        if (scorers == null || scorers.toString() == "null") return emptyList()
+        val s = scorers.toString().trim().replace("{", "").replace("}", "").replace("\"", "")
+        if (s.isEmpty() || s == "[]") return emptyList()
+        return s.split(",").mapNotNull { entry ->
+            val clean = entry.trim()
+            val minuteStr = clean.substringAfterLast(" ").replace("'", "")
+            val minute = minuteStr.toIntOrNull() ?: return@mapNotNull null
+            val name = clean.substringBeforeLast(" ").trim()
+            if (name.isBlank() || name == "null") null else GoalEvent(name, minute)
+        }
     }
 
     private fun normalize(name: String): String {

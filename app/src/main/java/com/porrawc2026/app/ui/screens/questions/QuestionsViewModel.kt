@@ -38,7 +38,9 @@ class QuestionsViewModel @Inject constructor(
                         repository.updateQuestionPrediction(q.copy(correctAnswer = null, pointsEarned = 0))
                     }
                 }
-
+                // Wait for Room to persist changes, then reload
+                kotlinx.coroutines.delay(200)
+                val questionsReloaded = repository.getAllQuestions().first()
                 val allMatches = repository.getAllMatches().first()
                 val groupMatches = allMatches.filter { !it.isKnockout && it.id < 900 }
                 val finished = allMatches.filter { it.homeGoals != null && it.awayGoals != null }
@@ -57,7 +59,7 @@ class QuestionsViewModel @Inject constructor(
                 val totalRedCards = finished.sumOf { (it.homeRedCards ?: 0) + (it.awayRedCards ?: 0) }
 
                 var resolved = 0
-                questions.value.filter { it.correctAnswer == null }.forEach { q ->
+                questionsReloaded.filter { it.correctAnswer == null }.forEach { q ->
                     val result: Boolean? = evaluateById(q.id, finished, groupFinished, knockout,
                         standings, totalGoals, totalRedCards, ::findMatch, ::teamPoints,
                         ::teamPosition, ::qualifiedFromGroup, ::matchName)

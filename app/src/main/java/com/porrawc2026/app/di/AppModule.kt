@@ -6,6 +6,8 @@ import com.porrawc2026.app.data.local.AppDatabase
 import com.porrawc2026.app.data.local.dao.*
 import com.porrawc2026.app.data.remote.ApiFootballConfig
 import com.porrawc2026.app.data.remote.SofascoreConfig
+import com.porrawc2026.app.data.remote.WorldCup26Config
+import com.porrawc2026.app.data.remote.WorldCup26Service
 import com.porrawc2026.app.data.remote.ApiFootballService
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.remote.ZafronixService
@@ -117,6 +119,23 @@ object AppModule {
     @Singleton
     fun provideApiFootballService(@Named("apifootball") retrofit: Retrofit): ApiFootballService {
         return retrofit.create(ApiFootballService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @Named("worldcup26")
+    fun provideWorldCup26Retrofit(client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(WorldCup26Config.BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideWorldCup26Service(@Named("worldcup26") retrofit: Retrofit): WorldCup26Service {
+        return retrofit.create(WorldCup26Service::class.java)
     }
 
     @Provides

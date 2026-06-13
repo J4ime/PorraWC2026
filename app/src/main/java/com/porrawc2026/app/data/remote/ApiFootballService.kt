@@ -88,12 +88,27 @@ interface ApiFootballService {
         @Query("date") date: String
     ): ApiFootballFixtureResponse
 
-    @GET("fixtures")
-    suspend fun getFixtureById(
+    @GET("fixtures/statistics")
+    suspend fun getFixtureStatistics(
         @Header("x-apisports-key") apiKey: String = "11ad7e440abb1ffc7f7d97ca5c3d23e3",
-        @Query("id") id: Long
-    ): ApiFootballFixtureResponse
+        @Query("fixture") fixture: Long
+    ): ApiFootballStatsResponse
 }
+
+data class ApiFootballStatsResponse(
+    val results: Int,
+    val response: List<ApiFootballTeamStats>
+)
+
+data class ApiFootballTeamStats(
+    val team: ApiFootballTeamInfo?,
+    val statistics: List<ApiFootballStatItem>
+)
+
+data class ApiFootballStatItem(
+    val type: String?,
+    val value: Any?
+)
 
 object ApiFootballConfig {
     const val BASE_URL = "https://v3.football.api-sports.io/"

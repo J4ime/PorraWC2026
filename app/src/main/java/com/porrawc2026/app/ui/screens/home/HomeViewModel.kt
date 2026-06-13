@@ -167,6 +167,8 @@ class HomeViewModel @Inject constructor(
                 _hasData.value = true
                 enrichScheduleFromApi()
                 refreshUpcomingMatches()
+                fetchLiveResults()
+                refreshUpcomingMatches()
             }
             _isReady.value = true
         }
@@ -235,6 +237,8 @@ class HomeViewModel @Inject constructor(
                     loadPlayers()
                     downloadPlayerPhotos()
                     startAutoRefresh()
+                    fetchLiveResults()
+                    refreshUpcomingMatches()
                 }
             } catch (e: Exception) {
                 Log.w("HomeVM", "===== IMPORT ERROR: ${e.message} =====", e)

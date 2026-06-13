@@ -98,7 +98,7 @@ fun AjustesScreen(
                 if (hasData) {
                     item {
                         SquareButton(
-                            icon = Icons.Filled.Delete,
+                            icon = Icons.Filled.GridOn,
                             label = "Borrar",
                             color = Color(0xFFB71C1C),
                             loading = false,

@@ -599,9 +599,9 @@ class HomeViewModel @Inject constructor(
             repository.updateMatchCards(card.matchId, card.homeReds, card.awayReds, card.homeYellows, card.awayYellows)
         }
 
-        // Actualizar minutos reales desde football-data.org
+        // Actualizar minutos reales desde api-sports.io
         try {
-            val minuteUpdates = liveScoreService.fetchLiveMatchDetails(cachedMatches)
+            val minuteUpdates = liveScoreService.fetchApiFootballMinutes(cachedMatches)
             minuteUpdates.forEach { update ->
                 if (update.liveMinute != null) {
                     liveMinutes[update.matchId] = update.liveMinute

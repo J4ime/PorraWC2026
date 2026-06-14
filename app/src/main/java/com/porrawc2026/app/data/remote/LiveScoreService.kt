@@ -33,7 +33,8 @@ data class CardUpdate(
 class LiveScoreService @Inject constructor(
     private val wc26: WorldCup26Service,
     private val zafronix: ZafronixService,
-    private val apiService: ApiService
+    private val apiService: ApiService,
+    private val apiFootballService: ApiFootballService
 ) {
 
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): Pair<List<LiveScoreUpdate>, List<CardUpdate>> {
@@ -112,6 +113,48 @@ class LiveScoreService @Inject constructor(
         } catch (_: Exception) { }
 
         return Pair(scoreUpdates, cardUpdates)
+    }
+
+    suspend fun fetchApiFootballMinutes(matches: List<MatchEntity>): List<LiveScoreUpdate> {
+        val updates = mutableListOf<LiveScoreUpdate>()
+        try {
+            val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val today = dateFmt.format(Date())
+            val resp = apiFootballService.getFixtures(today)
+
+            resp.response.forEach { fixture ->
+                val status = fixture.fixture.status ?: return@forEach
+                if (status.elapsed == null) return@forEach
+                val short = status.short ?: return@forEach
+                if (short in listOf("NS", "PST", "CANC", "ABD", "AWD", "WO", "TBD")) return@forEach
+
+                val entity = findMatchingMatch(matches,
+                    fixture.teams.home.name ?: "",
+                    fixture.teams.away.name ?: ""
+                ) ?: return@forEach
+
+                val elapsed = status.elapsed ?: return@forEach
+                val minute = when (short) {
+                    "HT" -> "HT"
+                    "FT", "AET", "PEN" -> "FINAL"
+                    "1H", "2H", "ET", "P", "LIVE" -> "$elapsed'"
+                    "INT" -> "INT"
+                    else -> "$elapsed'"
+                }
+                val homeGoals = fixture.goals.home ?: 0
+                val awayGoals = fixture.goals.away ?: 0
+
+                updates.add(LiveScoreUpdate(
+                    matchId = entity.id,
+                    homeGoals = homeGoals,
+                    awayGoals = awayGoals,
+                    isFinished = short in listOf("FT", "AET", "PEN"),
+                    liveMinute = minute
+                ))
+            }
+        } catch (_: Exception) { }
+
+        return updates
     }
 
     suspend fun fetchLiveMatchDetails(matches: List<MatchEntity>): List<LiveScoreUpdate> {

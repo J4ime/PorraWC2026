@@ -95,14 +95,23 @@ private fun QuestionRow(q: QuestionEntity) {
             val answer = when { q.correctAnswer == true -> "V"; q.correctAnswer == false -> "F"; else -> "-" }
             val ansColor = when { q.correctAnswer == true -> AccentGreen; q.correctAnswer == false -> AccentRed; else -> TextMuted }
             Text(answer, Modifier.width(50.dp), style = MaterialTheme.typography.bodySmall, color = ansColor, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-            Text("+${q.pointsEarned}", Modifier.width(40.dp),
-                style = MaterialTheme.typography.bodySmall, color = if (q.pointsEarned > 0) AccentGreen else TextMuted,
-                fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            if (closed) {
+                Text("+${q.pointsEarned}", Modifier.width(40.dp),
+                    style = MaterialTheme.typography.bodySmall, color = if (q.pointsEarned > 0) AccentGreen else TextMuted,
+                    fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            } else {
+                Text("", Modifier.width(40.dp))
+            }
         }
-        if (q.predictedAnswer != null && q.correctAnswer != null) {
-            val predicted = if (q.predictedAnswer == true) "V" else "F"
+        if (closed) {
+            val predicted = if (q.predictedAnswer == true) "V" else if (q.predictedAnswer == false) "F" else "-"
             val actual = if (q.correctAnswer == true) "V" else "F"
-            Text("Tu respuesta: $predicted → Real: $actual", fontSize = 9.sp, color = TextMuted, modifier = Modifier.padding(start = 24.dp))
+            Text(
+                "Excel: $actual  |  Tu respuesta: $predicted",
+                fontSize = 12.sp, color = if (q.pointsEarned > 0) AccentGreen else AccentRed,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 24.dp, top = 6.dp)
+            )
         }
     }
 }

@@ -149,21 +149,9 @@ class HomeViewModel @Inject constructor(
                     downloadPlayerPhotos()
                     precachePhotosInBackground()
                     startAutoRefresh()
-                    cachedMatches = cachedMatches.map {
-                        val start = parseMadridDate(it.dateTime)
-                        if (start != null) {
-                            val cal = Calendar.getInstance(madridTZ)
-                            val today = cal.get(Calendar.DAY_OF_YEAR)
-                            val year = cal.get(Calendar.YEAR)
-                            val matchCal = Calendar.getInstance(madridTZ).apply { time = start }
-                            val matchDay = matchCal.get(Calendar.DAY_OF_YEAR)
-                            val matchYear = matchCal.get(Calendar.YEAR)
-                            if (matchYear == year && matchDay == today)
-                                it.copy(homeGoals = null, awayGoals = null)
-                            else it
-                        } else it
-                    }
+                    // Keep DB goals, re-check from API
                     lastWrittenScores.clear()
+                    refreshUpcomingMatches()
                     fetchLiveResults()
                     refreshUpcomingMatches()
                     _hasData.value = true
@@ -583,6 +571,11 @@ class HomeViewModel @Inject constructor(
         scoreUpdates.forEach { update ->
             if (update.isFinished) liveMinutes[update.matchId] = "FINAL"
             else if (update.liveMinute != null) liveMinutes[update.matchId] = update.liveMinute
+            val match = cachedMatches.firstOrNull { it.id == update.matchId }
+            if (match != null) {
+                val start = parseMadridDate(match.dateTime)
+                if (start != null && start.after(Date())) return@forEach
+            }
             val prev = lastWrittenScores[update.matchId]
             if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
                 lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
@@ -615,15 +608,18 @@ class HomeViewModel @Inject constructor(
         try {
             val liveUpdates = liveScoreService.fetchLiveMatchDetails(cachedMatches)
             liveUpdates.forEach { update ->
-                if (update.homeGoals != null && update.awayGoals != null) {
-                    cachedMatches = cachedMatches.map {
-                        if (it.id == update.matchId) it.copy(
-                            homeGoals = update.homeGoals,
-                            awayGoals = update.awayGoals
-                        ) else it
-                    }
-                    recalcAllPoints()
+                val match = cachedMatches.firstOrNull { it.id == update.matchId }
+                if (match != null) {
+                    val start = parseMadridDate(match.dateTime)
+                    if (start != null && start.after(Date())) return@forEach
                 }
+                cachedMatches = cachedMatches.map {
+                    if (it.id == update.matchId) it.copy(
+                        homeGoals = update.homeGoals,
+                        awayGoals = update.awayGoals
+                    ) else it
+                }
+                recalcAllPoints()
             }
         } catch (_: Exception) { }
 
@@ -631,6 +627,11 @@ class HomeViewModel @Inject constructor(
         try {
             val minuteUpdates = liveScoreService.fetchApiFootballMinutes(cachedMatches)
             minuteUpdates.forEach { update ->
+                val m = cachedMatches.firstOrNull { it.id == update.matchId }
+                if (m != null) {
+                    val start = parseMadridDate(m.dateTime)
+                    if (start != null && start.after(Date())) return@forEach
+                }
                 if (update.liveMinute != null) {
                     liveMinutes[update.matchId] = update.liveMinute
                 }
@@ -711,7 +712,7 @@ class HomeViewModel @Inject constructor(
         } else ""
         val status = matchStatus(match)
 
-        val liveMin = when {
+        val liveMin = if (date != null && date.after(Date())) null else when {
             status == MatchStatus.FINISHED -> "FINAL"
             liveMinutes.containsKey(match.id) -> {
                 val lm = liveMinutes[match.id]

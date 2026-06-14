@@ -14,6 +14,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
 
 @HiltViewModel
@@ -61,6 +65,11 @@ class ResultsViewModel @Inject constructor(
                         TeamNameNormalizer.matches(m.homeTeam, liveMatch.homeTeam?.name ?: "") &&
                         TeamNameNormalizer.matches(m.awayTeam, liveMatch.awayTeam?.name ?: "")
                     } ?: return@forEach
+                    // No actualizar partidos futuros
+                    val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+                    sdf.timeZone = TimeZone.getTimeZone("Europe/Madrid")
+                    val matchDate = try { sdf.parse(localMatch.dateTime) } catch (_: Exception) { null }
+                    if (matchDate != null && matchDate.after(Date())) return@forEach
                     if (localMatch.homeGoals != homeGoals || localMatch.awayGoals != awayGoals) {
                         repository.updateMatchResults(localMatch.id, homeGoals, awayGoals)
                         val pts = PointsCalculator.calculateMatchPoints(

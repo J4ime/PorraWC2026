@@ -264,6 +264,12 @@ private fun SectionHeader(title: String, points: String) {
 
 @Composable
 private fun ResultRow(match: MatchEntity) {
+    val isFuture = kotlin.run {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+        sdf.timeZone = java.util.TimeZone.getTimeZone("Europe/Madrid")
+        try { sdf.parse(match.dateTime)?.after(java.util.Date()) ?: false } catch (_: Exception) { false }
+    }
+    val showScore = !isFuture && match.homeGoals != null && match.awayGoals != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -274,7 +280,7 @@ private fun ResultRow(match: MatchEntity) {
         Text(match.groupName, style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.width(60.dp))
         Text(match.homeTeam, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = TextPrimary, textAlign = TextAlign.End)
         Spacer(Modifier.width(8.dp))
-        if (match.homeGoals != null && match.awayGoals != null) {
+        if (showScore) {
             Text(
                 "${match.homeGoals} - ${match.awayGoals}",
                 style = MaterialTheme.typography.bodySmall,

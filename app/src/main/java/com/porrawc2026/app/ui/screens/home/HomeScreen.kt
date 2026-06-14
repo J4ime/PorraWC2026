@@ -67,14 +67,14 @@ fun HomeScreen(
         when { s == t - 1 -> "AYER"; s == t -> "HOY"; s == t + 1 -> "MAÑANA"; else -> day }
     }
 
-    val visibleDays = remember(allDaysSorted, selectedDay) {
-        val selIdx = if (selectedDay == null) todayIdx
-        else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
-        val start = maxOf(0, selIdx - 2)
-        val end = minOf(allDaysSorted.size, start + 5).let { if (it - start < 5) minOf(allDaysSorted.size, it + (5 - (it - start))) else it }
-        val adjStart = maxOf(0, end - 5)
-        allDaysSorted.subList(adjStart, end)
-    }
+        val visibleDays = remember(allDaysSorted, selectedDay) {
+            val selIdx = if (selectedDay == null) todayIdx
+            else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
+            val start = maxOf(0, selIdx - 3)
+            val end = minOf(allDaysSorted.size, start + 7).let { if (it - start < 7) minOf(allDaysSorted.size, it + (7 - (it - start))) else it }
+            val adjStart = maxOf(0, end - 7)
+            allDaysSorted.subList(adjStart, end)
+        }
 
     val visibleMatches = if (selectedDay == null) upcomingMatches
     else allMatches.filter { it.dayKey == selectedDay }

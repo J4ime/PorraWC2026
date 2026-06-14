@@ -1,6 +1,7 @@
 package com.porrawc2026.app.data.remote
 
 import com.porrawc2026.app.data.local.entity.MatchEntity
+import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -135,10 +136,13 @@ object MatchScheduleProvider {
     fun enrichSchedule(matches: List<MatchEntity>): List<MatchEntity> {
         val fallback = getHardcodedSchedule()
         return matches.map { match ->
-            val fb = fallback[match.id]
+            val fb = fallback.values.firstOrNull { s ->
+                TeamNameNormalizer.matches(match.homeTeam, s.home) &&
+                    TeamNameNormalizer.matches(match.awayTeam, s.away)
+            }
             val date = fb?.date ?: match.dateTime
             val isSpainMatch = spainTeams.any { match.homeTeam == it || match.awayTeam == it }
-            val tv = if (match.id in rtveMatchIds || isSpainMatch) "DAZN,RTVE" else "DAZN"
+            val tv = if (isSpainMatch) "DAZN,RTVE" else (fb?.tv ?: "DAZN")
             match.copy(dateTime = date, tvChannel = tv)
         }
     }

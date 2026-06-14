@@ -234,12 +234,14 @@ class LiveScoreService @Inject constructor(
         // The worldcup26 API returns strings like: {"Player 45'"} or {"Player1 45'","Player2 90'"}
         // where the outer braces and quotes are literal characters in the JSON string value
         val clean = s.trim().removeSurrounding("\"").removePrefix("{").removeSuffix("}")
+            .replace("\"", "").trim()
         if (clean.isBlank() || clean == "null" || clean == "[]") return emptyList()
         return clean.split(",").mapNotNull { parseSingleScorer(it.trim()) }
     }
 
     private fun parseSingleScorer(entry: String): LiveScorer? {
         val clean = entry.trim().removeSurrounding("\"").removeSurrounding("'")
+            .replace("\"", "").trim()
         if (clean.isBlank() || clean == "null") return null
 
         // The format is "Player Name 90'+5'" or "Player Name 17' (p)"

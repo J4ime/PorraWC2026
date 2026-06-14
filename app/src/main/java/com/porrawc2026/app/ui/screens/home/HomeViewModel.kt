@@ -685,13 +685,15 @@ class HomeViewModel @Inject constructor(
 
         val liveMin = when {
             status == MatchStatus.FINISHED -> "FINAL"
-            liveMinutes.containsKey(match.id) -> liveMinutes[match.id]
-            status == MatchStatus.LIVE && date != null -> {
-                val elapsed = ((Date().time - date.time) / 60000).toInt().coerceAtLeast(1)
-                if (elapsed > 45) "${(elapsed + 15).coerceAtMost(120)}'" else "$elapsed'"
+            liveMinutes.containsKey(match.id) -> {
+                val lm = liveMinutes[match.id]
+                if (lm == "LIVE") null else lm
             }
             else -> null
-        }
+        } ?: if (status == MatchStatus.LIVE && date != null) {
+            val elapsed = ((Date().time - date.time) / 60000).toInt().coerceAtLeast(1)
+            if (elapsed > 45) "${(elapsed + 15).coerceAtMost(120)}'" else "$elapsed'"
+        } else null
         val s = goalScorers[match.id]
         val homeScr = s?.first ?: emptyList()
         val awayScr = s?.second ?: emptyList()

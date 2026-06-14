@@ -38,6 +38,8 @@ fun AjustesScreen(
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val autoRefreshEnabled by viewModel.autoRefreshEnabled.collectAsState()
     val pdfResult by viewModel.pdfResult.collectAsState()
+    val userName by viewModel.userName.collectAsState()
+    val userPosition by viewModel.userPosition.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -136,8 +138,12 @@ fun AjustesScreen(
                 item {
                     SquareButton(
                         icon = Icons.Filled.Assessment,
-                        label = if (pdfResult != null) "Res: $pdfResult" else "Cargar result",
-                        color = Color(0xFF444444),
+                        label = when {
+                            pdfResult != null -> "Pos: $pdfResult"
+                            userPosition != null -> "Pos: $userPosition"
+                            else -> "Cargar result"
+                        },
+                        color = if (userPosition != null) Color(0xFF1565C0) else Color(0xFF444444),
                         loading = false,
                         onClick = { pdfLauncher.launch(arrayOf("application/pdf")) }
                     )
@@ -145,7 +151,12 @@ fun AjustesScreen(
             }
 
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(excelFileName ?: "", style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), maxLines = 1, modifier = Modifier.weight(1f))
+                Column(modifier = Modifier.weight(1f)) {
+                    if (userName != null) {
+                        Text(userName!!, style = MaterialTheme.typography.bodySmall, color = Color(0xFF888888), maxLines = 1)
+                    }
+                    Text(excelFileName ?: "", style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), maxLines = 1)
+                }
                 Text("v$appVersion", style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555))
             }
         }

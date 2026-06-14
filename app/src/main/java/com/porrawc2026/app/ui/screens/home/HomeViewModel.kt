@@ -104,6 +104,10 @@ class HomeViewModel @Inject constructor(
     val autoRefreshEnabled: StateFlow<Boolean> = _autoRefreshEnabled.asStateFlow()
     private val _pdfResult = MutableStateFlow<String?>(null)
     val pdfResult: StateFlow<String?> = _pdfResult.asStateFlow()
+    private val _userName = MutableStateFlow<String?>(null)
+    val userName: StateFlow<String?> = _userName.asStateFlow()
+    private val _userPosition = MutableStateFlow<Int?>(null)
+    val userPosition: StateFlow<Int?> = _userPosition.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
@@ -120,6 +124,7 @@ class HomeViewModel @Inject constructor(
             _excelFileName.value = prefsManager.getExcelFileNameSync()
             _autoRefreshEnabled.value = prefsManager.getAutoRefreshSync()
             _notificationsEnabled.value = prefsManager.getNotificationsSync()
+            _userName.value = prefsManager.getUserNameSync()
         }
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
@@ -186,9 +191,14 @@ class HomeViewModel @Inject constructor(
                     if (it.moveToFirst()) {
                         val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                         if (nameIndex >= 0) {
-                            val name = it.getString(nameIndex)
-                            _excelFileName.value = name
-                            prefsManager.setExcelFileName(name)
+                            val displayName = it.getString(nameIndex)
+                            _excelFileName.value = displayName
+                            prefsManager.setExcelFileName(displayName)
+                            val extracted = extractUserName(displayName)
+                            if (extracted != null) {
+                                _userName.value = extracted
+                                prefsManager.setUserName(extracted)
+                            }
                         }
                     }
                 }
@@ -269,23 +279,126 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             try {
+                val searchName = _userName.value?.takeIf { it.isNotBlank() } ?: "jaimede"
                 val inputStream = context.contentResolver.openInputStream(uri) ?: return@launch
-                val searchNormalized = "jaimede".lowercase()
-                inputStream.use { stream ->
-                    val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(stream)
-                    val stripper = com.tom_roush.pdfbox.text.PDFTextStripper()
-                    val text = stripper.getText(doc)
-                    doc.close()
-                    val found = text.lines().any { line ->
-                        line.lowercase().replace("í", "i").replace("é", "e").replace("á", "a")
-                            .replace("ó", "o").replace("ú", "u").contains(searchNormalized)
-                    }
-                    _pdfResult.value = if (found) "Encontrado" else "No encontrado"
-                }
+                val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
+                val position = findNamePosition(doc, searchName)
+                doc.close()
+                inputStream.close()
+                _pdfResult.value = if (position > 0) "Pos: $position" else "No encontrado"
+                _userPosition.value = position
             } catch (e: Exception) {
-                _pdfResult.value = "Error: ${e.message?.take(20)}"
+                _pdfResult.value = "Error: ${e.message?.take(25)}"
             } finally { _isBusy.value = false }
         }
+    }
+
+    private suspend fun findNamePosition(doc: com.tom_roush.pdfbox.pdmodel.PDDocument, searchName: String): Int {
+        data class Cc(val x: Float, val y: Float, val ch: String, val pg: Int)
+
+        val all = mutableListOf<Cc>()
+        var currentPage = 0
+
+        val stripper = object : com.tom_roush.pdfbox.text.PDFTextStripper() {
+            override fun startPage(page: com.tom_roush.pdfbox.pdmodel.PDPage) {
+                currentPage = currentPageNo
+            }
+            override fun writeString(text: String, textPositions: MutableList<com.tom_roush.pdfbox.text.TextPosition>) {
+                for (tp in textPositions) {
+                    val ch = tp.unicode
+                    if (ch != null && ch.isNotBlank()) {
+                        all.add(Cc(tp.xDirAdj, tp.yDirAdj, ch, currentPage))
+                    }
+                }
+            }
+        }
+        stripper.sortByPosition = true
+        stripper.getText(doc)
+
+        // Normalize search name (remove accents, lowercase)
+        fun normalize(s: String) = s.lowercase()
+            .replace("í", "i").replace("é", "e").replace("á", "a")
+            .replace("ó", "o").replace("ú", "u").replace("ñ", "n")
+        val searchNorm = normalize(searchName)
+
+        // Find the name by matching characters sequentially
+        var targetPage = -1
+        var targetY = -1f
+        for (i in 0..all.size - searchName.length) {
+            if (normalize(all[i].ch) == searchNorm[0].toString()) {
+                var match = true
+                for (j in 1 until searchName.length) {
+                    if (i + j >= all.size || normalize(all[i + j].ch) != searchNorm[j].toString()) {
+                        match = false
+                        break
+                    }
+                }
+                if (match) {
+                    targetPage = all[i].pg
+                    targetY = all[i].y
+                    break
+                }
+            }
+        }
+        if (targetPage < 0) return 0
+
+        // Name-area text: left side (X<100) OR right side (X in [450,600), excluding goal predictions with "/")
+        fun nameText(chars: List<Cc>): String {
+            val left = StringBuilder()
+            val right = StringBuilder()
+            for (cc in chars.sortedBy { it.x }) {
+                if (cc.ch in "0123456789 ") continue
+                if (cc.x < 100) left.append(cc.ch)
+                else if (cc.x >= 450 && cc.x < 600) right.append(cc.ch)
+            }
+            val l = left.toString().trim()
+            val r = right.toString().trim()
+            return when {
+                l.contains("/") && r.contains("/") -> ""
+                r.contains("/") -> l
+                l.contains("/") -> r
+                l.length >= 3 -> l
+                r.length >= 3 -> r
+                else -> ""
+            }
+        }
+
+        // Group by page, then Y (rounded)
+        val pageYGroups = mutableMapOf<Int, MutableMap<Int, MutableList<Cc>>>()
+        for (cc in all) {
+            val yKey = Math.round(cc.y)
+            pageYGroups.getOrPut(cc.pg) { mutableMapOf() }
+                .getOrPut(yKey) { mutableListOf() }
+                .add(cc)
+        }
+
+        // Count names across pages up to target
+        val targetYKey = Math.round(targetY)
+        var pos = 0
+        for (pg in 1..targetPage) {
+            val yg = pageYGroups[pg] ?: continue
+            val sortedY = yg.keys.sorted()
+            var prevY = -1000
+            for (y in sortedY) {
+                if (pg == targetPage && y > targetYKey) break
+                val text = nameText(yg[y]!!)
+                if (text.length < 3 || text.contains("/") || text.contains("---")) continue
+                if (text.firstOrNull()?.isUpperCase() != true) continue
+                if (text.matches(Regex("^[A-ZÁÉÍÓÚÑ]+$")) && text.length < 5) continue
+
+                // Always count the row where the name was found
+                if (pg == targetPage && y == targetYKey) {
+                    pos++
+                    break
+                }
+
+                val diff = y - prevY
+                if (diff < 6) continue // merge split names on same row
+                pos++
+                prevY = y
+            }
+        }
+        return pos
     }
 
     fun installUpdate() {
@@ -464,9 +577,9 @@ class HomeViewModel @Inject constructor(
                 cachedMatches = cachedMatches.map {
                     if (it.id == update.matchId) it.copy(homeGoals = update.homeGoals, awayGoals = update.awayGoals) else it
                 }
+                recalcAllPoints(); refreshPoints()
                 if (update.isFinished) {
                     repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
-                    recalcAllPoints(); refreshPoints()
                 }
                 val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
                 val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
@@ -485,6 +598,16 @@ class HomeViewModel @Inject constructor(
             }
             repository.updateMatchCards(card.matchId, card.homeReds, card.awayReds, card.homeYellows, card.awayYellows)
         }
+
+        // Actualizar minutos reales desde football-data.org
+        try {
+            val minuteUpdates = liveScoreService.fetchLiveMatchDetails(cachedMatches)
+            minuteUpdates.forEach { update ->
+                if (update.liveMinute != null) {
+                    liveMinutes[update.matchId] = update.liveMinute
+                }
+            }
+        } catch (_: Exception) { }
 
         checkGoalNotifications()
         refreshUpcomingMatches()
@@ -639,5 +762,23 @@ class HomeViewModel @Inject constructor(
     private fun stopLiveMinutePolling() {
         liveMinutePollJob?.cancel()
         liveMinutePollJob = null
+    }
+
+    private fun extractUserName(displayName: String?): String? {
+        if (displayName == null) return null
+        var name = displayName
+        name = name.replace(".xlsx", "", ignoreCase = true)
+            .replace(".xls", "", ignoreCase = true)
+        val separators = listOf(" - ", "-", " _ ", "_", " ")
+        for (sep in separators) {
+            val parts = name.split(sep)
+            if (parts.size >= 2) {
+                val last = parts.last().trim()
+                if (last.matches(Regex(".*[a-zA-Z].*")) && last.length >= 3) {
+                    return last
+                }
+            }
+        }
+        return name.takeIf { it.matches(Regex(".*[a-zA-Z].*")) && it.length >= 3 }
     }
 }

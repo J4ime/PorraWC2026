@@ -17,11 +17,13 @@ class PrefsManager(private val context: Context) {
         val EXCEL_FILE_NAME = stringPreferencesKey("excel_filename")
         val AUTO_REFRESH = booleanPreferencesKey("auto_refresh")
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
+        val USER_NAME = stringPreferencesKey("user_name")
     }
 
     val excelFileName: Flow<String?> = context.dataStore.data.map { it[EXCEL_FILE_NAME] }
     val autoRefresh: Flow<Boolean> = context.dataStore.data.map { it[AUTO_REFRESH] ?: true }
     val notificationsEnabled: Flow<Boolean> = context.dataStore.data.map { it[NOTIFICATIONS_ENABLED] ?: true }
+    val userName: Flow<String?> = context.dataStore.data.map { it[USER_NAME] }
 
     suspend fun setExcelFileName(name: String?) {
         context.dataStore.edit { it[EXCEL_FILE_NAME] = name ?: "" }
@@ -35,7 +37,12 @@ class PrefsManager(private val context: Context) {
         context.dataStore.edit { it[NOTIFICATIONS_ENABLED] = enabled }
     }
 
+    suspend fun setUserName(name: String?) {
+        context.dataStore.edit { it[USER_NAME] = name ?: "" }
+    }
+
     suspend fun getAutoRefreshSync(): Boolean = autoRefresh.first()
     suspend fun getNotificationsSync(): Boolean = notificationsEnabled.first()
     suspend fun getExcelFileNameSync(): String? = excelFileName.first()?.takeIf { it.isNotBlank() }
+    suspend fun getUserNameSync(): String? = userName.first()?.takeIf { it.isNotBlank() }
 }

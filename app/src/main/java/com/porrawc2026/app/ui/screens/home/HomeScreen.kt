@@ -3,6 +3,7 @@ package com.porrawc2026.app.ui.screens.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -76,8 +77,11 @@ fun HomeScreen(
             allDaysSorted.subList(adjStart, end)
         }
 
-    val visibleMatches = if (selectedDay == null) upcomingMatches
-    else allMatches.filter { it.dayKey == selectedDay }
+    val visibleMatches = remember(upcomingMatches, allMatches, selectedDay) {
+        val base = if (selectedDay == null) upcomingMatches
+        else allMatches.filter { it.dayKey == selectedDay }
+        base.sortedBy { if (it.status == MatchStatus.LIVE) 0 else 1 }
+    }
 
     var showYesterday by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -182,10 +186,11 @@ private fun MatchRow(match: MatchDisplay) {
     val hasPred = match.predictedHomeGoals != null && match.predictedAwayGoals != null
     val hasResult = match.homeGoals != null && match.awayGoals != null
     val isLive = match.status == MatchStatus.LIVE
-    val isFinished = hasResult && !isLive
+    val isFinished = hasResult && match.status == MatchStatus.FINISHED
     val hasLiveMinute = match.liveMinute != null
 
-    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 6.dp)) {
+    val borderColor = if (isLive) Color(0xFF4CAF50) else Color.Transparent
+    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).then(if (isLive) Modifier.border(2.dp, borderColor, RoundedCornerShape(10.dp)) else Modifier).padding(horizontal = 8.dp, vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Minute + Score column
             Column(modifier = Modifier.width(44.dp), horizontalAlignment = Alignment.CenterHorizontally) {

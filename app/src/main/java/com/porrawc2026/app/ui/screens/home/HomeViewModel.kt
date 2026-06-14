@@ -599,7 +599,23 @@ class HomeViewModel @Inject constructor(
             repository.updateMatchCards(card.matchId, card.homeReds, card.awayReds, card.homeYellows, card.awayYellows)
         }
 
-        // Actualizar minutos reales desde api-sports.io
+        // Actualizar marcadores desde football-data.org
+        try {
+            val liveUpdates = liveScoreService.fetchLiveMatchDetails(cachedMatches)
+            liveUpdates.forEach { update ->
+                if (update.homeGoals != null && update.awayGoals != null) {
+                    cachedMatches = cachedMatches.map {
+                        if (it.id == update.matchId) it.copy(
+                            homeGoals = update.homeGoals,
+                            awayGoals = update.awayGoals
+                        ) else it
+                    }
+                    recalcAllPoints()
+                }
+            }
+        } catch (_: Exception) { }
+
+        // Actualizar minuto real desde api-sports.io (sobrescribe "LIVE")
         try {
             val minuteUpdates = liveScoreService.fetchApiFootballMinutes(cachedMatches)
             minuteUpdates.forEach { update ->

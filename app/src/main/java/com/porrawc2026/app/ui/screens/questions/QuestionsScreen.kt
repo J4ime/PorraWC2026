@@ -81,7 +81,13 @@ fun QuestionsScreen(
 
 @Composable
 private fun QuestionRow(q: QuestionEntity) {
-    val bg = if (q.id % 2 == 0) MatchBg else MatchBgAlternate
+    val closed = q.correctAnswer != null
+    val bg = when {
+        closed && q.pointsEarned > 0 -> CorrectBg
+        closed -> IncorrectBg
+        q.id % 2 == 0 -> MatchBg
+        else -> MatchBgAlternate
+    }
     Column(Modifier.fillMaxWidth().background(bg, RoundedCornerShape(6.dp)).padding(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${q.id}", Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, fontWeight = FontWeight.Bold)
@@ -89,7 +95,7 @@ private fun QuestionRow(q: QuestionEntity) {
             val answer = when { q.correctAnswer == true -> "V"; q.correctAnswer == false -> "F"; else -> "-" }
             val ansColor = when { q.correctAnswer == true -> AccentGreen; q.correctAnswer == false -> AccentRed; else -> TextMuted }
             Text(answer, Modifier.width(50.dp), style = MaterialTheme.typography.bodySmall, color = ansColor, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
-            Text(if (q.pointsEarned > 0) "+${q.pointsEarned}" else "", Modifier.width(40.dp),
+            Text("+${q.pointsEarned}", Modifier.width(40.dp),
                 style = MaterialTheme.typography.bodySmall, color = if (q.pointsEarned > 0) AccentGreen else TextMuted,
                 fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         }

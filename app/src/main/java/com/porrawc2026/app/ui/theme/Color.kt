@@ -33,3 +33,7 @@ val MatchBg = Color(0xFF151515)
 val MatchBgAlternate = Color(0xFF111111)
 val InputBg = Color(0xFF1E1E1E)
 val InputBorder = Color(0xFF444444)
+
+// Question result backgrounds
+val CorrectBg = Color(0xFF1B3B1B)
+val IncorrectBg = Color(0xFF3B2020)

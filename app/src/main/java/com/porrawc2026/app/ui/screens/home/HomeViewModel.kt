@@ -121,43 +121,45 @@ class HomeViewModel @Inject constructor(
             _autoRefreshEnabled.value = prefsManager.getAutoRefreshSync()
             _notificationsEnabled.value = prefsManager.getNotificationsSync()
         }
-        refreshPoints(); loadPlayers(); preloadSchedule(); precachePhotos()
+        refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
     }
 
-    private fun precachePhotos() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _isBusy.value = true
-            PlayerPhotoDownloader.precacheTopPlayers(context)
-            _isBusy.value = false
-        }
+    private suspend fun precachePhotosInBackground() {
+        PlayerPhotoDownloader.precacheTopPlayers(context)
     }
 
     private fun preloadSchedule() {
         loadHardcodedMatches()
         viewModelScope.launch(Dispatchers.IO) {
-            val dbMatches = repository.getAllMatches().first()
-            if (dbMatches.isNotEmpty()) {
-                cachedMatches = dbMatches
-                _hasData.value = true
-                enrichSchedule()
-                recalcAllPoints()
-                refreshPoints()
-                loadPlayers()
-                downloadPlayerPhotos()
-                startAutoRefresh()
-                cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null) }
-                lastWrittenScores.clear()
-                fetchLiveResults()
-                refreshUpcomingMatches()
-            } else {
-                _hasData.value = true
-                enrichSchedule()
-                refreshUpcomingMatches()
-                fetchLiveResults()
-                refreshUpcomingMatches()
+            _isBusy.value = true
+            try {
+                val dbMatches = repository.getAllMatches().first()
+                if (dbMatches.isNotEmpty()) {
+                    cachedMatches = dbMatches
+                    _hasData.value = true
+                    enrichSchedule()
+                    recalcAllPoints()
+                    refreshPoints()
+                    loadPlayers()
+                    downloadPlayerPhotos()
+                    precachePhotosInBackground()
+                    startAutoRefresh()
+                    cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null) }
+                    lastWrittenScores.clear()
+                    fetchLiveResults()
+                    refreshUpcomingMatches()
+                } else {
+                    _hasData.value = true
+                    enrichSchedule()
+                    refreshUpcomingMatches()
+                    fetchLiveResults()
+                    refreshUpcomingMatches()
+                }
+                _isReady.value = true
+            } finally {
+                _isBusy.value = false
             }
-            _isReady.value = true
         }
     }
 
@@ -267,28 +269,19 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             try {
-                val fileName = _excelFileName.value ?: return@launch
-                val prefix = fileName.substringBefore(".").take(6)
-                if (prefix.length < 3) { _pdfResult.value = "Nombre corto"; return@launch }
                 val inputStream = context.contentResolver.openInputStream(uri) ?: return@launch
-                val pddoc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
-                inputStream.close()
-                val stripper = com.tom_roush.pdfbox.text.PDFTextStripper()
-                var result: String? = null
-                for (page in 1..pddoc.numberOfPages.coerceAtMost(5)) {
-                    stripper.startPage = page; stripper.endPage = page
-                    val text = stripper.getText(pddoc)
-                    for (line in text.lines()) {
-                        if (line.contains(prefix, ignoreCase = true)) {
-                            val parts = line.trim().split(Regex("\\s+"))
-                            val num = parts.firstOrNull { it.toIntOrNull() != null }
-                            if (num != null) { result = num; break }
-                        }
+                val searchNormalized = "jaimede".lowercase()
+                inputStream.use { stream ->
+                    val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(stream)
+                    val stripper = com.tom_roush.pdfbox.text.PDFTextStripper()
+                    val text = stripper.getText(doc)
+                    doc.close()
+                    val found = text.lines().any { line ->
+                        line.lowercase().replace("í", "i").replace("é", "e").replace("á", "a")
+                            .replace("ó", "o").replace("ú", "u").contains(searchNormalized)
                     }
-                    if (result != null) break
+                    _pdfResult.value = if (found) "Encontrado" else "No encontrado"
                 }
-                pddoc.close()
-                _pdfResult.value = result ?: "No encontrado"
             } catch (e: Exception) {
                 _pdfResult.value = "Error: ${e.message?.take(20)}"
             } finally { _isBusy.value = false }

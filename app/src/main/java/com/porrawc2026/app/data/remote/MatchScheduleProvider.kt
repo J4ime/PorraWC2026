@@ -13,7 +13,6 @@ object MatchScheduleProvider {
     private val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
 
     private val rtveMatchIds = setOf(1, 7, 13, 25, 43, 49, 67, 9, 21, 33, 45, 57, 69, 17, 30, 48, 65)
-    private val spainTeams = setOf("España")
 
     data class MatchSchedule(
         val id: Int,
@@ -120,6 +119,7 @@ object MatchScheduleProvider {
         val schedule = getHardcodedSchedule()
         return schedule.map { (id, s) ->
             val groupIndex = (id - 1) / 6
+            val tv = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
             MatchEntity(
                 id = id,
                 groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
@@ -127,7 +127,7 @@ object MatchScheduleProvider {
                 dateTime = s.date,
                 homeTeam = s.home,
                 awayTeam = s.away,
-                tvChannel = s.tv,
+                tvChannel = tv,
                 isKnockout = false
             )
         }.sortedBy { it.id }
@@ -141,8 +141,7 @@ object MatchScheduleProvider {
                     TeamNameNormalizer.matches(match.awayTeam, s.away)
             }
             val date = fb?.date ?: match.dateTime
-            val isSpainMatch = spainTeams.any { match.homeTeam == it || match.awayTeam == it }
-            val tv = if (isSpainMatch) "DAZN,RTVE" else (fb?.tv ?: "DAZN")
+            val tv = if (fb != null && rtveMatchIds.contains(fb.id)) "DAZN,RTVE" else "DAZN"
             match.copy(dateTime = date, tvChannel = tv)
         }
     }

@@ -21,8 +21,8 @@ android {
         applicationId = "com.porrawc2026.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 168
-        versionName = "1.8.4"
+        versionCode = 169
+        versionName = "1.8.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "FOOTBALL_DATA_API_KEY", "\"${localProperties.getProperty("FOOTBALL_DATA_API_KEY", "")}\"")
@@ -36,6 +36,8 @@ android {
             storePassword = "PorraWC2026!"
             keyAlias = "porrawc2026"
             keyPassword = "PorraWC2026!"
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 

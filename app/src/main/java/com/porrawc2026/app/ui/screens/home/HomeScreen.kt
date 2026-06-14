@@ -62,20 +62,19 @@ fun HomeScreen(
 
     val allDaysSorted = remember(dayKeys) { dayKeys.sortedBy { sortNum(it) } }
     val todayIdx = allDaysSorted.indexOf(todayDayKey)
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(selectedDay) {
+        val selIdx = if (selectedDay == null) todayIdx
+        else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
+        val targetScroll = (selIdx * 80).coerceAtMost(scrollState.maxValue)
+        scrollState.animateScrollTo(targetScroll)
+    }
 
     val dayLabel = { day: String ->
         val s = sortNum(day); val t = sortNum(todayDayKey)
         when { s == t - 1 -> "AYER"; s == t -> "HOY"; s == t + 1 -> "MAÑANA"; else -> day }
     }
-
-        val visibleDays = remember(allDaysSorted, selectedDay) {
-            val selIdx = if (selectedDay == null) todayIdx
-            else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
-            val start = maxOf(0, selIdx - 3)
-            val end = minOf(allDaysSorted.size, start + 7).let { if (it - start < 7) minOf(allDaysSorted.size, it + (7 - (it - start))) else it }
-            val adjStart = maxOf(0, end - 7)
-            allDaysSorted.subList(adjStart, end)
-        }
 
     val visibleMatches = remember(upcomingMatches, allMatches, selectedDay) {
         val base = if (selectedDay == null) upcomingMatches
@@ -95,17 +94,18 @@ fun HomeScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             // Day navigation bar
             Row(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF141414)).padding(vertical = 6.dp).horizontalScroll(scrollState),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                visibleDays.forEach { day ->
+                Spacer(Modifier.width(8.dp))
+                allDaysSorted.forEach { day ->
                     val isSelected = if (day == todayDayKey) selectedDay == null else selectedDay == day
                     DayChip(dayLabel(day), isSelected) {
                         selectedDay = if (day == todayDayKey) null else day
                     }
                     Spacer(Modifier.width(4.dp))
                 }
+                Spacer(Modifier.width(8.dp))
             }
 
             LazyColumn(modifier = Modifier.weight(1f).nestedScroll(pullRefreshState.nestedScrollConnection).pointerInput(allDaysSorted, selectedDay) {

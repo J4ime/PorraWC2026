@@ -137,7 +137,6 @@ class HomeViewModel @Inject constructor(
                 val dbMatches = repository.getAllMatches().first()
                 if (dbMatches.isNotEmpty()) {
                     cachedMatches = dbMatches
-                    _hasData.value = true
                     enrichSchedule()
                     recalcAllPoints()
                     refreshPoints()
@@ -149,12 +148,13 @@ class HomeViewModel @Inject constructor(
                     lastWrittenScores.clear()
                     fetchLiveResults()
                     refreshUpcomingMatches()
-                } else {
                     _hasData.value = true
+                } else {
                     enrichSchedule()
                     refreshUpcomingMatches()
                     fetchLiveResults()
                     refreshUpcomingMatches()
+                    _hasData.value = true
                 }
                 _isReady.value = true
             } finally {
@@ -194,19 +194,19 @@ class HomeViewModel @Inject constructor(
                 }
                 val data = ExcelParser.parse(context, uri)
                 val validation = ExcelParser.validate()
-                _validationResult.value = validation
+                    _validationResult.value = validation
                 if (validation.isValid) {
                     repository.insertAllData(
                         data.teams, data.matches, data.questions,
                         data.playerPredictions, data.knockoutPredictions, data.standings
                     )
-                    _hasData.value = true
                     cachedMatches = data.matches
                     lastWrittenScores.clear()
                     enrichSchedule()
                     recalcAllPoints()
                     refreshPoints()
                     refreshUpcomingMatches()
+                    _hasData.value = true
                     loadPlayers()
                     downloadPlayerPhotos()
                     startAutoRefresh()

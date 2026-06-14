@@ -139,7 +139,7 @@ fun HomeScreen(
                             visibleMatches.take(12).forEach { MatchRow(it); if (it != visibleMatches.take(12).last()) Spacer(Modifier.height(6.dp)) }
                         }
                     }
-                } else if (hasData) {
+                } else if (hasData && !isBusy) {
                     item { Text("Sin partidos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }
                 }
             }

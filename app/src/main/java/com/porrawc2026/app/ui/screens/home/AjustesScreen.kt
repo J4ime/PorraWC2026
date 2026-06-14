@@ -34,7 +34,6 @@ fun AjustesScreen(
     val isBusy by viewModel.isBusy.collectAsState()
     val isUpdating by viewModel.isUpdating.collectAsState()
     val appVersion by viewModel.appVersion.collectAsState()
-    val excelFileName by viewModel.excelFileName.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
     val autoRefreshEnabled by viewModel.autoRefreshEnabled.collectAsState()
     val pdfResult by viewModel.pdfResult.collectAsState()
@@ -139,7 +138,7 @@ fun AjustesScreen(
                     SquareButton(
                         icon = Icons.Filled.Assessment,
                         label = when {
-                            pdfResult != null -> "Pos: $pdfResult"
+                            pdfResult != null -> "POS: $pdfResult"
                             userPosition != null -> "Pos: $userPosition"
                             else -> "Cargar result"
                         },
@@ -155,7 +154,6 @@ fun AjustesScreen(
                     if (userName != null) {
                         Text(userName!!, style = MaterialTheme.typography.bodySmall, color = Color(0xFF888888), maxLines = 1)
                     }
-                    Text(excelFileName ?: "", style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555), maxLines = 1)
                 }
                 Text("v$appVersion", style = MaterialTheme.typography.labelSmall, color = Color(0xFF555555))
             }

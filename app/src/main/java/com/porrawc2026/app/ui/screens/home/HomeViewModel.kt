@@ -135,9 +135,9 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun preloadSchedule() {
+        _isBusy.value = true
         loadHardcodedMatches()
         viewModelScope.launch(Dispatchers.IO) {
-            _isBusy.value = true
             try {
                 val dbMatches = repository.getAllMatches().first()
                 if (dbMatches.isNotEmpty()) {
@@ -149,7 +149,20 @@ class HomeViewModel @Inject constructor(
                     downloadPlayerPhotos()
                     precachePhotosInBackground()
                     startAutoRefresh()
-                    cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null) }
+                    cachedMatches = cachedMatches.map {
+                        val start = parseMadridDate(it.dateTime)
+                        if (start != null) {
+                            val cal = Calendar.getInstance(madridTZ)
+                            val today = cal.get(Calendar.DAY_OF_YEAR)
+                            val year = cal.get(Calendar.YEAR)
+                            val matchCal = Calendar.getInstance(madridTZ).apply { time = start }
+                            val matchDay = matchCal.get(Calendar.DAY_OF_YEAR)
+                            val matchYear = matchCal.get(Calendar.YEAR)
+                            if (matchYear == year && matchDay == today)
+                                it.copy(homeGoals = null, awayGoals = null)
+                            else it
+                        } else it
+                    }
                     lastWrittenScores.clear()
                     fetchLiveResults()
                     refreshUpcomingMatches()
@@ -285,7 +298,7 @@ class HomeViewModel @Inject constructor(
                 val position = findNamePosition(doc, searchName)
                 doc.close()
                 inputStream.close()
-                _pdfResult.value = if (position > 0) "Pos: $position" else "No encontrado"
+                _pdfResult.value = if (position > 0) "$position" else "No encontrado"
                 _userPosition.value = position
             } catch (e: Exception) {
                 _pdfResult.value = "Error: ${e.message?.take(25)}"
@@ -384,7 +397,6 @@ class HomeViewModel @Inject constructor(
                 val text = nameText(yg[y]!!)
                 if (text.length < 3 || text.contains("/") || text.contains("---")) continue
                 if (text.firstOrNull()?.isUpperCase() != true) continue
-                if (text.matches(Regex("^[A-ZÁÉÍÓÚÑ]+$")) && text.length < 5) continue
 
                 // Always count the row where the name was found
                 if (pg == targetPage && y == targetYKey) {
@@ -393,7 +405,7 @@ class HomeViewModel @Inject constructor(
                 }
 
                 val diff = y - prevY
-                if (diff < 6) continue // merge split names on same row
+                if (diff < 3) continue // merge split names on same row
                 pos++
                 prevY = y
             }
@@ -737,13 +749,15 @@ class HomeViewModel @Inject constructor(
     }
 
     fun matchStatus(match: MatchEntity): MatchStatus {
+        val start = parseMadridDate(match.dateTime)
+        if (start != null && start.after(Date())) return MatchStatus.UPCOMING
         val lm = liveMinutes[match.id]
         if (lm != null && lm != "FINAL") return MatchStatus.LIVE
         if (match.homeGoals != null && match.awayGoals != null) return MatchStatus.FINISHED
-        val start = parseMadridDate(match.dateTime) ?: return MatchStatus.UPCOMING
+        val parsed = start ?: return MatchStatus.UPCOMING
         val now = Date()
-        val end = Date(start.time + 150L * 60 * 1000)
-        return if (now.after(start) && now.before(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
+        val end = Date(parsed.time + 150L * 60 * 1000)
+        return if (now.after(parsed) && now.before(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
     }
 
     override fun onCleared() {

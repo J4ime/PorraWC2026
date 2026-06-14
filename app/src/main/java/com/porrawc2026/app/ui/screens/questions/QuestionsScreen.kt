@@ -105,9 +105,8 @@ private fun QuestionRow(q: QuestionEntity) {
         }
         if (closed) {
             val predicted = if (q.predictedAnswer == true) "V" else if (q.predictedAnswer == false) "F" else "-"
-            val actual = if (q.correctAnswer == true) "V" else "F"
             Text(
-                "Tu respuesta: $predicted  →  Real: $actual",
+                "Tu respuesta: $predicted",
                 fontSize = 12.sp, color = if (q.pointsEarned > 0) AccentGreen else AccentRed,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 24.dp, top = 6.dp)

@@ -188,6 +188,7 @@ private fun MatchRow(match: MatchDisplay) {
     val isLive = match.status == MatchStatus.LIVE
     val isFinished = hasResult && match.status == MatchStatus.FINISHED
     val hasLiveMinute = match.liveMinute != null
+    val showScore = hasResult && match.status != MatchStatus.UPCOMING
 
     val borderColor = if (isLive) Color(0xFF4CAF50) else Color.Transparent
     Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).then(if (isLive) Modifier.border(2.dp, borderColor, RoundedCornerShape(10.dp)) else Modifier).padding(horizontal = 8.dp, vertical = 6.dp)) {
@@ -204,9 +205,9 @@ private fun MatchRow(match: MatchDisplay) {
 
             // Goals column  
             Column(modifier = Modifier.width(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val h = if (hasResult || isLive) match.homeGoals?.toString() ?: "0" else "-"
-                val a = if (hasResult || isLive) match.awayGoals?.toString() ?: "0" else "-"
-                val sc = when { isLive -> Color(0xFF4CAF50); hasResult -> Color.White; else -> Color(0xFF777777) }
+                val h = if (showScore || isLive) match.homeGoals?.toString() ?: "0" else "-"
+                val a = if (showScore || isLive) match.awayGoals?.toString() ?: "0" else "-"
+                val sc = when { isLive -> Color(0xFF4CAF50); showScore -> Color.White; else -> Color(0xFF777777) }
                 Text(h, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(4.dp))
                 Text(a, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
@@ -229,12 +230,12 @@ private fun MatchRow(match: MatchDisplay) {
 
             // Points + TV column
             Column(modifier = Modifier.width(36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (hasPred && (isLive || hasResult)) {
+                if (hasPred && (isLive || showScore)) {
                     val pts = if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0"
                     val pc = when { match.pointsEarned > 0 -> Color(0xFF4CAF50); else -> Color(0xFF666666) }
                     Text(pts, fontSize = 12.sp, color = pc, fontWeight = FontWeight.Bold)
                 }
-                if (!isLive && !hasResult) {
+                if (!isLive && !showScore) {
                     val channels = match.tvChannel.split(",").filter { it.isNotBlank() }
                     channels.forEach { ch ->
                         val bg = if (ch.contains("RTVE", true)) Color(0xFF0037A1) else Color(0xFF333333)

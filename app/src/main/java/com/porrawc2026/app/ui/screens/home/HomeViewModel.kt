@@ -82,7 +82,7 @@ class HomeViewModel @Inject constructor(
     val errorMessage: SharedFlow<String> = _errorMessage.asSharedFlow()
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
-    private val _isBusy = MutableStateFlow(false)
+    private val _isBusy = MutableStateFlow(true)
     val isBusy: StateFlow<Boolean> = _isBusy.asStateFlow()
     private val _updateAvailable = MutableStateFlow(false)
     val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()

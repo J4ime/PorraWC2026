@@ -285,11 +285,21 @@ class HomeViewModel @Inject constructor(
     fun loadPdfResult(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
+            Log.d("PdfDebug", "loadPdfResult: uri=$uri")
             try {
                 val searchName = _userName.value?.takeIf { it.isNotBlank() } ?: "jaimede"
-                val inputStream = context.contentResolver.openInputStream(uri) ?: return@launch
+                Log.d("PdfDebug", "searchName=$searchName")
+                val inputStream = context.contentResolver.openInputStream(uri)
+                if (inputStream == null) {
+                    Log.e("PdfDebug", "inputStream is NULL!")
+                    _pdfResult.value = "Error: null input"
+                    return@launch
+                }
+                Log.d("PdfDebug", "inputStream ok, loading doc...")
                 val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
+                Log.d("PdfDebug", "doc loaded, pages=${doc.numberOfPages}")
                 val position = findNamePosition(doc, searchName)
+                Log.d("PdfDebug", "findNamePosition returned position=$position")
                 doc.close()
                 inputStream.close()
 
@@ -300,12 +310,15 @@ class HomeViewModel @Inject constructor(
                     prefsManager.setUserPosition(position)
                     prefsManager.setPreviousPosition(oldPos)
                     _pdfResult.value = "$position"
+                    Log.d("PdfDebug", "SUCCESS: position=$position, oldPos=$oldPos, diff=${_positionDiff.value}")
                 } else {
                     _userPosition.value = null
                     _positionDiff.value = null
                     _pdfResult.value = "No encontrado"
+                    Log.d("PdfDebug", "NOT FOUND: position=$position")
                 }
             } catch (e: Exception) {
+                Log.e("PdfDebug", "Exception: ${e.message}", e)
                 _pdfResult.value = "Error: ${e.message?.take(25)}"
             } finally { _isBusy.value = false }
         }
@@ -333,32 +346,65 @@ class HomeViewModel @Inject constructor(
         stripper.sortByPosition = true
         stripper.getText(doc)
 
+        Log.d("PdfDebug", "allItems size=${allItems.size}, pages: ${allItems.map { it.pg }.distinct().sorted()}")
+        val pageCounts = allItems.groupBy { it.pg }.mapValues { it.value.size }
+        Log.d("PdfDebug", "items per page: $pageCounts")
+
         // Normalize search name
         fun normalize(s: String) = s.lowercase()
             .replace("í", "i").replace("é", "e").replace("á", "a")
             .replace("ó", "o").replace("ú", "u").replace("ñ", "n")
         val searchNorm = normalize(searchName)
+        Log.d("PdfDebug", "searchNorm=$searchNorm (len=${searchNorm.length})")
 
-        // Find the name by matching characters sequentially
+        // Find the name by matching characters sequentially (skip spaces/special chars in PDF)
+        fun isIgnored(c: String) = c.isBlank() || c in listOf("-", "_", ".", ",", "'", ":", ";", "(", ")", "\"", "!", "?")
         var targetPage = -1
         var targetX = -1f
-        for (i in 0..allItems.size - searchNorm.length) {
-            if (normalize(allItems[i].text) == searchNorm[0].toString()) {
-                var match = true
-                for (j in 1 until searchNorm.length) {
-                    if (i + j >= allItems.size || normalize(allItems[i + j].text) != searchNorm[j].toString()) {
-                        match = false
-                        break
-                    }
-                }
-                if (match) {
-                    targetPage = allItems[i].pg
-                    targetX = allItems[i].x
+        var searchOffset = -1
+        var pdfIdx = 0
+        var nameIdx = 0
+        while (pdfIdx < allItems.size && nameIdx < searchNorm.length) {
+            val pdfChar = normalize(allItems[pdfIdx].text)
+            if (isIgnored(pdfChar)) {
+                pdfIdx++
+                continue
+            }
+            if (pdfChar == searchNorm[nameIdx].toString()) {
+                if (nameIdx == 0) searchOffset = pdfIdx // start of potential match
+                nameIdx++
+                if (nameIdx == searchNorm.length) {
+                    targetPage = allItems[searchOffset].pg
+                    targetX = allItems[searchOffset].x
                     break
                 }
+                pdfIdx++
+            } else {
+                // Mismatch: reset search
+                pdfIdx = (searchOffset + 1).coerceAtLeast(pdfIdx - nameIdx + 1)
+                nameIdx = 0
+                searchOffset = -1
             }
         }
-        if (targetPage < 0) return 0
+        Log.d("PdfDebug", "name search: targetPage=$targetPage targetX=$targetX offset=$searchOffset")
+        if (targetPage < 0) {
+            Log.e("PdfDebug", "name NOT FOUND in allItems")
+            val dumpLen = 100
+            val sampleText = allItems.take(dumpLen).joinToString("") { it.text }
+            Log.d("PdfDebug", "First $dumpLen chars: $sampleText")
+            val page3items = allItems.filter { it.pg == 3 }
+            val samplePage3 = page3items.take(dumpLen).joinToString("") { it.text }
+            Log.d("PdfDebug", "Page3 first $dumpLen chars: $samplePage3")
+            val lastPage3 = page3items.takeLast(dumpLen).joinToString("") { it.text }
+            Log.d("PdfDebug", "Page3 last $dumpLen chars: $lastPage3")
+            for (i in 0 until allItems.size) {
+                val t = normalize(allItems[i].text)
+                if (t == "j" || t == "a" || t == "i" || t == "m" || t == "e") {
+                    Log.d("PdfDebug", "Found '${allItems[i].text}' at idx=$i pg=${allItems[i].pg} x=${allItems[i].x} y=${allItems[i].y}")
+                }
+            }
+            return 0
+        }
 
         // Group items by page and Y
         val pageYGroups = mutableMapOf<Int, MutableMap<Int, MutableList<TextPos>>>()
@@ -371,7 +417,7 @@ class HomeViewModel @Inject constructor(
         // Collect ALL position-number groups across every row on the page (positions may wrap to multiple rows)
         fun findPositionRow(yg: Map<Int, MutableList<TextPos>>): List<Pair<Int, Float>>? {
             val allPositions = mutableListOf<Pair<Int, Float>>()
-            for ((_, items) in yg) {
+            for ((yKey, items) in yg) {
                 if (items.size < 5) continue
                 if (!items.all { it.text.trim().all { c -> c.isDigit() } || it.text.isBlank() }) continue
                 val digitItems = items.filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
@@ -405,7 +451,12 @@ class HomeViewModel @Inject constructor(
                 for (i in 1 until sorted.size) {
                     if (sorted[i] != sorted[i - 1] + 1) { sequential = false; break }
                 }
-                if (sequential) allPositions.addAll(groups)
+                if (sequential) {
+                    Log.d("PdfDebug", "  Y=$yKey groups=${groups.size} seq=true first=${groups.first().first} last=${groups.last().first}")
+                    allPositions.addAll(groups)
+                } else {
+                    Log.d("PdfDebug", "  Y=$yKey groups=${groups.size} seq=false samples=${groups.take(5).map { it.first }}...")
+                }
             }
             return allPositions.sortedBy { it.first }.ifEmpty { null }
         }
@@ -415,6 +466,7 @@ class HomeViewModel @Inject constructor(
         for (pg in 1 until targetPage) {
             val yg = pageYGroups[pg] ?: continue
             val posData = findPositionRow(yg) ?: continue
+            Log.d("PdfDebug", "Page $pg: found ${posData.size} positions, first=${posData.first().first} last=${posData.last().first}")
             position += posData.size
         }
 
@@ -431,7 +483,9 @@ class HomeViewModel @Inject constructor(
                 bestPos = pos
             }
         }
+        Log.d("PdfDebug", "Page $targetPage: positions=${targetPositions.size} range=${targetPositions.first().first}-${targetPositions.last().first} bestPos=$bestPos targetX=$targetX")
         position += bestPos - targetPositions.first().first + 1
+        Log.d("PdfDebug", "FINAL position=$position")
         return position
     }
 

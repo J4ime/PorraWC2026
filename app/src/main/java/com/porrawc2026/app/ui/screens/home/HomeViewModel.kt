@@ -310,9 +310,9 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun findNamePosition(doc: com.tom_roush.pdfbox.pdmodel.PDDocument, searchName: String): Int {
-        data class Cc(val x: Float, val y: Float, val ch: String, val pg: Int)
+        data class TextPos(val x: Float, val y: Float, val text: String, val pg: Int)
 
-        val all = mutableListOf<Cc>()
+        val allItems = mutableListOf<TextPos>()
         var currentPage = 0
 
         val stripper = object : com.tom_roush.pdfbox.text.PDFTextStripper() {
@@ -323,7 +323,7 @@ class HomeViewModel @Inject constructor(
                 for (tp in textPositions) {
                     val ch = tp.unicode
                     if (ch != null && ch.isNotBlank()) {
-                        all.add(Cc(tp.xDirAdj, tp.yDirAdj, ch, currentPage))
+                        allItems.add(TextPos(tp.xDirAdj, tp.yDirAdj, ch, currentPage))
                     }
                 }
             }
@@ -331,7 +331,7 @@ class HomeViewModel @Inject constructor(
         stripper.sortByPosition = true
         stripper.getText(doc)
 
-        // Normalize search name (remove accents, lowercase)
+        // Normalize search name
         fun normalize(s: String) = s.lowercase()
             .replace("í", "i").replace("é", "e").replace("á", "a")
             .replace("ó", "o").replace("ú", "u").replace("ñ", "n")
@@ -339,81 +339,87 @@ class HomeViewModel @Inject constructor(
 
         // Find the name by matching characters sequentially
         var targetPage = -1
-        var targetY = -1f
-        for (i in 0..all.size - searchName.length) {
-            if (normalize(all[i].ch) == searchNorm[0].toString()) {
+        var targetX = -1f
+        for (i in 0..allItems.size - searchNorm.length) {
+            if (normalize(allItems[i].text) == searchNorm[0].toString()) {
                 var match = true
-                for (j in 1 until searchName.length) {
-                    if (i + j >= all.size || normalize(all[i + j].ch) != searchNorm[j].toString()) {
+                for (j in 1 until searchNorm.length) {
+                    if (i + j >= allItems.size || normalize(allItems[i + j].text) != searchNorm[j].toString()) {
                         match = false
                         break
                     }
                 }
                 if (match) {
-                    targetPage = all[i].pg
-                    targetY = all[i].y
+                    targetPage = allItems[i].pg
+                    targetX = allItems[i].x
                     break
                 }
             }
         }
         if (targetPage < 0) return 0
 
-        // Name-area text: left side (X<100) OR right side (X in [450,600), excluding goal predictions with "/")
-        fun nameText(chars: List<Cc>): String {
-            val left = StringBuilder()
-            val right = StringBuilder()
-            for (cc in chars.sortedBy { it.x }) {
-                if (cc.ch in "0123456789 ") continue
-                if (cc.x < 100) left.append(cc.ch)
-                else if (cc.x >= 450 && cc.x < 600) right.append(cc.ch)
-            }
-            val l = left.toString().trim()
-            val r = right.toString().trim()
-            return when {
-                l.contains("/") && r.contains("/") -> ""
-                r.contains("/") -> l
-                l.contains("/") -> r
-                l.length >= 3 -> l
-                r.length >= 3 -> r
-                else -> ""
-            }
+        // Group items by page and Y
+        val pageYGroups = mutableMapOf<Int, MutableMap<Int, MutableList<TextPos>>>()
+        for (item in allItems) {
+            pageYGroups.getOrPut(item.pg) { mutableMapOf() }
+                .getOrPut(Math.round(item.y)) { mutableListOf() }
+                .add(item)
         }
 
-        // Group by page, then Y (rounded)
-        val pageYGroups = mutableMapOf<Int, MutableMap<Int, MutableList<Cc>>>()
-        for (cc in all) {
-            val yKey = Math.round(cc.y)
-            pageYGroups.getOrPut(cc.pg) { mutableMapOf() }
-                .getOrPut(yKey) { mutableListOf() }
-                .add(cc)
-        }
-
-        // Count names across pages up to target
-        val targetYKey = Math.round(targetY)
-        var pos = 0
-        for (pg in 1..targetPage) {
-            val yg = pageYGroups[pg] ?: continue
-            val sortedY = yg.keys.sorted()
-            var prevY = -1000
-            for (y in sortedY) {
-                if (pg == targetPage && y > targetYKey) break
-                val text = nameText(yg[y]!!)
-                if (text.length < 3 || text.contains("/") || text.contains("---")) continue
-                if (text.firstOrNull()?.isUpperCase() != true) continue
-
-                // Always count the row where the name was found
-                if (pg == targetPage && y == targetYKey) {
-                    pos++
-                    break
+        // Extract (position, x) pairs from the position-number row on each page
+        fun extractPositions(yg: MutableMap<Int, MutableList<TextPos>>): List<Pair<Int, Float>> {
+            // Find row where all non-blank items are digits (the position numbers row)
+            val posRowY = yg.entries.firstOrNull { (_, items) ->
+                items.size >= 5 && items.all { it.text.trim().all { c -> c.isDigit() } || it.text.isBlank() }
+            }?.key ?: return emptyList()
+            // Collect digit sequences: consecutive digits at nearby X form one number
+            val digits = yg[posRowY]!!
+                .filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
+                .sortedBy { it.x }
+            if (digits.isEmpty()) return emptyList()
+            // Group consecutive digits that are close in X (same number)
+            val groups = mutableListOf<Pair<String, Float>>()
+            var current = StringBuilder()
+            var currentX = 0f
+            for (d in digits) {
+                if (current.isEmpty()) {
+                    current.append(d.text)
+                    currentX = d.x
+                } else if (d.x - currentX < 3) {
+                    current.append(d.text)
+                } else {
+                    groups.add(current.toString() to currentX)
+                    current = StringBuilder(d.text)
+                    currentX = d.x
                 }
+            }
+            if (current.isNotEmpty()) groups.add(current.toString() to currentX)
+            return groups.mapNotNull { (num, x) -> num.toIntOrNull()?.let { pos -> pos to x } }
+        }
 
-                val diff = y - prevY
-                if (diff < 3) continue // merge split names on same row
-                pos++
-                prevY = y
+        // Count positions on pages before target page
+        var position = 0
+        for (pg in 1 until targetPage) {
+            val yg = pageYGroups[pg] ?: continue
+            position += extractPositions(yg).size
+        }
+
+        // On the target page, find the position nearest to targetX
+        val targetYg = pageYGroups[targetPage] ?: return 0
+        val targetPositions = extractPositions(targetYg)
+        if (targetPositions.isEmpty()) return 0
+
+        var bestPos = targetPositions.first().first
+        var bestDist = Float.MAX_VALUE
+        for ((pos, x) in targetPositions) {
+            val dist = kotlin.math.abs(x - targetX)
+            if (dist < bestDist) {
+                bestDist = dist
+                bestPos = pos
             }
         }
-        return pos
+        position += bestPos - targetPositions.first().first + 1
+        return position
     }
 
     fun installUpdate() {

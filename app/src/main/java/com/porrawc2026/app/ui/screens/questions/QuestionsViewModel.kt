@@ -30,7 +30,7 @@ class QuestionsViewModel @Inject constructor(
     fun evaluateQuestions() {
         viewModelScope.launch(Dispatchers.IO) {
             _isEvaluating.value = true
-            try {
+            runCatching {
                 val allMatches = repository.getAllMatches().first()
                 val groupMatches = allMatches.filter { !it.isKnockout && it.id < 900 }
                 val finished = allMatches.filter { it.homeGoals != null && it.awayGoals != null }
@@ -82,7 +82,7 @@ class QuestionsViewModel @Inject constructor(
                         26 -> if(groupsDone) qualified(standings,"Panamá") else null
                         27 -> null; 28 -> null; 29 -> null; 30 -> null
                         31 -> { val f = finished.any { val h=it.homeGoals?:0; val a=it.awayGoals?:0; (h>a && (it.homeRedCards?:0)>0) || (a>h && (it.awayRedCards?:0)>0) }; if(f) true else if(allDone) false else null }
-                        32 -> null; 33 -> false // 4 corners opening match
+                        32 -> null; 33 -> false
                         34 -> null; 35 -> null
                         36 -> { if(totalRedCards>=4) true else if(allDone) false else null }
                         37 -> null; 38 -> null; 39 -> null; 40 -> null; 41 -> null; 42 -> null; 43 -> null; 44 -> null
@@ -96,9 +96,10 @@ class QuestionsViewModel @Inject constructor(
                 }
                 val pts = repository.calculateTotalPoints()
                 _evalMessage.value = if (resolved > 0) "$resolved preguntas resueltas ($pts pts)" else "Sin cambios"
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 _evalMessage.value = "Error: ${e.message}"
-            } finally { _isEvaluating.value = false }
+            }
+            _isEvaluating.value = false
         }
     }
 

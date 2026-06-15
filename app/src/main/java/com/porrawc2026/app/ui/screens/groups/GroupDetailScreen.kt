@@ -171,7 +171,7 @@ private fun MatchPredictionCard(match: MatchEntity) {
     val isFuture = kotlin.run {
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
         sdf.timeZone = java.util.TimeZone.getTimeZone("Europe/Madrid")
-        try { sdf.parse(match.dateTime)?.after(java.util.Date()) ?: false } catch (_: Exception) { false }
+        sdf.parse(match.dateTime)?.after(java.util.Date()) ?: false
     }
     val hasRealResult = !isFuture && match.homeGoals != null && match.awayGoals != null
     val hasPrediction = match.predictedHomeGoals != null && match.predictedAwayGoals != null

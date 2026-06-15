@@ -2,8 +2,6 @@ package com.porrawc2026.app.util
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.util.Log
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,13 +14,12 @@ import java.net.URL
 
 object UpdateManager {
 
-    private const val TAG = "UpdateManager"
     private const val GITHUB_API = "https://api.github.com/repos/J4ime/PorraWC2026/releases?per_page=1&sort=created&direction=desc"
 
     data class UpdateInfo(val version: String, val downloadUrl: String, val isNewer: Boolean)
 
     suspend fun checkForUpdate(context: Context): UpdateInfo? = withContext(Dispatchers.IO) {
-        try {
+        runCatching {
             withTimeout(15_000) {
                 val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
                 val conn = URL(GITHUB_API).openConnection() as HttpURLConnection
@@ -30,8 +27,6 @@ object UpdateManager {
                 conn.connectTimeout = 10_000; conn.readTimeout = 10_000
                 val code = conn.responseCode
                 if (code != 200) {
-                    val err = conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
-                    Log.w(TAG, "Update check HTTP $code: $err")
                     conn.disconnect()
                     return@withTimeout null
                 }
@@ -45,17 +40,13 @@ object UpdateManager {
                     .firstOrNull { it.getString("name").endsWith(".apk") } ?: return@withTimeout null
                 val downloadUrl = apkAsset.getString("browser_download_url")
                 val isNewer = compareVersions(tag.removePrefix("v"), currentVersion) > 0
-                Log.d(TAG, "Latest: $tag (current: v$currentVersion), newer=$isNewer")
                 UpdateInfo(tag, downloadUrl, isNewer)
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Update check failed: ${e.message}")
-            null
-        }
+        }.getOrNull()
     }
 
     suspend fun downloadAndInstall(context: Context, url: String): Boolean = withContext(Dispatchers.IO) {
-        try {
+        runCatching {
             withTimeout(120_000) {
                 val file = File(context.cacheDir, "update.apk")
                 file.delete()
@@ -64,8 +55,6 @@ object UpdateManager {
                 conn.setRequestProperty("Accept", "application/octet-stream")
                 val code = conn.responseCode
                 if (code !in 200..299) {
-                    val err = conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
-                    Log.w(TAG, "Download HTTP $code: $err")
                     conn.disconnect()
                     return@withTimeout false
                 }
@@ -81,10 +70,7 @@ object UpdateManager {
                     true
                 } else false
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Download/install failed: ${e.message}")
-            false
-        }
+        }.getOrDefault(false)
     }
 
     private fun compareVersions(v1: String, v2: String): Int {

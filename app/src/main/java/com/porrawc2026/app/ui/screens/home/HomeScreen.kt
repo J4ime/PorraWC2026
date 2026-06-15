@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -138,10 +139,9 @@ fun HomeScreen(
                 }
             }, contentPadding = PaddingValues(bottom = 8.dp)) {
                 if (visibleMatches.isNotEmpty()) {
-                    item {
-                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                            visibleMatches.take(12).forEach { MatchRow(it); if (it != visibleMatches.take(12).last()) Spacer(Modifier.height(6.dp)) }
-                        }
+                    items(visibleMatches.take(12), key = { it.id }) { match ->
+                        MatchRow(match)
+                        if (match != visibleMatches.take(12).last()) Spacer(Modifier.height(6.dp))
                     }
                 } else if (hasData && !isBusy) {
                     item { Text("Sin partidos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }
@@ -153,22 +153,24 @@ fun HomeScreen(
 
         if (pullRefreshState.isRefreshing) {
             Box(modifier = Modifier.align(Alignment.TopCenter).zIndex(1f).padding(top = 12.dp), contentAlignment = Alignment.Center) {
-                val inf = rememberInfiniteTransition("ptr")
-                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
-                val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
-                Text("\u26BD", fontSize = 36.sp, color = Color.White, modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
+                SpinningBall(36.sp)
             }
         }
 
         if (isBusy) {
             Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
-                val inf = rememberInfiniteTransition("busy")
-                val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
-                val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
-                Text("\u26BD", fontSize = 64.sp, modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
+                SpinningBall(64.sp)
             }
         }
     }
+}
+
+@Composable
+private fun SpinningBall(fontSize: androidx.compose.ui.unit.TextUnit) {
+    val inf = rememberInfiniteTransition("spin")
+    val rot by inf.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing)))
+    val scale by inf.animateFloat(0.9f, 1.1f, infiniteRepeatable(tween(800, easing = LinearEasing)))
+    Text("\u26BD", fontSize = fontSize, color = Color.White, modifier = Modifier.graphicsLayer { rotationZ = rot; scaleX = scale; scaleY = scale })
 }
 
 @Composable

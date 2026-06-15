@@ -15,14 +15,14 @@ val localProperties = Properties().apply {
 
 android {
     namespace = "com.porrawc2026.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.porrawc2026.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 187
-        versionName = "1.9.16"
+        targetSdk = 35
+        versionCode = 188
+        versionName = "1.9.17"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "FOOTBALL_DATA_API_KEY", "\"${localProperties.getProperty("FOOTBALL_DATA_API_KEY", "")}\"")
@@ -33,9 +33,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("../release.jks")
-            storePassword = "PorraWC2026!"
+            storePassword = localProperties.getProperty("STORE_PASSWORD", "")
             keyAlias = "porrawc2026"
-            keyPassword = "PorraWC2026!"
+            keyPassword = localProperties.getProperty("KEY_PASSWORD", "")
             enableV1Signing = true
             enableV2Signing = true
         }
@@ -48,7 +48,7 @@ android {
             }
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -92,8 +92,8 @@ android {
     }
 
     lint {
-        abortOnError = false
-        checkReleaseBuilds = false
+        abortOnError = true
+        checkReleaseBuilds = true
     }
 }
 

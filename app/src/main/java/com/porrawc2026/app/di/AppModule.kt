@@ -202,4 +202,21 @@ object AppModule {
     fun provideZafronixService(@Named("zafronix-retrofit") retrofit: Retrofit): ZafronixService {
         return retrofit.create(ZafronixService::class.java)
     }
+
+    @Provides
+    @Singleton
+    @Named("espn")
+    fun provideEspnRetrofit(client: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(EspnConfig.BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideEspnService(@Named("espn") retrofit: Retrofit): EspnService {
+        return retrofit.create(EspnService::class.java)
+    }
 }

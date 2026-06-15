@@ -2,10 +2,8 @@ package com.porrawc2026.app.util
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import com.porrawc2026.app.data.local.entity.*
 import org.apache.poi.ss.usermodel.*
-import org.apache.poi.ss.util.CellRangeAddress
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.*
@@ -43,11 +41,11 @@ object ExcelParser {
     private const val COL_GOAL_AWAY = 29
     private const val COL_QUESTION_ID = 22
     private const val COL_QUESTION_TEXT = 23
-    private const val COL_QUESTION_ANSWER = 31  // AF
-    private const val COL_PLAYER_NAME = 26  // AA (rows 154-156)
-    private const val COL_PLAYER_POINTS = 22  // W (rows 154-156)
-    private const val COL_KNOCKOUT_WINNER_HOME = 28  // AC
-    private const val COL_KNOCKOUT_WINNER_AWAY = 29  // AD
+    private const val COL_QUESTION_ANSWER = 31
+    private const val COL_PLAYER_NAME = 26
+    private const val COL_PLAYER_POINTS = 22
+    private const val COL_KNOCKOUT_WINNER_HOME = 28
+    private const val COL_KNOCKOUT_WINNER_AWAY = 29
     private const val COL_KNOCKOUT_MATCH_NUM = 9
     private const val COL_KNOCKOUT_HOME_REF = 12
     private const val COL_KNOCKOUT_AWAY_REF = 13
@@ -63,12 +61,9 @@ object ExcelParser {
         val workbook = WorkbookFactory.create(inputStream, "")
         formatter = DataFormatter()
 
-        val sheet = workbook.getSheet("WORLDCUP")
-            ?: workbook.getSheetAt(1)
+        val sheet = workbook.getSheet("WORLDCUP") ?: workbook.getSheetAt(1)
 
-        Log.d("ExcelParser", "WORLDCUP sheet: rows=${sheet.lastRowNum + 1}, protected=${sheet.protect}")
-        try { sheet.protectSheet(null) } catch (_: Exception) {}
-        Log.d("ExcelParser", "Sheet unprotected: ${!sheet.protect}")
+        runCatching { sheet.protectSheet(null) }
 
         val teams = parseTeams(workbook)
         val matches = parseMatches(sheet)
@@ -76,8 +71,6 @@ object ExcelParser {
         val playerPredictions = parsePlayers(sheet)
         val knockoutPredictions = parseKnockout(sheet)
         val standings = parseStandings(teams)
-
-        Log.d("ExcelParser", "Parsed: teams=${teams.size}, matches=${matches.size} (group=${matches.count { !it.isKnockout }}, ko=${matches.count { it.isKnockout }}), questions=${questions.size} (answered=${questions.count { it.predictedAnswer != null }}), players=${playerPredictions.size} (named=${playerPredictions.count { !it.predictedName.isNullOrBlank() }}), knockoutPred=${knockoutPredictions.size} (picked=${knockoutPredictions.count { it.winner != null }})")
 
         cachedValidation = doValidate(sheet)
 
@@ -97,7 +90,7 @@ object ExcelParser {
     }
 
     private fun doValidate(sheet: Sheet): ValidationResult {
-        return try {
+        return runCatching {
             val errors = mutableListOf<String>()
             val warnings = mutableListOf<String>()
 
@@ -113,11 +106,6 @@ object ExcelParser {
             val passed = agResult.greenCount + dataResult.passedChecks
             val failed = agResult.redCount + dataResult.failedChecks
 
-            Log.w("ExcelParser", "===== VALIDACION: isValid=$isValid total=$total \u2705=$passed \u274C=$failed =====")
-            if (errors.isNotEmpty()) {
-                Log.w("ExcelParser", "===== ERRORES: ${errors.joinToString("; ")} =====")
-            }
-
             ValidationResult(
                 isValid = isValid,
                 totalChecks = total,
@@ -126,13 +114,12 @@ object ExcelParser {
                 errors = errors,
                 warnings = warnings
             )
-        } catch (e: Exception) {
-            Log.w("ExcelParser", "===== VALIDACION ERROR: ${e.message} =====", e)
+        }.getOrElse { e ->
             ValidationResult(
                 isValid = true,
                 totalChecks = 1, passedChecks = 1, failedChecks = 0,
                 errors = emptyList(),
-                warnings = listOf("Validación omitida por error: ${e.message}")
+                warnings = listOf("Validacion omitida por error: ${e.message}")
             )
         }
     }
@@ -154,7 +141,7 @@ object ExcelParser {
         var questionsEmpty = 0
         for (rowIdx in 158..207) {
             val row = sheet.getRow(rowIdx) ?: continue
-            val cellValue = try { formatter.formatCellValue(row.getCell(31)).trim() } catch (e: Exception) { "" }
+            val cellValue = runCatching { formatter.formatCellValue(row.getCell(31)).trim() }.getOrDefault("")
             total++
             if (cellValue.isBlank() || cellValue == "0" || cellValue == "0.0") {
                 questionsEmpty++
@@ -212,7 +199,6 @@ object ExcelParser {
             failed += 72
         }
 
-        Log.d("ExcelParser", "Data completeness: Q=$questionsAnswered/$questionsEmpty P=$playersNamed/$playersEmpty K=$knockoutPicked/$knockoutEmpty M=$matchesWithGoals")
         val passed = total - failed
         return DataCompletenessResult(failed == 0, total, passed, failed, errors)
     }
@@ -230,7 +216,6 @@ object ExcelParser {
         val errors = mutableListOf<String>()
 
         val dataValidations = sheet.dataValidations
-        Log.w("ExcelParser", "AG validate: found ${dataValidations.size} data validations")
 
         var green = 0
         var red = 0
@@ -244,15 +229,13 @@ object ExcelParser {
                         if (isAgCellValid(cell, dv)) green++
                         else {
                             red++
-                            val cellValue = try { formatter.formatCellValue(cell).trim() } catch (e: Exception) { "" }
+                            val cellValue = runCatching { formatter.formatCellValue(cell).trim() }.getOrDefault("")
                             errors.add("Fila $rowIdx, col $colIdx — '$cellValue'")
                         }
                     }
                 }
             }
         }
-
-        Log.w("ExcelParser", "AG validate: total=${green + red} \u2705=$green \u274C=$red errors=${errors.size}")
 
         return AgValidationResult(
             isValid = red == 0 && (green + red) > 0,
@@ -265,7 +248,7 @@ object ExcelParser {
     }
 
     private fun isAgCellValid(cell: Cell, dv: DataValidation): Boolean {
-        val cellValue = try { formatter.formatCellValue(cell).trim() } catch (e: Exception) { "" }
+        val cellValue = runCatching { formatter.formatCellValue(cell).trim() }.getOrDefault("")
         val isEmpty = cellValue.isEmpty() || cellValue == "0" || cellValue == "0.0"
 
         if (isEmpty) return dv.emptyCellAllowed
@@ -274,9 +257,7 @@ object ExcelParser {
         val result = when (constraint.validationType) {
             DataValidationConstraint.ValidationType.LIST -> {
                 val allowed = constraint.explicitListValues
-                val match = allowed.any { it.equals(cellValue, ignoreCase = true) }
-                Log.d("ExcelParser", "  Validate LIST '$cellValue' in [${allowed.joinToString()}] → $match")
-                match
+                allowed.any { it.equals(cellValue, ignoreCase = true) }
             }
             DataValidationConstraint.ValidationType.INTEGER,
             DataValidationConstraint.ValidationType.DECIMAL -> {
@@ -288,9 +269,6 @@ object ExcelParser {
                 v in min..max
             }
             else -> true
-        }
-        if (!result) {
-            Log.d("ExcelParser", "  INVALID cell at (${cell.rowIndex},${cell.columnIndex}): '$cellValue' type=${constraint.validationType} emptyAllowed=${dv.emptyCellAllowed}")
         }
         return result
     }
@@ -315,7 +293,6 @@ object ExcelParser {
         val matches = mutableListOf<MatchEntity>()
         var matchId = 0
         val groupHeaders = listOf(2, 10, 18, 26, 34, 42, 50, 58, 66, 74, 82, 90)
-        var loggedFirst = false
 
         for (baseRow in groupHeaders) {
             for (offset in 1..6) {
@@ -325,17 +302,9 @@ object ExcelParser {
                 val dateStr = readDateCell(row)
 
                 val homeCell = cellText(row, COL_MATCH_HOME) ?: getCellValue(row, COL_MATCH_HOME)?.toString()
-                if (homeCell == null) { Log.d("ExcelParser", "Skip r$rowIdx: no home team"); continue }
+                    ?: continue
                 val awayCell = cellText(row, COL_MATCH_AWAY) ?: getCellValue(row, COL_MATCH_AWAY)?.toString()
-                if (awayCell == null) { Log.d("ExcelParser", "Skip r$rowIdx: no away team"); continue }
-
-                if (!loggedFirst) {
-                    loggedFirst = true
-                    val rawDateCell = row.getCell(COL_MATCH_DATE)
-                    val rawDateType = rawDateCell?.cellType
-                    val rawDateDf = if (rawDateCell != null) formatter.formatCellValue(rawDateCell) else "null"
-                    Log.d("ExcelParser", "Match1(r$rowIdx): home=$homeCell, away=$awayCell, dateRaw='$rawDateDf' type=$rawDateType dateParsed='$dateStr', col25='${cellText(row, 25)}', col24='${cellText(row, 24)}', col33='${cellText(row, COL_TV)}', gH=${cellText(row, COL_GOAL_HOME)}, gA=${cellText(row, COL_GOAL_AWAY)}")
-                }
+                    ?: continue
 
                 val predHome = cellInt(row, COL_GOAL_HOME)
                 val predAway = cellInt(row, COL_GOAL_AWAY)
@@ -400,8 +369,6 @@ object ExcelParser {
             }
         }
 
-        Log.d("ExcelParser", "parseMatches: found ${matches.size} (group=${matches.count { !it.isKnockout }}, ko=${matches.count { it.isKnockout }})")
-
         val thirdPlaceRow = sheet.getRow(142)
         if (thirdPlaceRow != null) {
             matchId++
@@ -443,16 +410,12 @@ object ExcelParser {
             val cell = row.getCell(col) ?: continue
             val value = formatter.formatCellValue(cell).trim()
             if (value.isBlank()) continue
-            try {
-                val d = cell.dateCellValue
-                if (d != null) return fmt.format(d)
-            } catch (e: Exception) {}
-            try {
-                val n = cell.numericCellValue
-                if (DateUtil.isCellDateFormatted(cell)) {
-                    return fmt.format(cell.dateCellValue)
-                }
-            } catch (e: Exception) {}
+            val d = runCatching { cell.dateCellValue }.getOrNull()
+            if (d != null) return fmt.format(d)
+            val n = runCatching { cell.numericCellValue }.getOrNull()
+            if (n != null && DateUtil.isCellDateFormatted(cell)) {
+                return fmt.format(cell.dateCellValue)
+            }
             if (value.matches(Regex("\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}.*"))) {
                 return value
             }
@@ -462,7 +425,6 @@ object ExcelParser {
 
     private fun parseQuestions(sheet: Sheet): List<QuestionEntity> {
         val questions = mutableListOf<QuestionEntity>()
-        val sampleRows = listOf(158, 159, 160, 170, 180, 190, 200, 207)
 
         for (rowIdx in 158..207) {
             val row = sheet.getRow(rowIdx) ?: continue
@@ -472,25 +434,11 @@ object ExcelParser {
             val answerRaw = cellText(row, COL_QUESTION_ANSWER)
             val answer: Boolean? = when {
                 answerRaw == null -> null
-                answerRaw.uppercase() in listOf("TRUE", "VERDADERO", "V", "1", "YES", "SÍ", "SI") -> true
+                answerRaw.uppercase() in listOf("TRUE", "VERDADERO", "V", "1", "YES", "SI", "SÍ") -> true
                 answerRaw.uppercase() in listOf("FALSE", "FALSO", "F", "0", "NO") -> false
                 answerRaw == "1.0" || answerRaw == "1,0" -> true
                 answerRaw == "0.0" || answerRaw == "0,0" -> false
                 else -> null
-            }
-
-            if (rowIdx in sampleRows) {
-                val cell = row.getCell(COL_QUESTION_ANSWER)
-                val raw = if (cell != null) {
-                    when (cell.cellType) {
-                        CellType.NUMERIC -> cell.numericCellValue.toString()
-                        CellType.STRING -> cell.stringCellValue
-                        CellType.BOOLEAN -> cell.booleanCellValue.toString()
-                        CellType.FORMULA -> "F:${cell.cachedFormulaResultType}=${cell.numericCellValue}"
-                        else -> formatter.formatCellValue(cell)
-                    }
-                } else "null"
-                Log.d("ExcelParser", "Q$id(r$rowIdx): type=${cell?.cellType}, raw='$raw', txt='$answerRaw', ans=$answer")
             }
 
             questions.add(
@@ -502,7 +450,6 @@ object ExcelParser {
             )
         }
 
-        Log.d("ExcelParser", "parseQuestions: found ${questions.size}, answered=${questions.count { it.predictedAnswer != null }}")
         return questions
     }
 
@@ -510,12 +457,10 @@ object ExcelParser {
         val players = mutableListOf<PlayerPredictionEntity>()
 
         for (rank in 1..3) {
-            val rowIdx = 152 + rank  // AA154, AA155, AA156
+            val rowIdx = 152 + rank
             val row = sheet.getRow(rowIdx) ?: continue
             val name = cellText(row, COL_PLAYER_NAME)?.trim()?.takeIf { it.isNotEmpty() && !it.matches(Regex("^[\\d.]+$")) }
             val pts = cellInt(row, COL_PLAYER_POINTS) ?: when (rank) { 1 -> 50; 2 -> 30; else -> 10 }
-
-            Log.d("ExcelParser", "Player $rank (r$rowIdx): name='$name' pts=$pts")
 
             players.add(
                 PlayerPredictionEntity(
@@ -568,14 +513,6 @@ object ExcelParser {
                 }
                 val winner = winnerHome ?: winnerAway
 
-                if (matchNumber <= 76) {
-                    val cAb = row.getCell(COL_KNOCKOUT_WINNER_HOME)
-                    val cAe = row.getCell(COL_KNOCKOUT_WINNER_AWAY)
-                    val rawAb = if (cAb != null) when (cAb.cellType) { CellType.NUMERIC -> cAb.numericCellValue.toString(); CellType.FORMULA -> "F:${cAb.cachedFormulaResultType}=${try { cAb.numericCellValue } catch(e:Exception) { cAb.stringCellValue }}"; else -> formatter.formatCellValue(cAb) } else "null"
-                    val rawAe = if (cAe != null) when (cAe.cellType) { CellType.NUMERIC -> cAe.numericCellValue.toString(); CellType.FORMULA -> "F:${cAe.cachedFormulaResultType}=${try { cAe.numericCellValue } catch(e:Exception) { cAe.stringCellValue }}"; else -> formatter.formatCellValue(cAe) } else "null"
-                    Log.d("ExcelParser", "KO$matchNumber(r$rowIdx): AB=$rawAb, AE=$rawAe, wh='$whRaw', wa='$waRaw', w=$winner")
-                }
-
                 predictions.add(
                     KnockoutPredictionEntity(
                         matchNumber = matchNumber,
@@ -604,7 +541,6 @@ object ExcelParser {
                 when { wh == "1" || wh == "1.0" -> 1; wa == "1" || wa == "1.0" -> 2; else -> null }))
         }
 
-        Log.d("ExcelParser", "parseKnockout: ${predictions.size} predictions, picked=${predictions.count { it.winner != null }}")
         return predictions
     }
 
@@ -612,11 +548,9 @@ object ExcelParser {
         return teams.map { team -> GroupStandingEntity(teamId = team.id, groupLetter = team.groupLetter) }
     }
 
-    // ── New helper functions that use DataFormatter ──────────────
-
     private fun cellText(row: Row, colIndex: Int): String? {
         val cell = row.getCell(colIndex) ?: return null
-        val result = try {
+        val result = runCatching {
             when (cell.cellType) {
                 CellType.STRING -> cell.stringCellValue
                 CellType.NUMERIC -> {
@@ -633,9 +567,8 @@ object ExcelParser {
                 CellType.BLANK -> null
                 else -> null
             }
-        } catch (e: Exception) { null }
+        }.getOrNull()
         if (result != null) return result.trim().takeIf { it.isNotEmpty() }
-        // Fallback to DataFormatter
         val fb = formatter.formatCellValue(cell).trim()
         return fb.takeIf { it.isNotEmpty() }
     }
@@ -656,8 +589,8 @@ object ExcelParser {
             CellType.STRING -> cell.stringCellValue
             CellType.BOOLEAN -> cell.booleanCellValue
             CellType.FORMULA -> {
-                try { cell.numericCellValue } catch (e: Exception) {
-                    try { cell.stringCellValue } catch (e2: Exception) { null }
+                runCatching { cell.numericCellValue }.getOrElse {
+                    runCatching { cell.stringCellValue }.getOrNull()
                 }
             }
             CellType.BLANK -> null

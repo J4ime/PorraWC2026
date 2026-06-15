@@ -5,8 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
 object GoalNotifier {
@@ -31,17 +29,17 @@ object GoalNotifier {
             context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = androidx.core.app.NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("\u26BD \u00A1${playerName} ha marcado!")
             .setContentText("Un goleador de tu porra acaba de marcar en directo")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pending)
             .build()
 
-        try {
+        runCatching {
             NotificationManagerCompat.from(context).notify(nextId++, notification)
-        } catch (_: SecurityException) {}
+        }
     }
 }

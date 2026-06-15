@@ -53,27 +53,25 @@ fun MatchesScreen(viewModel: GroupsViewModel = hiltViewModel()) {
 
 private fun fmtDate(match: MatchEntity): String {
     val dt = match.dateTime.ifBlank { return "" }
-    return try {
-        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-        sdf.timeZone = java.util.TimeZone.getTimeZone("Europe/Madrid")
-        val date = sdf.parse(dt) ?: return ""
-        if (match.homeGoals != null && match.awayGoals != null) {
-            if (date.after(java.util.Date())) {
-                val dayAbbr = java.text.SimpleDateFormat("EEE", java.util.Locale("es", "ES")).format(date).replace(".", "").uppercase()
-                val dayNum = java.text.SimpleDateFormat("dd", java.util.Locale.US).format(date)
-                val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(date)
-                return "$dayAbbr$dayNum $time"
-            }
-            return "FINAL"
+    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+    sdf.timeZone = java.util.TimeZone.getTimeZone("Europe/Madrid")
+    val date = sdf.parse(dt) ?: return dt.take(10)
+    if (match.homeGoals != null && match.awayGoals != null) {
+        if (date.after(java.util.Date())) {
+            val dayAbbr = java.text.SimpleDateFormat("EEE", java.util.Locale("es", "ES")).format(date).replace(".", "").uppercase()
+            val dayNum = java.text.SimpleDateFormat("dd", java.util.Locale.US).format(date)
+            val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(date)
+            return "$dayAbbr$dayNum $time"
         }
-        val now = java.util.Date()
-        val end = java.util.Date(date.time + 150L * 60 * 1000)
-        if (now.after(date) && now.before(end)) return "EN JUEGO"
-        val dayAbbr = java.text.SimpleDateFormat("EEE", java.util.Locale("es", "ES")).format(date).replace(".", "").uppercase()
-        val dayNum = java.text.SimpleDateFormat("dd", java.util.Locale.US).format(date)
-        val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(date)
-        "$dayAbbr$dayNum $time"
-    } catch (_: Exception) { dt.take(10) }
+        return "FINAL"
+    }
+    val now = java.util.Date()
+    val end = java.util.Date(date.time + 150L * 60 * 1000)
+    if (now.after(date) && now.before(end)) return "EN JUEGO"
+    val dayAbbr = java.text.SimpleDateFormat("EEE", java.util.Locale("es", "ES")).format(date).replace(".", "").uppercase()
+    val dayNum = java.text.SimpleDateFormat("dd", java.util.Locale.US).format(date)
+    val time = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(date)
+    return "$dayAbbr$dayNum $time"
 }
 
 @Composable
@@ -81,7 +79,7 @@ private fun GroupMatchRow(match: MatchEntity) {
     val isFuture = kotlin.run {
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
         sdf.timeZone = java.util.TimeZone.getTimeZone("Europe/Madrid")
-        try { sdf.parse(match.dateTime)?.after(java.util.Date()) ?: false } catch (_: Exception) { false }
+        sdf.parse(match.dateTime)?.after(java.util.Date()) ?: false
     }
     val hasResult = !isFuture && match.homeGoals != null && match.awayGoals != null
     val hasPred = match.predictedHomeGoals != null && match.predictedAwayGoals != null

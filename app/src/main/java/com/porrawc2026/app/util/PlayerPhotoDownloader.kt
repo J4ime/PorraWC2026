@@ -1,7 +1,6 @@
 package com.porrawc2026.app.util
 
 import android.content.Context
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -10,6 +9,7 @@ import org.json.JSONObject
 import java.io.File
 import java.text.Normalizer
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 object PlayerPhotoDownloader {
 
@@ -20,8 +20,8 @@ object PlayerPhotoDownloader {
                 .build()
             chain.proceed(req)
         }
-        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     private val topGoalScorers = listOf(
@@ -43,13 +43,11 @@ object PlayerPhotoDownloader {
     suspend fun precacheTopPlayers(context: Context) {
         withContext(Dispatchers.IO) {
             ensureSquadMap(context)
-            Log.d("PhotoDownloader", "Precaching ${topGoalScorers.size} top player photos...")
             var downloaded = 0
             for (name in topGoalScorers) {
                 val result = download(context, name)
                 if (result != null) downloaded++
             }
-            Log.d("PhotoDownloader", "Precache done: $downloaded/${topGoalScorers.size} downloaded")
         }
     }
 
@@ -61,32 +59,26 @@ object PlayerPhotoDownloader {
 
     suspend fun download(context: Context, playerName: String): String? {
         return withContext(Dispatchers.IO) {
-            try {
+            runCatching {
                 val cacheDir = File(context.filesDir, "photos")
                 if (!cacheDir.exists()) cacheDir.mkdirs()
 
                 val cached = findCachedFile(cacheDir, playerName)
                 if (cached != null) {
-                    Log.d("PhotoDownloader", "Cache hit for '$playerName' → ${cached.name}")
-                    return@withContext cached.absolutePath
+                    return@runCatching cached.absolutePath
                 }
 
                 ensureSquadMap(context)
                 val resolved = resolveFullName(playerName)
                 val entry = squadEntryMap?.get(normalize(resolved))
                 val wikiUrl = entry?.wikiUrl ?: "https://en.wikipedia.org/wiki/${resolved.replace(" ", "_")}"
-                Log.d("PhotoDownloader", "Resolved '$playerName' → '$resolved' wiki=$wikiUrl")
 
                 val imageUrl = fetchOgImage(wikiUrl)
-                if (imageUrl == null) {
-                    Log.d("PhotoDownloader", "No og:image for '$resolved'")
-                    return@withContext null
-                }
+                    ?: return@runCatching null
 
                 val canonical = bestMatchTopScorer(resolved) ?: resolved.trim().lowercase()
                 val fileName = sanitizeForFile(canonical) + ".jpg"
                 val destFile = File(cacheDir, fileName)
-                Log.d("PhotoDownloader", "Downloading $imageUrl → ${destFile.name}...")
 
                 val imgRequest = Request.Builder()
                     .url(imageUrl)
@@ -94,25 +86,17 @@ object PlayerPhotoDownloader {
                     .build()
                 client.newCall(imgRequest).execute().use { imgResponse ->
                     if (!imgResponse.isSuccessful) {
-                        Log.d("PhotoDownloader", "Image download failed: HTTP ${imgResponse.code}")
-                        return@withContext null
+                        return@runCatching null
                     }
-                    val body = imgResponse.body ?: run {
-                        Log.d("PhotoDownloader", "Image download: null body")
-                        return@withContext null
-                    }
+                    val body = imgResponse.body ?: return@runCatching null
                     body.byteStream().use { input ->
                         destFile.outputStream().use { output ->
                             input.copyTo(output)
                         }
                     }
-                    Log.d("PhotoDownloader", "Downloaded photo for '$resolved' (${body.contentLength()} bytes) → ${destFile.absolutePath}")
                 }
                 destFile.absolutePath
-            } catch (e: Exception) {
-                Log.e("PhotoDownloader", "Failed for '$playerName': ${e.message}")
-                null
-            }
+            }.getOrNull()
         }
     }
 
@@ -132,14 +116,11 @@ object PlayerPhotoDownloader {
     }
 
     private fun fetchOgImage(wikiUrl: String): String? {
-        try {
+        return runCatching {
             val request = Request.Builder().url(wikiUrl).build()
             val html = client.newCall(request).execute().use { r ->
-                if (!r.isSuccessful) {
-                    Log.d("PhotoDownloader", "HTTP ${r.code} for $wikiUrl")
-                    return null
-                }
-                r.body?.string() ?: return null
+                if (!r.isSuccessful) return@runCatching null
+                r.body?.string() ?: return@runCatching null
             }
 
             val ogRegex = Regex(
@@ -147,23 +128,13 @@ object PlayerPhotoDownloader {
                 RegexOption.IGNORE_CASE
             )
             val match = ogRegex.find(html)
-            if (match != null) {
-                val url = match.groupValues[1]
-                Log.d("PhotoDownloader", "og:image → $url")
-                return url
-            }
-
-            Log.d("PhotoDownloader", "No og:image found, HTML length=${html.length}")
-            return null
-        } catch (e: Exception) {
-            Log.e("PhotoDownloader", "Fetch failed: ${e.message}")
-            return null
-        }
+            match?.groupValues?.get(1)
+        }.getOrNull()
     }
 
     private suspend fun ensureSquadMap(context: Context) {
         if (squadEntryMap != null) return
-        try {
+        runCatching {
             val cacheFile = File(context.filesDir, "photos/squad_names.json")
             if (cacheFile.exists()) {
                 val json = JSONObject(cacheFile.readText())
@@ -176,17 +147,15 @@ object PlayerPhotoDownloader {
                     )
                 }
                 squadEntryMap = map
-                Log.d("PhotoDownloader", "Loaded ${map.size} squad entries from cache")
-                return
+                return@runCatching
             }
 
-            Log.d("PhotoDownloader", "Fetching squad page to build player map...")
             val request = Request.Builder()
                 .url("https://en.wikipedia.org/w/api.php?action=parse&page=2026_FIFA_World_Cup_squads&prop=text&format=json&formatversion=2")
                 .build()
             val respBody = client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return
-                response.body?.string() ?: return
+                if (!response.isSuccessful) return@runCatching
+                response.body?.string() ?: return@runCatching
             }
 
             val json = JSONObject(respBody)
@@ -234,9 +203,6 @@ object PlayerPhotoDownloader {
             }
             cacheFile.parentFile?.mkdirs()
             cacheFile.writeText(saveJson.toString())
-            Log.d("PhotoDownloader", "Built squad map: ${map.size} entries")
-        } catch (e: Exception) {
-            Log.e("PhotoDownloader", "Failed to build squad map: ${e.message}")
         }
     }
 

@@ -3,7 +3,6 @@ package com.porrawc2026.app.ui.screens.home
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.MatchEntity
@@ -15,16 +14,31 @@ import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.GoalNotifier
+import com.porrawc2026.app.util.PdfRankingParser
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.PrefsManager
 import com.porrawc2026.app.util.UpdateManager
 import com.porrawc2026.app.util.ValidationResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
 
 enum class MatchStatus { UPCOMING, LIVE, FINISHED }
@@ -64,6 +78,7 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val madridTZ = TimeZone.getTimeZone("Europe/Madrid")
+
     private val _totalPoints = MutableStateFlow(0)
     val totalPoints: StateFlow<Int> = _totalPoints.asStateFlow()
     private val _isLoading = MutableStateFlow(false)
@@ -90,9 +105,7 @@ class HomeViewModel @Inject constructor(
     val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
     private val _isUpdating = MutableStateFlow(false)
     val isUpdating: StateFlow<Boolean> = _isUpdating.asStateFlow()
-    private val _appVersion = MutableStateFlow(
-        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
-    )
+    private val _appVersion = MutableStateFlow(context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?")
     val appVersion: StateFlow<String> = _appVersion.asStateFlow()
     private val _excelFileName = MutableStateFlow<String?>(null)
     val excelFileName: StateFlow<String?> = _excelFileName.asStateFlow()
@@ -115,13 +128,12 @@ class HomeViewModel @Inject constructor(
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
-    private var livePollJob: Job? = null
     private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
     private val goalScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
     private val liveMinutes = mutableMapOf<Int, String>()
-    private var isInForeground = false
     private val notifiedScorers = mutableSetOf<String>()
+    private val pdfParser = PdfRankingParser()
 
     init {
         com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
@@ -136,47 +148,25 @@ class HomeViewModel @Inject constructor(
         forceCheckUpdate()
     }
 
-    private suspend fun precachePhotosInBackground() {
-        PlayerPhotoDownloader.precacheTopPlayers(context)
-    }
-
     private fun preloadSchedule() {
         _isBusy.value = true
-        loadHardcodedMatches()
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val dbMatches = repository.getAllMatches().first()
-                if (dbMatches.isNotEmpty()) {
-                    cachedMatches = dbMatches
-                    enrichSchedule()
-                    recalcAllPoints()
-                    refreshPoints()
-                    loadPlayers()
-                    downloadPlayerPhotos()
-                    precachePhotosInBackground()
-                    startAutoRefresh()
-                    // Keep DB goals, re-check from API
-                    lastWrittenScores.clear()
-                    refreshUpcomingMatches()
-                    fetchLiveResults()
-                    refreshUpcomingMatches()
-                    _hasData.value = true
-                } else {
-                    enrichSchedule()
-                    refreshUpcomingMatches()
-                    fetchLiveResults()
-                    refreshUpcomingMatches()
-                    _hasData.value = true
-                }
-                _isReady.value = true
-            } finally {
-                _isBusy.value = false
-            }
-        }
-    }
-
-    private fun loadHardcodedMatches() {
         cachedMatches = MatchScheduleProvider.buildMatchEntities()
+        viewModelScope.launch(Dispatchers.IO) {
+            val dbMatches = repository.getAllMatches().first()
+            cachedMatches = if (dbMatches.isNotEmpty()) dbMatches else cachedMatches
+            enrichSchedule()
+            recalcAllPoints()
+            refreshPoints()
+            loadPlayers()
+            startAutoRefresh()
+            lastWrittenScores.clear()
+            fetchLiveResults()
+            downloadPlayerPhotos()
+            precachePhotosInBackground()
+            _hasData.value = true
+            _isReady.value = true
+            _isBusy.value = false
+        }
     }
 
     private fun loadPlayers() {
@@ -192,26 +182,24 @@ class HomeViewModel @Inject constructor(
             _isLoading.value = true
             _isBusy.value = true
             _validationResult.value = null
-            try {
-                val cursor = context.contentResolver.query(uri, null, null, null, null)
-                cursor?.use {
-                    if (it.moveToFirst()) {
-                        val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            runCatching {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                         if (nameIndex >= 0) {
-                            val displayName = it.getString(nameIndex)
+                            val displayName = cursor.getString(nameIndex)
                             _excelFileName.value = displayName
                             prefsManager.setExcelFileName(displayName)
-                            val extracted = extractUserName(displayName)
-                            if (extracted != null) {
-                                _userName.value = extracted
-                                prefsManager.setUserName(extracted)
+                            extractUserName(displayName)?.let {
+                                _userName.value = it
+                                prefsManager.setUserName(it)
                             }
                         }
                     }
                 }
                 val data = ExcelParser.parse(context, uri)
                 val validation = ExcelParser.validate()
-                    _validationResult.value = validation
+                _validationResult.value = validation
                 if (validation.isValid) {
                     repository.insertAllData(
                         data.teams, data.matches, data.questions,
@@ -222,20 +210,17 @@ class HomeViewModel @Inject constructor(
                     enrichSchedule()
                     recalcAllPoints()
                     refreshPoints()
-                    refreshUpcomingMatches()
+                    refreshAll()
                     _hasData.value = true
                     loadPlayers()
                     downloadPlayerPhotos()
                     startAutoRefresh()
-                    fetchLiveResults()
-                    refreshUpcomingMatches()
                 }
-            } catch (e: Exception) {
-                _errorMessage.emit("Error al cargar el Excel: ${e.message}")
-            } finally {
-                _isLoading.value = false
-                _isBusy.value = false
+            }.onFailure { e ->
+                viewModelScope.launch { _errorMessage.emit("Error al cargar el Excel: ${e.message}") }
             }
+            _isLoading.value = false
+            _isBusy.value = false
         }
     }
 
@@ -261,45 +246,28 @@ class HomeViewModel @Inject constructor(
     fun refreshLiveScores() {
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
-            try {
-                fetchLiveResults()
-                refreshUpcomingMatches()
-            } finally {
-                _isBusy.value = false
-            }
+            refreshAll()
+            _isBusy.value = false
         }
     }
 
     fun refreshCache() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _isBusy.value = true
-            try {
-                fetchLiveResults()
-                refreshUpcomingMatches()
-            } finally {
-                _isBusy.value = false
-            }
-        }
+        refreshLiveScores()
+    }
+
+    fun setForegroundState(isForeground: Boolean) {
+        // Lifecycle hook - no-op since polling is handled by startAutoRefresh
     }
 
     fun loadPdfResult(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
-            Log.d("PdfDebug", "loadPdfResult: uri=$uri")
-            try {
+            runCatching {
                 val searchName = _userName.value?.takeIf { it.isNotBlank() } ?: "jaimede"
-                Log.d("PdfDebug", "searchName=$searchName")
                 val inputStream = context.contentResolver.openInputStream(uri)
-                if (inputStream == null) {
-                    Log.e("PdfDebug", "inputStream is NULL!")
-                    _pdfResult.value = "Error: null input"
-                    return@launch
-                }
-                Log.d("PdfDebug", "inputStream ok, loading doc...")
+                    ?: error("No se pudo abrir el PDF")
                 val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
-                Log.d("PdfDebug", "doc loaded, pages=${doc.numberOfPages}")
-                val position = findNamePosition(doc, searchName)
-                Log.d("PdfDebug", "findNamePosition returned position=$position")
+                val position = pdfParser.findNamePosition(doc, searchName)
                 doc.close()
                 inputStream.close()
 
@@ -310,200 +278,22 @@ class HomeViewModel @Inject constructor(
                     prefsManager.setUserPosition(position)
                     prefsManager.setPreviousPosition(oldPos)
                     _pdfResult.value = "$position"
-                    Log.d("PdfDebug", "SUCCESS: position=$position, oldPos=$oldPos, diff=${_positionDiff.value}")
                 } else {
                     _userPosition.value = null
                     _positionDiff.value = null
                     _pdfResult.value = "No encontrado"
-                    Log.d("PdfDebug", "NOT FOUND: position=$position")
                 }
-            } catch (e: Exception) {
-                Log.e("PdfDebug", "Exception: ${e.message}", e)
+            }.onFailure { e ->
                 _pdfResult.value = "Error: ${e.message?.take(25)}"
-            } finally { _isBusy.value = false }
-        }
-    }
-
-    private suspend fun findNamePosition(doc: com.tom_roush.pdfbox.pdmodel.PDDocument, searchName: String): Int {
-        data class TextPos(val x: Float, val y: Float, val text: String, val pg: Int)
-
-        val allItems = mutableListOf<TextPos>()
-        var currentPage = 0
-
-        val stripper = object : com.tom_roush.pdfbox.text.PDFTextStripper() {
-            override fun startPage(page: com.tom_roush.pdfbox.pdmodel.PDPage) {
-                currentPage = currentPageNo
             }
-            override fun writeString(text: String, textPositions: MutableList<com.tom_roush.pdfbox.text.TextPosition>) {
-                for (tp in textPositions) {
-                    val ch = tp.unicode
-                    if (ch != null && ch.isNotBlank()) {
-                        allItems.add(TextPos(tp.xDirAdj, tp.yDirAdj, ch, currentPage))
-                    }
-                }
-            }
+            _isBusy.value = false
         }
-        stripper.sortByPosition = true
-        stripper.getText(doc)
-
-        Log.d("PdfDebug", "allItems size=${allItems.size}, pages: ${allItems.map { it.pg }.distinct().sorted()}")
-        val pageCounts = allItems.groupBy { it.pg }.mapValues { it.value.size }
-        Log.d("PdfDebug", "items per page: $pageCounts")
-
-        // Normalize search name
-        fun normalize(s: String) = s.lowercase()
-            .replace("í", "i").replace("é", "e").replace("á", "a")
-            .replace("ó", "o").replace("ú", "u").replace("ñ", "n")
-        val searchNorm = normalize(searchName)
-        Log.d("PdfDebug", "searchNorm=$searchNorm (len=${searchNorm.length})")
-
-        // Find the name by matching characters sequentially (skip spaces/special chars in PDF)
-        fun isIgnored(c: String) = c.isBlank() || c in listOf("-", "_", ".", ",", "'", ":", ";", "(", ")", "\"", "!", "?")
-        var targetPage = -1
-        var targetX = -1f
-        var searchOffset = -1
-        var pdfIdx = 0
-        var nameIdx = 0
-        while (pdfIdx < allItems.size && nameIdx < searchNorm.length) {
-            val pdfChar = normalize(allItems[pdfIdx].text)
-            if (isIgnored(pdfChar)) {
-                pdfIdx++
-                continue
-            }
-            if (pdfChar == searchNorm[nameIdx].toString()) {
-                if (nameIdx == 0) searchOffset = pdfIdx // start of potential match
-                nameIdx++
-                if (nameIdx == searchNorm.length) {
-                    targetPage = allItems[searchOffset].pg
-                    var sumX = 0f
-                    for (k in searchOffset..pdfIdx) {
-                        sumX += allItems[k].x
-                    }
-                    targetX = sumX / (pdfIdx - searchOffset + 1)
-                    break
-                }
-                pdfIdx++
-            } else {
-                // Mismatch: reset search
-                pdfIdx = (searchOffset + 1).coerceAtLeast(pdfIdx - nameIdx + 1)
-                nameIdx = 0
-                searchOffset = -1
-            }
-        }
-        Log.d("PdfDebug", "name search: targetPage=$targetPage targetX=$targetX offset=$searchOffset")
-        // Log individual character X values
-        val charLog = StringBuilder("name chars: ")
-        for (k in searchOffset..pdfIdx.coerceAtMost(searchOffset + 50)) {
-            charLog.append("${allItems[k].text}(${allItems[k].x}) ")
-        }
-        Log.d("PdfDebug", charLog.toString())
-        if (targetPage < 0) {
-            Log.e("PdfDebug", "name NOT FOUND in allItems")
-            val dumpLen = 100
-            val sampleText = allItems.take(dumpLen).joinToString("") { it.text }
-            Log.d("PdfDebug", "First $dumpLen chars: $sampleText")
-            val page3items = allItems.filter { it.pg == 3 }
-            val samplePage3 = page3items.take(dumpLen).joinToString("") { it.text }
-            Log.d("PdfDebug", "Page3 first $dumpLen chars: $samplePage3")
-            val lastPage3 = page3items.takeLast(dumpLen).joinToString("") { it.text }
-            Log.d("PdfDebug", "Page3 last $dumpLen chars: $lastPage3")
-            for (i in 0 until allItems.size) {
-                val t = normalize(allItems[i].text)
-                if (t == "j" || t == "a" || t == "i" || t == "m" || t == "e") {
-                    Log.d("PdfDebug", "Found '${allItems[i].text}' at idx=$i pg=${allItems[i].pg} x=${allItems[i].x} y=${allItems[i].y}")
-                }
-            }
-            return 0
-        }
-
-        // Group items by page and Y
-        val pageYGroups = mutableMapOf<Int, MutableMap<Int, MutableList<TextPos>>>()
-        for (item in allItems) {
-            pageYGroups.getOrPut(item.pg) { mutableMapOf() }
-                .getOrPut(Math.round(item.y)) { mutableListOf() }
-                .add(item)
-        }
-
-        // Collect ALL position-number groups across every row on the page (positions may wrap to multiple rows)
-        fun findPositionRow(yg: Map<Int, MutableList<TextPos>>): List<Pair<Int, Float>>? {
-            val allPositions = mutableListOf<Pair<Int, Float>>()
-            for ((yKey, items) in yg) {
-                if (items.size < 5) continue
-                // Extract ONLY digit items, ignore non-digit characters (headers, lines, etc.)
-                val digitItems = items.filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
-                    .sortedBy { it.x }
-                if (digitItems.size < 5) continue
-                val groups = mutableListOf<Pair<Int, Float>>()
-                var current = StringBuilder()
-                var firstX = 0f
-                var prevX = 0f
-                for (d in digitItems) {
-                    if (current.isEmpty()) {
-                        current.append(d.text.trim())
-                        firstX = d.x
-                        prevX = d.x
-                    } else if (d.x - prevX < 3) {
-                        current.append(d.text.trim())
-                        prevX = d.x
-                    } else {
-                        val n = current.toString().toIntOrNull()
-                        if (n != null) groups.add(n to firstX)
-                        current = StringBuilder(d.text.trim())
-                        firstX = d.x
-                        prevX = d.x
-                    }
-                }
-                val n = current.toString().toIntOrNull()
-                if (n != null) groups.add(n to firstX)
-                if (groups.size < 5) continue
-                val sorted = groups.map { it.first }.sorted()
-                var sequential = true
-                for (i in 1 until sorted.size) {
-                    if (sorted[i] != sorted[i - 1] + 1) { sequential = false; break }
-                }
-                if (sequential) {
-                    Log.d("PdfDebug", "  Y=$yKey groups=${groups.size} seq=true first=${groups.first().first} last=${groups.last().first}")
-                    allPositions.addAll(groups)
-                } else {
-                    Log.d("PdfDebug", "  Y=$yKey groups=${groups.size} seq=false samples=${groups.take(5).map { it.first }}...")
-                }
-            }
-            return allPositions.sortedBy { it.first }.ifEmpty { null }
-        }
-
-        // Count positions on pages before target page
-        var position = 0
-        for (pg in 1 until targetPage) {
-            val yg = pageYGroups[pg] ?: continue
-            val posData = findPositionRow(yg) ?: continue
-            Log.d("PdfDebug", "Page $pg: found ${posData.size} positions, first=${posData.first().first} last=${posData.last().first}")
-            position += posData.size
-        }
-
-        // On the target page, find which column (position) contains targetX
-        val targetYg = pageYGroups[targetPage] ?: return 0
-        val targetPositions = findPositionRow(targetYg) ?: return 0
-
-        // Use percentage-based position: find targetX's relative position within the table width
-        val sortedPositions = targetPositions.sortedBy { it.second }
-        val firstPosX = sortedPositions.first().second
-        val lastPosX = sortedPositions.last().second
-        val tableWidth = lastPosX - firstPosX
-        val numPositions = sortedPositions.size
-        val relativeX = ((targetX - firstPosX) / tableWidth).coerceIn(0f, 1f)
-        val colIndex = Math.round(relativeX * (numPositions - 1)).coerceIn(0, numPositions - 1)
-        val bestPos = sortedPositions[colIndex].first
-        Log.d("PdfDebug", "Page $targetPage: positions=$numPositions range=${sortedPositions.first().first}-${sortedPositions.last().first} " +
-            "bestPos=$bestPos targetX=$targetX firstPosX=$firstPosX lastPosX=$lastPosX tableWidth=$tableWidth relativeX=$relativeX colIndex=$colIndex")
-        position += bestPos - sortedPositions.first().first + 1
-        Log.d("PdfDebug", "FINAL position=$position")
-        return position
     }
 
     fun installUpdate() {
         viewModelScope.launch(Dispatchers.IO) {
             _isUpdating.value = true
-            try {
+            runCatching {
                 val info = UpdateManager.checkForUpdate(context)
                 when {
                     info == null -> _errorMessage.emit("Error al comprobar actualizacion. Sin conexion?")
@@ -511,14 +301,13 @@ class HomeViewModel @Inject constructor(
                     else -> {
                         val ok = UpdateManager.downloadAndInstall(context, info.downloadUrl)
                         if (!ok) _errorMessage.emit("Error al descargar la actualizacion")
-                        else _appVersion.value = try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?" } catch (_: Exception) { "?" }
+                        else _appVersion.value = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
                     }
                 }
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 _errorMessage.emit("Error al actualizar: ${e.message}")
-            } finally {
-                _isUpdating.value = false
             }
+            _isUpdating.value = false
         }
     }
 
@@ -560,6 +349,10 @@ class HomeViewModel @Inject constructor(
             loadPlayers()
             _isBusy.value = false
         }
+    }
+
+    private suspend fun precachePhotosInBackground() {
+        PlayerPhotoDownloader.precacheTopPlayers(context)
     }
 
     private suspend fun recalcAllPoints() {
@@ -620,19 +413,25 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun checkLiveWindow() {
-        if (!_autoRefreshEnabled.value) { livePollJob?.cancel(); return }
-        if (livePollJob?.isActive != true) startLivePolling()
+        if (!_autoRefreshEnabled.value) return
+        val todayMatches = getTodayMatchesWithDates()
+        if (todayMatches.isEmpty()) return
+        val now = Date()
+        val times = todayMatches.map { parseMadridDate(it.dateTime) }.filterNotNull()
+        val firstStart = times.minOrNull()
+        val lastEnd = times.maxOrNull()?.let { Date(it.time + 150L * 60 * 1000) }
+        if (firstStart != null && now.before(firstStart)) return
+        if (lastEnd != null && now.after(lastEnd)) return
+        fetchLiveResults()
     }
 
     fun parseMadridDate(dateTime: String): Date? {
         if (dateTime.isBlank()) return null
-        return try {
-            if (dateTime.endsWith("Z")) {
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(dateTime)
-            } else {
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = madridTZ }.parse(dateTime)
-            }
-        } catch (e: Exception) { null }
+        return if (dateTime.endsWith("Z")) {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(dateTime)
+        } else {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = madridTZ }.parse(dateTime)
+        }
     }
 
     private fun getTodayMatchesWithDates(): List<MatchEntity> {
@@ -646,22 +445,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun startLivePolling() {
-        livePollJob?.cancel()
-        livePollJob = viewModelScope.launch(Dispatchers.IO) {
-            while (isActive) {
-                val todayMatches = getTodayMatchesWithDates()
-                if (todayMatches.isEmpty()) break
-                val now = Date()
-                val times = todayMatches.map { parseMadridDate(it.dateTime) }.filterNotNull()
-                val firstStart = times.minOrNull()
-                val lastEnd = times.maxOrNull()?.let { Date(it.time + 150L * 60 * 1000) }
-                if (firstStart != null && now.before(firstStart)) break
-                if (lastEnd != null && now.after(lastEnd)) break
-                try { fetchLiveResults() } catch (e: Exception) { Log.d("HomeVM", "Live fetch: ${e.message}") }
-                delay(5 * 60_000L)
-            }
-        }
+    private suspend fun refreshAll() {
+        fetchLiveResults()
     }
 
     private suspend fun fetchLiveResults() {
@@ -685,11 +470,11 @@ class HomeViewModel @Inject constructor(
                 if (update.isFinished) {
                     repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
                 }
-                val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
-                val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
-                if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
-                    goalScorers[update.matchId] = Pair(homeScr, awayScr)
-                }
+            }
+            val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
+            val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+            if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
+                goalScorers[update.matchId] = Pair(homeScr, awayScr)
             }
         }
 
@@ -703,39 +488,22 @@ class HomeViewModel @Inject constructor(
             repository.updateMatchCards(card.matchId, card.homeReds, card.awayReds, card.homeYellows, card.awayYellows)
         }
 
-        // Actualizar marcadores desde football-data.org
-        try {
-            val liveUpdates = liveScoreService.fetchLiveMatchDetails(cachedMatches)
-            liveUpdates.forEach { update ->
-                val match = cachedMatches.firstOrNull { it.id == update.matchId }
-                if (match != null) {
-                    val start = parseMadridDate(match.dateTime)
-                    if (start != null && start.after(Date())) return@forEach
-                }
-                cachedMatches = cachedMatches.map {
-                    if (it.id == update.matchId) it.copy(
-                        homeGoals = update.homeGoals,
-                        awayGoals = update.awayGoals
-                    ) else it
-                }
-                recalcAllPoints()
+        val espnUpdates = liveScoreService.fetchEspnLiveMinutes(cachedMatches)
+        espnUpdates.forEach { update ->
+            val match = cachedMatches.firstOrNull { it.id == update.matchId }
+            if (match != null) {
+                val start = parseMadridDate(match.dateTime)
+                if (start != null && start.after(Date())) return@forEach
             }
-        } catch (_: Exception) { }
-
-        // Actualizar minuto real desde api-sports.io (sobrescribe "LIVE")
-        try {
-            val minuteUpdates = liveScoreService.fetchApiFootballMinutes(cachedMatches)
-            minuteUpdates.forEach { update ->
-                val m = cachedMatches.firstOrNull { it.id == update.matchId }
-                if (m != null) {
-                    val start = parseMadridDate(m.dateTime)
-                    if (start != null && start.after(Date())) return@forEach
-                }
-                if (update.liveMinute != null) {
-                    liveMinutes[update.matchId] = update.liveMinute
-                }
+            if (update.liveMinute != null) {
+                liveMinutes[update.matchId] = update.liveMinute
             }
-        } catch (_: Exception) { }
+            if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
+                val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
+                val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+                goalScorers[update.matchId] = Pair(homeScr, awayScr)
+            }
+        }
 
         for ((matchId, pair) in goalScorers) {
             for (scorer in pair.first + pair.second) {
@@ -802,6 +570,8 @@ class HomeViewModel @Inject constructor(
         val date = parseMadridDate(match.dateTime)
         val timeFmt = SimpleDateFormat("HH:mm", Locale.US).apply { timeZone = madridTZ }
         val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "ES")).apply { timeZone = madridTZ }
+        val dayAbbrFmt = SimpleDateFormat("EEE", Locale("es", "ES")).apply { timeZone = madridTZ }
+        val dayNumFmt = SimpleDateFormat("dd", Locale.US).apply { timeZone = madridTZ }
         val time = if (date != null) timeFmt.format(date) else ""
         val dateLabel = if (date != null) {
             val cal = Calendar.getInstance(madridTZ)
@@ -830,8 +600,6 @@ class HomeViewModel @Inject constructor(
         val s = goalScorers[match.id]
         val homeScr = s?.first ?: emptyList()
         val awayScr = s?.second ?: emptyList()
-        val dayAbbrFmt = SimpleDateFormat("EEE", Locale("es", "ES")).apply { timeZone = madridTZ }
-        val dayNumFmt = SimpleDateFormat("dd", Locale.US).apply { timeZone = madridTZ }
         val dayKey = if (date != null) "${dayAbbrFmt.format(date).replace(".", "").uppercase()} ${dayNumFmt.format(date)}" else ""
         val sortKey = if (date != null) dayNumFmt.format(date) else ""
 
@@ -867,38 +635,7 @@ class HomeViewModel @Inject constructor(
 
     override fun onCleared() {
         refreshJob?.cancel()
-        livePollJob?.cancel()
         super.onCleared()
-    }
-
-    fun setForegroundState(isForeground: Boolean) {
-        isInForeground = isForeground
-        if (isForeground) {
-            startLiveMinutePolling()
-        } else {
-            stopLiveMinutePolling()
-        }
-    }
-
-    private var liveMinutePollJob: Job? = null
-
-    private fun startLiveMinutePolling() {
-        liveMinutePollJob?.cancel()
-        liveMinutePollJob = viewModelScope.launch(Dispatchers.IO) {
-            while (isActive && isInForeground) {
-                try {
-                    fetchLiveResults()
-                } catch (e: Exception) {
-                    Log.d("HomeVM", "Live minute polling error: ${e.message}")
-                }
-                delay(5 * 60_000L)
-            }
-        }
-    }
-
-    private fun stopLiveMinutePolling() {
-        liveMinutePollJob?.cancel()
-        liveMinutePollJob = null
     }
 
     private fun extractUserName(displayName: String?): String? {

@@ -1,6 +1,5 @@
 package com.porrawc2026.app.util
 
-import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -41,8 +40,6 @@ object TvScraper {
         val h = homeTeam.trim()
         val a = awayTeam.trim()
 
-        Log.d("TvScraper", "Lookup: '$h' vs '$a'")
-
         val idx = text.indexOf(h, ignoreCase = true)
         if (idx < 0) {
             val idx2 = text.indexOf(a, ignoreCase = true)
@@ -66,7 +63,6 @@ object TvScraper {
         val cacheFile = cacheDir?.let { File(it, "tv_cache_$today.html") }
         if (cacheFile != null && cacheFile.exists()) {
             val body = cacheFile.readText()
-            Log.d("TvScraper", "Loaded TV cache for $today: ${body.length} bytes")
             return body
         }
 
@@ -74,26 +70,21 @@ object TvScraper {
         if (cacheFile != null) {
             cacheFile.parentFile?.mkdirs()
             cacheFile.writeText(html)
-            Log.d("TvScraper", "Saved TV cache for $today: ${html.length} bytes")
         }
         return html
     }
 
     private fun fetchHtml(): String? {
-        return try {
+        return runCatching {
             val request = Request.Builder()
                 .url("https://www.futbolenlatv.es/competicion/fifa-world-cup")
                 .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .build()
             val response = client.newCall(request).execute()
-            val body = response.body?.string() ?: return null
+            val body = response.body?.string()
             response.close()
-            Log.d("TvScraper", "Fetched HTML: ${body.length} bytes")
             body
-        } catch (e: Exception) {
-            Log.e("TvScraper", "Fetch failed: ${e.message}")
-            null
-        }
+        }.getOrNull()
     }
 
     fun clearCache() {

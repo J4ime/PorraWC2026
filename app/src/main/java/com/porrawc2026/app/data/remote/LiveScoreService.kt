@@ -2,10 +2,6 @@ package com.porrawc2026.app.data.remote
 
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,15 +29,14 @@ data class CardUpdate(
 class LiveScoreService @Inject constructor(
     private val wc26: WorldCup26Service,
     private val zafronix: ZafronixService,
-    private val apiService: ApiService,
-    private val apiFootballService: ApiFootballService
+    private val espnService: EspnService
 ) {
 
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): Pair<List<LiveScoreUpdate>, List<CardUpdate>> {
         val scoreUpdates = mutableListOf<LiveScoreUpdate>()
         val cardUpdates = mutableListOf<CardUpdate>()
 
-        try {
+        runCatching {
             val resp = wc26.getGames()
             resp.games.forEach { g ->
                 if (g.time_elapsed == "notstarted") return@forEach
@@ -69,9 +64,9 @@ class LiveScoreService @Inject constructor(
                     )
                 )
             }
-        } catch (_: Exception) { }
+        }
 
-        try {
+        runCatching {
             val zaf = zafronix.getMatches()
             zaf.data.forEach { m ->
                 val entity = findMatchingMatch(matches, m.homeTeam ?: "", m.awayTeam ?: "")
@@ -83,7 +78,6 @@ class LiveScoreService @Inject constructor(
                 val awayYellows = cards.count { c -> c.team == "away" && c.color == "yellow" }
                 cardUpdates.add(CardUpdate(entity.id, homeReds, awayReds, homeYellows, awayYellows))
 
-                // Add Zafronix goals as scorer source for matches not yet handled by worldcup26
                 val existingEntry = scoreUpdates.indexOfFirst { it.matchId == entity.id }
                 if (existingEntry < 0 || (scoreUpdates[existingEntry].homeScorers.isEmpty() && scoreUpdates[existingEntry].awayScorers.isEmpty())) {
                     val goals = m.goals ?: return@forEach
@@ -110,125 +104,70 @@ class LiveScoreService @Inject constructor(
                     }
                 }
             }
-        } catch (_: Exception) { }
+        }
 
         return Pair(scoreUpdates, cardUpdates)
     }
 
-    suspend fun fetchApiFootballMinutes(matches: List<MatchEntity>): List<LiveScoreUpdate> {
+    suspend fun fetchEspnLiveMinutes(matches: List<MatchEntity>): List<LiveScoreUpdate> {
         val updates = mutableListOf<LiveScoreUpdate>()
-        try {
-            val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val today = dateFmt.format(Date())
-            val resp = apiFootballService.getFixtures(today)
+        runCatching {
+            val scoreboard = espnService.getScoreboard()
+            val events = scoreboard.events ?: return@runCatching
 
-            resp.response.forEach { fixture ->
-                val status = fixture.fixture.status ?: return@forEach
-                if (status.elapsed == null) return@forEach
-                val short = status.short ?: return@forEach
-                if (short in listOf("NS", "PST", "CANC", "ABD", "AWD", "WO", "TBD")) return@forEach
+            events.forEach { event ->
+                val competition = event.competitions?.firstOrNull() ?: return@forEach
+                val status = competition.status ?: return@forEach
+                val competitors = competition.competitors ?: return@forEach
 
-                val entity = findMatchingMatch(matches,
-                    fixture.teams.home.name ?: "",
-                    fixture.teams.away.name ?: ""
-                ) ?: return@forEach
+                val homeTeam = competitors.firstOrNull { it.homeAway == "home" } ?: return@forEach
+                val awayTeam = competitors.firstOrNull { it.homeAway == "away" } ?: return@forEach
 
-                val elapsed = status.elapsed ?: return@forEach
-                val minute = when (short) {
-                    "HT" -> "HT"
-                    "FT", "AET", "PEN" -> "FINAL"
-                    "1H", "2H", "ET", "P", "LIVE" -> "$elapsed'"
-                    "INT" -> "INT"
-                    else -> "$elapsed'"
+                val homeName = homeTeam.team?.displayName ?: homeTeam.team?.name ?: return@forEach
+                val awayName = awayTeam.team?.displayName ?: awayTeam.team?.name ?: return@forEach
+
+                val entity = findMatchingMatch(matches, homeName, awayName) ?: return@forEach
+
+                val hScore = homeTeam.score?.toIntOrNull() ?: 0
+                val aScore = awayTeam.score?.toIntOrNull() ?: 0
+
+                val statusType = status.type
+                val state = statusType?.state ?: ""
+                val displayClock = status.displayClock ?: ""
+                val shortDetail = statusType?.shortDetail ?: ""
+
+                val minute = when {
+                    statusType?.completed == true -> "FINAL"
+                    state == "in" && displayClock.isNotBlank() -> displayClock
+                    shortDetail == "Halftime" || shortDetail == "HT" -> "HT"
+                    else -> null
                 }
-                val homeGoals = fixture.goals.home ?: 0
-                val awayGoals = fixture.goals.away ?: 0
+
+                val homeScorers = mutableListOf<LiveScorer>()
+                val awayScorers = mutableListOf<LiveScorer>()
+                competition.details?.forEach { detail ->
+                    val detailText = detail.type?.text ?: ""
+                    if (detailText == "Goal" || detailText == "Own Goal") {
+                        val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
+                        val minuteStr = detail.clock?.displayValue ?: return@forEach
+                        val goalMinute = minuteStr.replace("'", "").replace("+", "").toIntOrNull() ?: 0
+                        val isHome = detail.team?.id == homeTeam.id
+                        val scorer = LiveScorer(playerName, goalMinute)
+                        if (isHome) homeScorers.add(scorer) else awayScorers.add(scorer)
+                    }
+                }
 
                 updates.add(LiveScoreUpdate(
                     matchId = entity.id,
-                    homeGoals = homeGoals,
-                    awayGoals = awayGoals,
-                    isFinished = short in listOf("FT", "AET", "PEN"),
+                    homeGoals = hScore,
+                    awayGoals = aScore,
+                    homeScorers = homeScorers,
+                    awayScorers = awayScorers,
+                    isFinished = statusType?.completed == true,
                     liveMinute = minute
                 ))
             }
-        } catch (_: Exception) { }
-
-        return updates
-    }
-
-    suspend fun fetchLiveMatchDetails(matches: List<MatchEntity>): List<LiveScoreUpdate> {
-        val updates = mutableListOf<LiveScoreUpdate>()
-
-        try {
-            val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
-                timeZone = TimeZone.getTimeZone("UTC")
-            }
-            val today = dateFmt.format(Date())
-            val todayMatchesResponse = apiService.getMatches(dateFrom = today, dateTo = today)
-
-            todayMatchesResponse.matches.forEach { fbMatch ->
-                if (fbMatch.status !in listOf("IN_PLAY", "PAUSED", "FINISHED")) return@forEach
-
-                val entity = findMatchingMatch(matches,
-                    fbMatch.homeTeam?.name ?: fbMatch.homeTeam?.shortName ?: "",
-                    fbMatch.awayTeam?.name ?: fbMatch.awayTeam?.shortName ?: ""
-                ) ?: return@forEach
-
-                try {
-                    val detail = apiService.getMatchDetail(fbMatch.id)
-                    val status = detail.status ?: return@forEach
-
-                    if (status !in listOf("IN_PLAY", "PAUSED", "FINISHED")) return@forEach
-
-                    val homeGoals = detail.score?.fullTime?.home
-                        ?: detail.score?.halfTime?.home
-                        ?: 0
-                    val awayGoals = detail.score?.fullTime?.away
-                        ?: detail.score?.halfTime?.away
-                        ?: 0
-
-                    val minute = detail.minute ?: when (status) {
-                        "PAUSED" -> "HT"
-                        "FINISHED" -> "FINAL"
-                        else -> null
-                    }
-
-                    val homeScorers = detail.goals?.filter {
-                        it.team?.name?.let { teamName ->
-                            TeamNameNormalizer.matches(entity.homeTeam, teamName)
-                        } ?: false
-                    }?.mapNotNull { goal ->
-                        val scorerName = goal.scorer?.name ?: return@mapNotNull null
-                        val goalMinute = goal.minute ?: return@mapNotNull null
-                        LiveScorer(scorerName, goalMinute)
-                    } ?: emptyList()
-
-                    val awayScorers = detail.goals?.filter {
-                        it.team?.name?.let { teamName ->
-                            TeamNameNormalizer.matches(entity.awayTeam, teamName)
-                        } ?: false
-                    }?.mapNotNull { goal ->
-                        val scorerName = goal.scorer?.name ?: return@mapNotNull null
-                        val goalMinute = goal.minute ?: return@mapNotNull null
-                        LiveScorer(scorerName, goalMinute)
-                    } ?: emptyList()
-
-                    updates.add(
-                        LiveScoreUpdate(
-                            matchId = entity.id,
-                            homeGoals = homeGoals,
-                            awayGoals = awayGoals,
-                            homeScorers = homeScorers,
-                            awayScorers = awayScorers,
-                            isFinished = status == "FINISHED",
-                            liveMinute = minute
-                        )
-                    )
-                } catch (_: Exception) { }
-            }
-        } catch (_: Exception) { }
-
+        }
         return updates
     }
 
@@ -274,8 +213,6 @@ class LiveScoreService @Inject constructor(
     }
 
     private fun parseScorerString(s: String): List<LiveScorer> {
-        // The worldcup26 API returns strings like: {"Player 45'"} or {"Player1 45'","Player2 90'"}
-        // where the outer braces and quotes are literal characters in the JSON string value
         val clean = s.trim().removeSurrounding("\"").removePrefix("{").removeSuffix("}")
             .replace("\"", "").trim()
         if (clean.isBlank() || clean == "null" || clean == "[]") return emptyList()
@@ -287,9 +224,6 @@ class LiveScoreService @Inject constructor(
             .replace("\"", "").trim()
         if (clean.isBlank() || clean == "null") return null
 
-        // The format is "Player Name 90'+5'" or "Player Name 17' (p)"
-        // Find the first ' character, take everything before it,
-        // the last word before ' is the minute number
         val quoteIndex = clean.indexOf("'")
         if (quoteIndex < 0) return null
 

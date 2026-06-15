@@ -63,7 +63,7 @@ class GoalscorersViewModel @Inject constructor(
 
     private suspend fun fetchTopScorers() {
         _isLoading.value = true
-        try {
+        runCatching {
             val response = apiService.getWorldCupScorers()
             val scorers = response.scorers.take(10).mapIndexed { idx, s ->
                 val teamName = TeamNameNormalizer.enToEs(s.team.name ?: "")
@@ -79,10 +79,9 @@ class GoalscorersViewModel @Inject constructor(
                 )
             }
             _topScorers.value = scorers
-        } catch (e: Exception) {
+        }.onFailure {
             _topScorers.value = emptyList()
-        } finally {
-            _isLoading.value = false
         }
+        _isLoading.value = false
     }
 }

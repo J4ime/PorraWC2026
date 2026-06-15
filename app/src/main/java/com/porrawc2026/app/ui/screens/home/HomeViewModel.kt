@@ -301,6 +301,8 @@ class HomeViewModel @Inject constructor(
                     prefsManager.setPreviousPosition(oldPos)
                     _pdfResult.value = "$position"
                 } else {
+                    _userPosition.value = null
+                    _positionDiff.value = null
                     _pdfResult.value = "No encontrado"
                 }
             } catch (e: Exception) {

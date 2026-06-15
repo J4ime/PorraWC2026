@@ -146,6 +146,7 @@ fun AjustesScreen(
                     SquareButton(
                         icon = Icons.Filled.Assessment,
                         label = when {
+                            pdfResult != null -> pdfResult!!
                             userPosition != null -> {
                                 val diff = positionDiff
                                 if (diff != null && diff != 0) {
@@ -153,7 +154,6 @@ fun AjustesScreen(
                                     else "$userPosition ($diff)"
                                 } else "${userPosition}"
                             }
-                            pdfResult != null -> pdfResult!!
                             else -> "Cargar result"
                         },
                         color = if (userPosition != null) Color(0xFF1565C0) else Color(0xFF444444),

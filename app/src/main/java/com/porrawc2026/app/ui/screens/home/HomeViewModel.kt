@@ -375,7 +375,11 @@ class HomeViewModel @Inject constructor(
                 nameIdx++
                 if (nameIdx == searchNorm.length) {
                     targetPage = allItems[searchOffset].pg
-                    targetX = allItems[searchOffset].x
+                    var sumX = 0f
+                    for (k in searchOffset..pdfIdx) {
+                        sumX += allItems[k].x
+                    }
+                    targetX = sumX / (pdfIdx - searchOffset + 1)
                     break
                 }
                 pdfIdx++
@@ -387,6 +391,12 @@ class HomeViewModel @Inject constructor(
             }
         }
         Log.d("PdfDebug", "name search: targetPage=$targetPage targetX=$targetX offset=$searchOffset")
+        // Log individual character X values
+        val charLog = StringBuilder("name chars: ")
+        for (k in searchOffset..pdfIdx.coerceAtMost(searchOffset + 50)) {
+            charLog.append("${allItems[k].text}(${allItems[k].x}) ")
+        }
+        Log.d("PdfDebug", charLog.toString())
         if (targetPage < 0) {
             Log.e("PdfDebug", "name NOT FOUND in allItems")
             val dumpLen = 100
@@ -419,7 +429,7 @@ class HomeViewModel @Inject constructor(
             val allPositions = mutableListOf<Pair<Int, Float>>()
             for ((yKey, items) in yg) {
                 if (items.size < 5) continue
-                if (!items.all { it.text.trim().all { c -> c.isDigit() } || it.text.isBlank() }) continue
+                // Extract ONLY digit items, ignore non-digit characters (headers, lines, etc.)
                 val digitItems = items.filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
                     .sortedBy { it.x }
                 if (digitItems.size < 5) continue
@@ -470,21 +480,22 @@ class HomeViewModel @Inject constructor(
             position += posData.size
         }
 
-        // On the target page, find the position nearest to targetX
+        // On the target page, find which column (position) contains targetX
         val targetYg = pageYGroups[targetPage] ?: return 0
         val targetPositions = findPositionRow(targetYg) ?: return 0
 
-        var bestPos = targetPositions.first().first
-        var bestDist = Float.MAX_VALUE
-        for ((pos, x) in targetPositions) {
-            val dist = kotlin.math.abs(x - targetX)
-            if (dist < bestDist) {
-                bestDist = dist
-                bestPos = pos
-            }
-        }
-        Log.d("PdfDebug", "Page $targetPage: positions=${targetPositions.size} range=${targetPositions.first().first}-${targetPositions.last().first} bestPos=$bestPos targetX=$targetX")
-        position += bestPos - targetPositions.first().first + 1
+        // Use percentage-based position: find targetX's relative position within the table width
+        val sortedPositions = targetPositions.sortedBy { it.second }
+        val firstPosX = sortedPositions.first().second
+        val lastPosX = sortedPositions.last().second
+        val tableWidth = lastPosX - firstPosX
+        val numPositions = sortedPositions.size
+        val relativeX = ((targetX - firstPosX) / tableWidth).coerceIn(0f, 1f)
+        val colIndex = Math.round(relativeX * (numPositions - 1)).coerceIn(0, numPositions - 1)
+        val bestPos = sortedPositions[colIndex].first
+        Log.d("PdfDebug", "Page $targetPage: positions=$numPositions range=${sortedPositions.first().first}-${sortedPositions.last().first} " +
+            "bestPos=$bestPos targetX=$targetX firstPosX=$firstPosX lastPosX=$lastPosX tableWidth=$tableWidth relativeX=$relativeX colIndex=$colIndex")
+        position += bestPos - sortedPositions.first().first + 1
         Log.d("PdfDebug", "FINAL position=$position")
         return position
     }
@@ -812,13 +823,10 @@ class HomeViewModel @Inject constructor(
             status == MatchStatus.FINISHED -> "FINAL"
             liveMinutes.containsKey(match.id) -> {
                 val lm = liveMinutes[match.id]
-                if (lm == "LIVE") null else lm
+                if (lm == "LIVE") "EN JUEGO" else lm
             }
             else -> null
-        } ?: if (status == MatchStatus.LIVE && date != null) {
-            val elapsed = ((Date().time - date.time) / 60000).toInt().coerceAtLeast(1)
-            if (elapsed > 45) "${(elapsed + 15).coerceAtMost(120)}'" else "$elapsed'"
-        } else null
+        } ?: if (status == MatchStatus.LIVE) "EN JUEGO" else null
         val s = goalScorers[match.id]
         val homeScr = s?.first ?: emptyList()
         val awayScr = s?.second ?: emptyList()

@@ -61,7 +61,7 @@ class GoalscorersViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchTopScorers() = withContext(Dispatchers.IO) {
+    private suspend fun fetchTopScorers() {
         _isLoading.value = true
         try {
             val response = apiService.getWorldCupScorers()

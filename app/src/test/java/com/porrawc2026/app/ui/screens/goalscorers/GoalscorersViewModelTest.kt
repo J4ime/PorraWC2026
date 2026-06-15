@@ -3,6 +3,7 @@ package com.porrawc2026.app.ui.screens.goalscorers
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.*
 import com.porrawc2026.app.data.repository.PorraRepository
+import com.porrawc2026.app.util.GoalEventBus
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,6 +19,7 @@ class GoalscorersViewModelTest {
 
     private lateinit var repository: PorraRepository
     private lateinit var apiService: ApiService
+    private lateinit var goalEventBus: GoalEventBus
     private lateinit var viewModel: GoalscorersViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -26,11 +28,12 @@ class GoalscorersViewModelTest {
         Dispatchers.setMain(testDispatcher)
         repository = mockk(relaxed = true)
         apiService = mockk(relaxed = true)
+        goalEventBus = GoalEventBus()
         
         every { repository.getPlayerPredictions() } returns flowOf(emptyList())
         coEvery { apiService.getWorldCupScorers() } returns ScorersResponse(0, emptyList())
         
-        viewModel = GoalscorersViewModel(repository, apiService)
+        viewModel = GoalscorersViewModel(repository, apiService, goalEventBus)
     }
 
     @After
@@ -44,7 +47,7 @@ class GoalscorersViewModelTest {
         
         coEvery { apiService.getWorldCupScorers() } returns scorersResponse
         
-        viewModel.loadTopScorers()
+        viewModel.refresh()
         
         advanceUntilIdle()
         
@@ -55,7 +58,7 @@ class GoalscorersViewModelTest {
     fun `loadTopScorers handles API error gracefully`() = runTest {
         coEvery { apiService.getWorldCupScorers() } throws RuntimeException("Network error")
         
-        viewModel.loadTopScorers()
+        viewModel.refresh()
         
         advanceUntilIdle()
         
@@ -68,7 +71,7 @@ class GoalscorersViewModelTest {
         val scorersResponse = ScorersResponse(count = 0, scorers = emptyList())
         coEvery { apiService.getWorldCupScorers() } returns scorersResponse
         
-        viewModel.loadTopScorers()
+        viewModel.refresh()
         
         advanceUntilIdle()
         

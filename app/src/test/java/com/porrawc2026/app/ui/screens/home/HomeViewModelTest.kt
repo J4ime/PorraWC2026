@@ -4,6 +4,7 @@ import android.content.Context
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.remote.LiveScoreService
 import com.porrawc2026.app.data.repository.PorraRepository
+import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.PrefsManager
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,7 @@ class HomeViewModelTest {
     private lateinit var repository: PorraRepository
     private lateinit var liveScoreService: LiveScoreService
     private lateinit var prefsManager: PrefsManager
+    private lateinit var goalEventBus: GoalEventBus
     private lateinit var context: Context
     private lateinit var viewModel: HomeViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -35,6 +37,7 @@ class HomeViewModelTest {
         repository = mockk(relaxed = true)
         liveScoreService = mockk(relaxed = true)
         prefsManager = mockk(relaxed = true)
+        goalEventBus = GoalEventBus()
         context = mockk(relaxed = true)
         
         coEvery { prefsManager.getExcelFileNameSync() } returns null
@@ -49,7 +52,7 @@ class HomeViewModelTest {
         mockkStatic("com.tom_roush.pdfbox.android.PDFBoxResourceLoader")
         every { com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(any()) } just Runs
         
-        viewModel = HomeViewModel(repository, liveScoreService, prefsManager, context)
+        viewModel = HomeViewModel(repository, liveScoreService, prefsManager, goalEventBus, context)
     }
 
     @After

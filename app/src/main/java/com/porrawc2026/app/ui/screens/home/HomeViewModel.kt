@@ -377,22 +377,26 @@ class HomeViewModel @Inject constructor(
                 if (digitItems.size < 5) continue
                 val groups = mutableListOf<Pair<Int, Float>>()
                 var current = StringBuilder()
-                var currentX = 0f
+                var firstX = 0f
+                var prevX = 0f
                 for (d in digitItems) {
                     if (current.isEmpty()) {
                         current.append(d.text.trim())
-                        currentX = d.x
-                    } else if (d.x - currentX < 3) {
+                        firstX = d.x
+                        prevX = d.x
+                    } else if (d.x - prevX < 3) {
                         current.append(d.text.trim())
+                        prevX = d.x
                     } else {
                         val n = current.toString().toIntOrNull()
-                        if (n != null) groups.add(n to currentX)
+                        if (n != null) groups.add(n to firstX)
                         current = StringBuilder(d.text.trim())
-                        currentX = d.x
+                        firstX = d.x
+                        prevX = d.x
                     }
                 }
                 val n = current.toString().toIntOrNull()
-                if (n != null) groups.add(n to currentX)
+                if (n != null) groups.add(n to firstX)
                 if (groups.size < 5) continue
                 val sorted = groups.map { it.first }.sorted()
                 var sequential = true

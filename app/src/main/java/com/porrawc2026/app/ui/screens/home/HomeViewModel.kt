@@ -366,14 +366,12 @@ class HomeViewModel @Inject constructor(
                 .add(item)
         }
 
-        // Find the position-numbers row: all items are digits/blank AND form a sequential sequence
+        // Collect ALL position-number groups across every row on the page (positions may wrap to multiple rows)
         fun findPositionRow(yg: Map<Int, MutableList<TextPos>>): List<Pair<Int, Float>>? {
-            val candidateRows = yg.filter { (_, items) ->
-                if (items.size < 5) return@filter false
-                items.all { it.text.trim().all { c -> c.isDigit() } || it.text.isBlank() }
-            }
-            for ((_, items) in candidateRows) {
-                // Group consecutive digit characters by X proximity into complete numbers FIRST
+            val allPositions = mutableListOf<Pair<Int, Float>>()
+            for ((_, items) in yg) {
+                if (items.size < 5) continue
+                if (!items.all { it.text.trim().all { c -> c.isDigit() } || it.text.isBlank() }) continue
                 val digitItems = items.filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
                     .sortedBy { it.x }
                 if (digitItems.size < 5) continue
@@ -396,15 +394,14 @@ class HomeViewModel @Inject constructor(
                 val n = current.toString().toIntOrNull()
                 if (n != null) groups.add(n to currentX)
                 if (groups.size < 5) continue
-                // Now check if the grouped numbers form a sequential sequence
                 val sorted = groups.map { it.first }.sorted()
                 var sequential = true
                 for (i in 1 until sorted.size) {
                     if (sorted[i] != sorted[i - 1] + 1) { sequential = false; break }
                 }
-                if (sequential) return groups
+                if (sequential) allPositions.addAll(groups)
             }
-            return null
+            return allPositions.sortedBy { it.first }.ifEmpty { null }
         }
 
         // Count positions on pages before target page

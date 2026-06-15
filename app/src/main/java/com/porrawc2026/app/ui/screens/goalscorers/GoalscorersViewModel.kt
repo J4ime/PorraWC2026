@@ -6,10 +6,10 @@ import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
+import com.porrawc2026.app.util.GoalEventBus
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class TopScorerDisplay(
@@ -26,7 +26,8 @@ data class TopScorerDisplay(
 @HiltViewModel
 class GoalscorersViewModel @Inject constructor(
     private val repository: PorraRepository,
-    private val apiService: ApiService
+    private val apiService: ApiService,
+    private val goalEventBus: GoalEventBus
 ) : ViewModel() {
 
     private val _players = MutableStateFlow<List<PlayerPredictionEntity>>(emptyList())
@@ -40,7 +41,16 @@ class GoalscorersViewModel @Inject constructor(
 
     init {
         loadPlayers()
-        loadTopScorers()
+        viewModelScope.launch { fetchTopScorers() }
+        viewModelScope.launch {
+            goalEventBus.goalScored.collect {
+                fetchTopScorers()
+            }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch { fetchTopScorers() }
     }
 
     private fun loadPlayers() {
@@ -51,30 +61,28 @@ class GoalscorersViewModel @Inject constructor(
         }
     }
 
-    fun loadTopScorers() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _isLoading.value = true
-            try {
-                val response = apiService.getWorldCupScorers()
-                val scorers = response.scorers.take(10).mapIndexed { idx, s ->
-                    val teamName = TeamNameNormalizer.enToEs(s.team.name ?: "")
-                    TopScorerDisplay(
-                        rank = idx + 1,
-                        name = s.player.name ?: "?",
-                        team = teamName,
-                        goals = s.goals ?: 0,
-                        assists = s.assists,
-                        matches = s.playedMatches,
-                        minutesPlayed = null,
-                        flagEmoji = com.porrawc2026.app.util.ExcelParser.getFlagEmoji(teamName)
-                    )
-                }
-                _topScorers.value = scorers
-            } catch (e: Exception) {
-                _topScorers.value = emptyList()
-            } finally {
-                _isLoading.value = false
+    private suspend fun fetchTopScorers() = withContext(Dispatchers.IO) {
+        _isLoading.value = true
+        try {
+            val response = apiService.getWorldCupScorers()
+            val scorers = response.scorers.take(10).mapIndexed { idx, s ->
+                val teamName = TeamNameNormalizer.enToEs(s.team.name ?: "")
+                TopScorerDisplay(
+                    rank = idx + 1,
+                    name = s.player.name ?: "?",
+                    team = teamName,
+                    goals = s.goals ?: 0,
+                    assists = s.assists,
+                    matches = s.playedMatches,
+                    minutesPlayed = null,
+                    flagEmoji = com.porrawc2026.app.util.ExcelParser.getFlagEmoji(teamName)
+                )
             }
+            _topScorers.value = scorers
+        } catch (e: Exception) {
+            _topScorers.value = emptyList()
+        } finally {
+            _isLoading.value = false
         }
     }
 }

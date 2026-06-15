@@ -13,6 +13,7 @@ import com.porrawc2026.app.data.remote.MatchScheduleProvider
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.util.ExcelParser
+import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.GoalNotifier
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.PrefsManager
@@ -58,6 +59,7 @@ class HomeViewModel @Inject constructor(
     private val repository: PorraRepository,
     private val liveScoreService: LiveScoreService,
     private val prefsManager: PrefsManager,
+    private val goalEventBus: GoalEventBus,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -117,6 +119,7 @@ class HomeViewModel @Inject constructor(
     private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
     private val liveMinutes = mutableMapOf<Int, String>()
     private var isInForeground = false
+    private val notifiedScorers = mutableSetOf<String>()
 
     init {
         com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
@@ -638,6 +641,14 @@ class HomeViewModel @Inject constructor(
             }
         } catch (_: Exception) { }
 
+        for ((matchId, pair) in goalScorers) {
+            for (scorer in pair.first + pair.second) {
+                val key = "$matchId:${scorer.playerName}:${scorer.minute}"
+                if (notifiedScorers.add(key)) {
+                    goalEventBus.notifyGoal()
+                }
+            }
+        }
         checkGoalNotifications()
         refreshUpcomingMatches()
     }

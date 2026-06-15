@@ -24,3 +24,5 @@ app/build/
 release.jks
 *.apk.idsig
 *.apk
+
+node_modules/

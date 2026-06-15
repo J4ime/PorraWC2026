@@ -366,48 +366,58 @@ class HomeViewModel @Inject constructor(
                 .add(item)
         }
 
-        // Extract (position, x) pairs from the position-number row on each page
-        fun extractPositions(yg: MutableMap<Int, MutableList<TextPos>>): List<Pair<Int, Float>> {
-            // Find row where all non-blank items are digits (the position numbers row)
-            val posRowY = yg.entries.firstOrNull { (_, items) ->
-                items.size >= 5 && items.all { it.text.trim().all { c -> c.isDigit() } || it.text.isBlank() }
-            }?.key ?: return emptyList()
-            // Collect digit sequences: consecutive digits at nearby X form one number
-            val digits = yg[posRowY]!!
-                .filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
-                .sortedBy { it.x }
-            if (digits.isEmpty()) return emptyList()
-            // Group consecutive digits that are close in X (same number)
-            val groups = mutableListOf<Pair<String, Float>>()
-            var current = StringBuilder()
-            var currentX = 0f
-            for (d in digits) {
-                if (current.isEmpty()) {
-                    current.append(d.text)
-                    currentX = d.x
-                } else if (d.x - currentX < 3) {
-                    current.append(d.text)
-                } else {
-                    groups.add(current.toString() to currentX)
-                    current = StringBuilder(d.text)
-                    currentX = d.x
+        // Find the position-numbers row: all items are digits/blank AND form a sequential sequence
+        fun findPositionRow(yg: Map<Int, MutableList<TextPos>>): List<Pair<Int, Float>>? {
+            val candidateRows = yg.filter { (_, items) ->
+                if (items.size < 5) return@filter false
+                items.all { it.text.trim().all { c -> c.isDigit() } || it.text.isBlank() }
+            }
+            for ((_, items) in candidateRows) {
+                val nums = items.mapNotNull { it.text.trim().toIntOrNull() }.sorted()
+                if (nums.size < 5) continue
+                var sequential = true
+                for (i in 1 until nums.size) {
+                    if (nums[i] != nums[i - 1] + 1) { sequential = false; break }
+                }
+                if (sequential) {
+                    // Found: group digit items by X proximity into full numbers
+                    val digitItems = items.filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
+                        .sortedBy { it.x }
+                    val groups = mutableListOf<Pair<Int, Float>>()
+                    var current = StringBuilder()
+                    var currentX = 0f
+                    for (d in digitItems) {
+                        if (current.isEmpty()) {
+                            current.append(d.text.trim())
+                            currentX = d.x
+                        } else if (d.x - currentX < 3) {
+                            current.append(d.text.trim())
+                        } else {
+                            val num = current.toString().toIntOrNull()
+                            if (num != null) groups.add(num to currentX)
+                            current = StringBuilder(d.text.trim())
+                            currentX = d.x
+                        }
+                    }
+                    val num = current.toString().toIntOrNull()
+                    if (num != null) groups.add(num to currentX)
+                    return groups
                 }
             }
-            if (current.isNotEmpty()) groups.add(current.toString() to currentX)
-            return groups.mapNotNull { (num, x) -> num.toIntOrNull()?.let { pos -> pos to x } }
+            return null
         }
 
         // Count positions on pages before target page
         var position = 0
         for (pg in 1 until targetPage) {
             val yg = pageYGroups[pg] ?: continue
-            position += extractPositions(yg).size
+            val posData = findPositionRow(yg) ?: continue
+            position += posData.size
         }
 
         // On the target page, find the position nearest to targetX
         val targetYg = pageYGroups[targetPage] ?: return 0
-        val targetPositions = extractPositions(targetYg)
-        if (targetPositions.isEmpty()) return 0
+        val targetPositions = findPositionRow(targetYg) ?: return 0
 
         var bestPos = targetPositions.first().first
         var bestDist = Float.MAX_VALUE

@@ -3,6 +3,7 @@ package com.porrawc2026.app.util
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -18,12 +19,16 @@ class PrefsManager(private val context: Context) {
         val AUTO_REFRESH = booleanPreferencesKey("auto_refresh")
         val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
         val USER_NAME = stringPreferencesKey("user_name")
+        val USER_POSITION = intPreferencesKey("user_position")
+        val PREVIOUS_POSITION = intPreferencesKey("previous_position")
     }
 
     val excelFileName: Flow<String?> = context.dataStore.data.map { it[EXCEL_FILE_NAME] }
     val autoRefresh: Flow<Boolean> = context.dataStore.data.map { it[AUTO_REFRESH] ?: true }
     val notificationsEnabled: Flow<Boolean> = context.dataStore.data.map { it[NOTIFICATIONS_ENABLED] ?: true }
     val userName: Flow<String?> = context.dataStore.data.map { it[USER_NAME] }
+    val userPosition: Flow<Int?> = context.dataStore.data.map { it[USER_POSITION] }
+    val previousPosition: Flow<Int?> = context.dataStore.data.map { it[PREVIOUS_POSITION] }
 
     suspend fun setExcelFileName(name: String?) {
         context.dataStore.edit { it[EXCEL_FILE_NAME] = name ?: "" }
@@ -41,8 +46,24 @@ class PrefsManager(private val context: Context) {
         context.dataStore.edit { it[USER_NAME] = name ?: "" }
     }
 
+    suspend fun setUserPosition(pos: Int?) {
+        context.dataStore.edit {
+            if (pos != null) it[USER_POSITION] = pos
+            else it.remove(USER_POSITION)
+        }
+    }
+
+    suspend fun setPreviousPosition(pos: Int?) {
+        context.dataStore.edit {
+            if (pos != null) it[PREVIOUS_POSITION] = pos
+            else it.remove(PREVIOUS_POSITION)
+        }
+    }
+
     suspend fun getAutoRefreshSync(): Boolean = autoRefresh.first()
     suspend fun getNotificationsSync(): Boolean = notificationsEnabled.first()
     suspend fun getExcelFileNameSync(): String? = excelFileName.first()?.takeIf { it.isNotBlank() }
     suspend fun getUserNameSync(): String? = userName.first()?.takeIf { it.isNotBlank() }
+    suspend fun getUserPositionSync(): Int? = userPosition.first()
+    suspend fun getPreviousPositionSync(): Int? = previousPosition.first()
 }

@@ -39,6 +39,7 @@ fun AjustesScreen(
     val pdfResult by viewModel.pdfResult.collectAsState()
     val userName by viewModel.userName.collectAsState()
     val userPosition by viewModel.userPosition.collectAsState()
+    val positionDiff by viewModel.positionDiff.collectAsState()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -138,8 +139,14 @@ fun AjustesScreen(
                     SquareButton(
                         icon = Icons.Filled.Assessment,
                         label = when {
-                            pdfResult != null -> "POS: $pdfResult"
-                            userPosition != null -> "Pos: $userPosition"
+                            userPosition != null -> {
+                                val diff = positionDiff
+                                if (diff != null && diff != 0) {
+                                    if (diff > 0) "${userPosition} (+$diff)"
+                                    else "$userPosition ($diff)"
+                                } else "${userPosition}"
+                            }
+                            pdfResult != null -> pdfResult!!
                             else -> "Cargar result"
                         },
                         color = if (userPosition != null) Color(0xFF1565C0) else Color(0xFF444444),

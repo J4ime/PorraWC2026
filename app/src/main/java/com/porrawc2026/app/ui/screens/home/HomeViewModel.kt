@@ -110,6 +110,8 @@ class HomeViewModel @Inject constructor(
     val userName: StateFlow<String?> = _userName.asStateFlow()
     private val _userPosition = MutableStateFlow<Int?>(null)
     val userPosition: StateFlow<Int?> = _userPosition.asStateFlow()
+    private val _positionDiff = MutableStateFlow<Int?>(null)
+    val positionDiff: StateFlow<Int?> = _positionDiff.asStateFlow()
 
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
@@ -128,6 +130,7 @@ class HomeViewModel @Inject constructor(
             _autoRefreshEnabled.value = prefsManager.getAutoRefreshSync()
             _notificationsEnabled.value = prefsManager.getNotificationsSync()
             _userName.value = prefsManager.getUserNameSync()
+            _userPosition.value = prefsManager.getUserPositionSync()
         }
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
@@ -289,8 +292,17 @@ class HomeViewModel @Inject constructor(
                 val position = findNamePosition(doc, searchName)
                 doc.close()
                 inputStream.close()
-                _pdfResult.value = if (position > 0) "$position" else "No encontrado"
-                _userPosition.value = position
+
+                if (position > 0) {
+                    val oldPos = _userPosition.value
+                    _positionDiff.value = if (oldPos != null && oldPos > 0) oldPos - position else null
+                    _userPosition.value = position
+                    prefsManager.setUserPosition(position)
+                    prefsManager.setPreviousPosition(oldPos)
+                    _pdfResult.value = "$position"
+                } else {
+                    _pdfResult.value = "No encontrado"
+                }
             } catch (e: Exception) {
                 _pdfResult.value = "Error: ${e.message?.take(25)}"
             } finally { _isBusy.value = false }

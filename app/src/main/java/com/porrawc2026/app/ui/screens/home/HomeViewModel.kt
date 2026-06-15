@@ -373,36 +373,36 @@ class HomeViewModel @Inject constructor(
                 items.all { it.text.trim().all { c -> c.isDigit() } || it.text.isBlank() }
             }
             for ((_, items) in candidateRows) {
-                val nums = items.mapNotNull { it.text.trim().toIntOrNull() }.sorted()
-                if (nums.size < 5) continue
-                var sequential = true
-                for (i in 1 until nums.size) {
-                    if (nums[i] != nums[i - 1] + 1) { sequential = false; break }
-                }
-                if (sequential) {
-                    // Found: group digit items by X proximity into full numbers
-                    val digitItems = items.filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
-                        .sortedBy { it.x }
-                    val groups = mutableListOf<Pair<Int, Float>>()
-                    var current = StringBuilder()
-                    var currentX = 0f
-                    for (d in digitItems) {
-                        if (current.isEmpty()) {
-                            current.append(d.text.trim())
-                            currentX = d.x
-                        } else if (d.x - currentX < 3) {
-                            current.append(d.text.trim())
-                        } else {
-                            val num = current.toString().toIntOrNull()
-                            if (num != null) groups.add(num to currentX)
-                            current = StringBuilder(d.text.trim())
-                            currentX = d.x
-                        }
+                // Group consecutive digit characters by X proximity into complete numbers FIRST
+                val digitItems = items.filter { it.text.trim().isNotEmpty() && it.text.trim().all { c -> c.isDigit() } }
+                    .sortedBy { it.x }
+                if (digitItems.size < 5) continue
+                val groups = mutableListOf<Pair<Int, Float>>()
+                var current = StringBuilder()
+                var currentX = 0f
+                for (d in digitItems) {
+                    if (current.isEmpty()) {
+                        current.append(d.text.trim())
+                        currentX = d.x
+                    } else if (d.x - currentX < 3) {
+                        current.append(d.text.trim())
+                    } else {
+                        val n = current.toString().toIntOrNull()
+                        if (n != null) groups.add(n to currentX)
+                        current = StringBuilder(d.text.trim())
+                        currentX = d.x
                     }
-                    val num = current.toString().toIntOrNull()
-                    if (num != null) groups.add(num to currentX)
-                    return groups
                 }
+                val n = current.toString().toIntOrNull()
+                if (n != null) groups.add(n to currentX)
+                if (groups.size < 5) continue
+                // Now check if the grouped numbers form a sequential sequence
+                val sorted = groups.map { it.first }.sorted()
+                var sequential = true
+                for (i in 1 until sorted.size) {
+                    if (sorted[i] != sorted[i - 1] + 1) { sequential = false; break }
+                }
+                if (sequential) return groups
             }
             return null
         }

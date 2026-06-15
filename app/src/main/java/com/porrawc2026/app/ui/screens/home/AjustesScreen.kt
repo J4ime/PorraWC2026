@@ -150,7 +150,7 @@ fun AjustesScreen(
                             else -> "Cargar result"
                         },
                         color = if (userPosition != null) Color(0xFF1565C0) else Color(0xFF444444),
-                        loading = false,
+                        loading = isBusy,
                         onClick = { pdfLauncher.launch(arrayOf("application/pdf")) }
                     )
                 }
@@ -168,7 +168,11 @@ fun AjustesScreen(
 
         if (isBusy) {
             Box(modifier = Modifier.fillMaxSize().background(Color(0x88000000)), contentAlignment = Alignment.Center) {
-                Text("\u26BD", fontSize = 64.sp, color = Color.White)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Leyendo PDF...", color = Color.White, fontSize = 16.sp)
+                }
             }
         }
     }

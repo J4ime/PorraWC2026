@@ -451,8 +451,17 @@ class HomeViewModel @Inject constructor(
         fetchLiveResults()
     }
 
+    private suspend fun <T> fetchWithRetry(maxAttempts: Int = 5, block: suspend () -> T?): T? {
+        repeat(maxAttempts) { attempt ->
+            val result = runCatching { block() }
+            if (result.isSuccess) return result.getOrDefault(null)
+            if (attempt < maxAttempts - 1) delay(2000L shl attempt.coerceAtMost(3))
+        }
+        return null
+    }
+
     private suspend fun fetchLiveResults() {
-        val scoreUpdates = liveScoreService.fetchScoreUpdates(cachedMatches)
+        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(cachedMatches) }.orEmpty()
 
         scoreUpdates.forEach { update ->
             if (update.isFinished) liveMinutes[update.matchId] = "FINAL"
@@ -480,7 +489,7 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val espnUpdates = liveScoreService.fetchEspnLiveMinutes(cachedMatches)
+        val espnUpdates = fetchWithRetry { liveScoreService.fetchEspnLiveMinutes(cachedMatches) }.orEmpty()
         espnUpdates.forEach { update ->
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
             if (match != null) {

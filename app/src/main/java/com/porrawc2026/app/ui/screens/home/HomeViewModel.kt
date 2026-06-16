@@ -160,13 +160,14 @@ class HomeViewModel @Inject constructor(
             loadPlayers()
             startAutoRefresh()
             lastWrittenScores.clear()
+            fetchLiveResults()
             downloadPlayerPhotos()
             precachePhotosInBackground()
+            refreshUpcomingMatches()
             _hasData.value = true
             _isReady.value = true
             _isBusy.value = false
         }
-        viewModelScope.launch(Dispatchers.IO) { fetchLiveResults() }
     }
 
     private fun loadPlayers() {

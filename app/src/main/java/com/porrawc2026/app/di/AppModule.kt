@@ -13,6 +13,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.Interceptor
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -160,7 +161,66 @@ object AppModule {
     @Provides
     @Singleton
     @Named("worldcup26")
-    fun provideWorldCup26Retrofit(client: OkHttpClient): Retrofit {
+    fun provideWorldCup26Client(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val response = chain.proceed(chain.request())
+                val raw = response.body?.string() ?: return@addInterceptor response
+                val fixed = fixWorldCup26Json(raw)
+                response.newBuilder()
+                    .body(fixed.toResponseBody(response.body?.contentType()))
+                    .build()
+            }
+            .addInterceptor(loggingInterceptor())
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private fun fixWorldCup26Json(json: String): String {
+        var result = json
+        for (field in listOf("home_scorers", "away_scorers")) {
+            val key = "\"$field\":\""
+            var idx = result.indexOf(key)
+            while (idx >= 0) {
+                val start = idx + key.length
+                val braceIdx = result.indexOf('{', start)
+                if (braceIdx < 0 || braceIdx > start + 5) break
+                var bracePos = braceIdx
+                var depth = 0
+                var endPos = -1
+                while (bracePos < result.length) {
+                    when (result[bracePos]) {
+                        '{' -> depth++
+                        '}' -> {
+                            depth--
+                            if (depth == 0) {
+                                if (bracePos + 1 < result.length && result[bracePos + 1] == '"') {
+                                    endPos = bracePos + 1
+                                }
+                                break
+                            }
+                        }
+                        '\\' -> bracePos++ // skip escaped char
+                    }
+                    bracePos++
+                }
+                if (endPos < 0) break
+                val content = result.substring(braceIdx + 1, bracePos)
+                if (content.contains("\"") && !content.contains("\\\"")) {
+                    val escaped = content.replace("\"", "\\\"")
+                    result = result.substring(0, braceIdx + 1) + escaped + result.substring(bracePos)
+                }
+                idx = result.indexOf(key, idx + 1)
+            }
+        }
+        return result
+    }
+
+    @Provides
+    @Singleton
+    @Named("worldcup26")
+    fun provideWorldCup26Retrofit(@Named("worldcup26") client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
             .baseUrl(WorldCup26Config.BASE_URL)
             .client(client)

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
@@ -68,7 +69,17 @@ fun HomeScreen(
     LaunchedEffect(selectedDay) {
         val selIdx = if (selectedDay == null) todayIdx
         else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
-        if (selIdx >= 0) listState.animateScrollToItem(selIdx)
+        if (selIdx < 0) return@LaunchedEffect
+        listState.animateScrollToItem(selIdx)
+        delay(350)
+        val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == selIdx }
+        if (itemInfo != null) {
+            val viewportW = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
+            val centeringOffset = viewportW / 2 - itemInfo.size / 2
+            if (centeringOffset > 2 || centeringOffset < -2) {
+                listState.animateScrollToItem(selIdx, scrollOffset = centeringOffset)
+            }
+        }
     }
 
     val dayLabel = { day: String ->

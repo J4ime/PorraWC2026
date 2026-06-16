@@ -160,13 +160,13 @@ class HomeViewModel @Inject constructor(
             loadPlayers()
             startAutoRefresh()
             lastWrittenScores.clear()
-            fetchLiveResults()
             downloadPlayerPhotos()
             precachePhotosInBackground()
             _hasData.value = true
             _isReady.value = true
             _isBusy.value = false
         }
+        viewModelScope.launch(Dispatchers.IO) { fetchLiveResults() }
     }
 
     private fun loadPlayers() {
@@ -451,11 +451,14 @@ class HomeViewModel @Inject constructor(
         fetchLiveResults()
     }
 
-    private suspend fun <T> fetchWithRetry(maxAttempts: Int = 5, block: suspend () -> T?): T? {
+    private suspend fun <T> fetchWithRetry(maxAttempts: Int = 10, block: suspend () -> T?): T? {
         repeat(maxAttempts) { attempt ->
             val result = runCatching { block() }
-            if (result.isSuccess) return result.getOrDefault(null)
-            if (attempt < maxAttempts - 1) delay(2000L shl attempt.coerceAtMost(3))
+            if (result.isSuccess) {
+                val data = result.getOrNull()
+                if (data != null) return data
+            }
+            if (attempt < maxAttempts - 1) delay(2000L shl attempt.coerceAtMost(4))
         }
         return null
     }

@@ -133,6 +133,7 @@ class HomeViewModel @Inject constructor(
     private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
     private val liveMinutes = mutableMapOf<Int, String>()
     private val notifiedScorers = mutableSetOf<String>()
+    private val processedGoalKeys = mutableSetOf<String>()
     private val pdfParser = PdfRankingParser()
 
     init {
@@ -171,6 +172,7 @@ class HomeViewModel @Inject constructor(
             recalcAllPoints()
             refreshPoints()
             loadPlayers()
+            processedGoalKeys.addAll(prefsManager.getProcessedGoalKeys())
             startAutoRefresh()
             lastWrittenScores.clear()
             fetchLiveResults()
@@ -478,7 +480,10 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
-        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(cachedMatches) }.orEmpty()
+        val todayMatches = getTodayMatchesWithDates()
+        if (todayMatches.isEmpty()) return
+
+        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(todayMatches) }.orEmpty()
 
         scoreUpdates.forEach { update ->
             if (update.isFinished) liveMinutes[update.matchId] = "FINAL"
@@ -506,7 +511,7 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val espnUpdates = fetchWithRetry { liveScoreService.fetchEspnLiveMinutes(cachedMatches) }.orEmpty()
+        val espnUpdates = fetchWithRetry { liveScoreService.fetchEspnLiveMinutes(todayMatches) }.orEmpty()
         espnUpdates.forEach { update ->
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
             if (match != null) {
@@ -524,15 +529,37 @@ class HomeViewModel @Inject constructor(
         }
 
         for ((matchId, pair) in goalScorers) {
+            var goalsChanged = false
             for (scorer in pair.first + pair.second) {
                 val key = "$matchId:${scorer.playerName}:${scorer.minute}"
-                if (notifiedScorers.add(key)) {
+                if (notifiedScorers.add(key) && processedGoalKeys.add(key)) {
                     goalEventBus.notifyGoal()
+                    if (updatePlayerGoal(scorer.playerName)) goalsChanged = true
                 }
+            }
+            if (goalsChanged) {
+                prefsManager.setProcessedGoalKeys(processedGoalKeys.toSet())
+                refreshPoints()
             }
         }
         checkGoalNotifications()
         refreshUpcomingMatches()
+    }
+
+    private suspend fun updatePlayerGoal(scorerName: String): Boolean {
+        val currentPlayers = _players.value
+        for (player in currentPlayers) {
+            val pred = player.predictedName ?: continue
+            val key = scorerName.lowercase().trim()
+            val predLower = pred.lowercase().trim()
+            if (key.contains(predLower, ignoreCase = true) || predLower.contains(key, ignoreCase = true)) {
+                val newGoals = player.goalsScored + 1
+                val newPoints = newGoals * player.pointsPerGoal
+                repository.updatePlayerPrediction(player.copy(goalsScored = newGoals, pointsEarned = newPoints))
+                return true
+            }
+        }
+        return false
     }
 
     fun refreshUpcomingMatches() {

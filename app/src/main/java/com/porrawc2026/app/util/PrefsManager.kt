@@ -24,6 +24,7 @@ class PrefsManager(private val context: Context) {
         val PREVIOUS_POSITION = intPreferencesKey("previous_position")
         val CACHE_TIMESTAMP = longPreferencesKey("cache_timestamp")
         val LAST_CACHE_VERSION = intPreferencesKey("last_cache_version")
+        val PROCESSED_GOAL_KEYS = stringPreferencesKey("processed_goal_keys")
     }
 
     val excelFileName: Flow<String?> = context.dataStore.data.map { it[EXCEL_FILE_NAME] }
@@ -84,4 +85,13 @@ class PrefsManager(private val context: Context) {
     }
 
     suspend fun getLastCacheVersionSync(): Int? = lastCacheVersion.first()
+
+    suspend fun setProcessedGoalKeys(keys: Set<String>) {
+        context.dataStore.edit { it[PROCESSED_GOAL_KEYS] = keys.joinToString(",") }
+    }
+
+    suspend fun getProcessedGoalKeys(): Set<String> {
+        val raw = context.dataStore.data.first()[PROCESSED_GOAL_KEYS] ?: ""
+        return raw.split(",").filter { it.isNotBlank() }.toSet()
+    }
 }

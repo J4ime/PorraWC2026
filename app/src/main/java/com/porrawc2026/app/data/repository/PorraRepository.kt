@@ -75,6 +75,8 @@ class PorraRepository @Inject constructor(
         groupStandingDao.insertAll(standings)
     }
 
+    suspend fun insertMatches(matches: List<MatchEntity>) = matchDao.insertAll(matches)
+
     suspend fun updateMatchResults(matchId: Int, homeGoals: Int, awayGoals: Int) {
         matchDao.updateMatchResult(matchId, homeGoals, awayGoals)
     }

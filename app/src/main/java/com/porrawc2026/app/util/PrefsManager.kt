@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,8 @@ class PrefsManager(private val context: Context) {
         val USER_NAME = stringPreferencesKey("user_name")
         val USER_POSITION = intPreferencesKey("user_position")
         val PREVIOUS_POSITION = intPreferencesKey("previous_position")
+        val CACHE_TIMESTAMP = longPreferencesKey("cache_timestamp")
+        val LAST_CACHE_VERSION = intPreferencesKey("last_cache_version")
     }
 
     val excelFileName: Flow<String?> = context.dataStore.data.map { it[EXCEL_FILE_NAME] }
@@ -66,4 +69,19 @@ class PrefsManager(private val context: Context) {
     suspend fun getUserNameSync(): String? = userName.first()?.takeIf { it.isNotBlank() }
     suspend fun getUserPositionSync(): Int? = userPosition.first()
     suspend fun getPreviousPositionSync(): Int? = previousPosition.first()
+
+    val cacheTimestamp: Flow<Long?> = context.dataStore.data.map { it[CACHE_TIMESTAMP] }
+    val lastCacheVersion: Flow<Int?> = context.dataStore.data.map { it[LAST_CACHE_VERSION] }
+
+    suspend fun setCacheTimestamp(ts: Long) {
+        context.dataStore.edit { it[CACHE_TIMESTAMP] = ts }
+    }
+
+    suspend fun getCacheTimestampSync(): Long? = cacheTimestamp.first()
+
+    suspend fun setLastCacheVersion(version: Int) {
+        context.dataStore.edit { it[LAST_CACHE_VERSION] = version }
+    }
+
+    suspend fun getLastCacheVersionSync(): Int? = lastCacheVersion.first()
 }

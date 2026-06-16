@@ -153,7 +153,20 @@ class HomeViewModel @Inject constructor(
         cachedMatches = MatchScheduleProvider.buildMatchEntities()
         viewModelScope.launch(Dispatchers.IO) {
             val dbMatches = repository.getAllMatches().first()
-            cachedMatches = if (dbMatches.isNotEmpty()) dbMatches else cachedMatches
+            val staticSchedule = MatchScheduleProvider.buildMatchEntities()
+
+            if (dbMatches.isNotEmpty()) {
+                cachedMatches = dbMatches
+                val dbIds = dbMatches.map { it.id }.toSet()
+                val newMatches = staticSchedule.filter { it.id !in dbIds }
+                if (newMatches.isNotEmpty()) {
+                    cachedMatches = (cachedMatches + newMatches).sortedBy { it.id }
+                    repository.insertMatches(newMatches)
+                }
+            } else {
+                repository.insertMatches(staticSchedule)
+                prefsManager.setCacheTimestamp(System.currentTimeMillis())
+            }
             enrichSchedule()
             recalcAllPoints()
             refreshPoints()

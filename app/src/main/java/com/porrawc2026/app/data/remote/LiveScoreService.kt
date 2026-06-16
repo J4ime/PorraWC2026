@@ -25,6 +25,12 @@ data class CardUpdate(
     val awayYellows: Int
 )
 
+data class TopScorerData(
+    val playerName: String,
+    val teamName: String,
+    val goals: Int
+)
+
 @Singleton
 class LiveScoreService @Inject constructor(
     private val wc26: WorldCup26Service,
@@ -169,6 +175,65 @@ class LiveScoreService @Inject constructor(
             }
         }
         return updates
+    }
+
+    suspend fun fetchTopScorers(matches: List<MatchEntity>): List<TopScorerData> {
+        val allScorers = mutableMapOf<String, TopScorerData>()
+        
+        runCatching {
+            val resp = wc26.getGames()
+            resp.games.forEach { g ->
+                if (g.time_elapsed == "notstarted") return@forEach
+                val homeTeam = g.home_team_name_en ?: return@forEach
+                val awayTeam = g.away_team_name_en ?: return@forEach
+                
+                val homeScorers = parseScorers(g.home_scorers)
+                val awayScorers = parseScorers(g.away_scorers)
+                
+                homeScorers.forEach { scorer ->
+                    val key = scorer.playerName.lowercase()
+                    val existing = allScorers[key]
+                    if (existing != null) {
+                        allScorers[key] = existing.copy(goals = existing.goals + 1)
+                    } else {
+                        allScorers[key] = TopScorerData(scorer.playerName, homeTeam, 1)
+                    }
+                }
+                
+                awayScorers.forEach { scorer ->
+                    val key = scorer.playerName.lowercase()
+                    val existing = allScorers[key]
+                    if (existing != null) {
+                        allScorers[key] = existing.copy(goals = existing.goals + 1)
+                    } else {
+                        allScorers[key] = TopScorerData(scorer.playerName, awayTeam, 1)
+                    }
+                }
+            }
+        }
+        
+        runCatching {
+            val zaf = zafronix.getMatches()
+            zaf.data.forEach { m ->
+                val homeTeam = m.homeTeam ?: return@forEach
+                val awayTeam = m.awayTeam ?: return@forEach
+                val goals = m.goals ?: return@forEach
+                
+                goals.forEach { goal ->
+                    val scorerName = goal.scorer ?: return@forEach
+                    val team = if (goal.team == "home") homeTeam else awayTeam
+                    val key = scorerName.lowercase()
+                    val existing = allScorers[key]
+                    if (existing != null) {
+                        allScorers[key] = existing.copy(goals = existing.goals + 1)
+                    } else {
+                        allScorers[key] = TopScorerData(scorerName, team, 1)
+                    }
+                }
+            }
+        }
+        
+        return allScorers.values.sortedByDescending { it.goals }.take(20)
     }
 
     private fun findMatchingMatch(matches: List<MatchEntity>, homeName: String, awayName: String): MatchEntity? {

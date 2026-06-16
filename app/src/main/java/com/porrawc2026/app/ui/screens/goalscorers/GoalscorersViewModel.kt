@@ -3,7 +3,7 @@ package com.porrawc2026.app.ui.screens.goalscorers
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
-import com.porrawc2026.app.data.remote.ApiService
+import com.porrawc2026.app.data.remote.LiveScoreService
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import com.porrawc2026.app.util.GoalEventBus
@@ -26,7 +26,7 @@ data class TopScorerDisplay(
 @HiltViewModel
 class GoalscorersViewModel @Inject constructor(
     private val repository: PorraRepository,
-    private val apiService: ApiService,
+    private val liveScoreService: LiveScoreService,
     private val goalEventBus: GoalEventBus
 ) : ViewModel() {
 
@@ -64,21 +64,22 @@ class GoalscorersViewModel @Inject constructor(
     private suspend fun fetchTopScorers() {
         _isLoading.value = true
         runCatching {
-            val response = apiService.getWorldCupScorers()
-            val scorers = response.scorers.take(10).mapIndexed { idx, s ->
-                val teamName = TeamNameNormalizer.enToEs(s.team.name ?: "")
+            val allMatches = repository.getAllMatches().first()
+            val scorers = liveScoreService.fetchTopScorers(allMatches)
+            val displayScorers = scorers.take(10).mapIndexed { idx, s ->
+                val teamName = TeamNameNormalizer.enToEs(s.teamName)
                 TopScorerDisplay(
                     rank = idx + 1,
-                    name = s.player.name ?: "?",
+                    name = s.playerName,
                     team = teamName,
-                    goals = s.goals ?: 0,
-                    assists = s.assists,
-                    matches = s.playedMatches,
+                    goals = s.goals,
+                    assists = null,
+                    matches = null,
                     minutesPlayed = null,
                     flagEmoji = com.porrawc2026.app.util.ExcelParser.getFlagEmoji(teamName)
                 )
             }
-            _topScorers.value = scorers
+            _topScorers.value = displayScorers
         }.onFailure {
             _topScorers.value = emptyList()
         }

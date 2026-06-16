@@ -76,7 +76,11 @@ class GoalscorersViewModel @Inject constructor(
         runCatching {
             val allMatches = repository.getAllMatches().first()
             val scorers = liveScoreService.fetchTopScorers(allMatches)
-            val displayScorers = scorers.take(10).mapIndexed { idx, s ->
+            val tenthGoals = scorers.getOrNull(9)?.goals ?: Int.MAX_VALUE
+            val displayScorers = scorers
+                .take(10)
+                .plus(scorers.drop(10).filter { it.goals >= tenthGoals })
+                .mapIndexed { idx, s ->
                 val teamName = TeamNameNormalizer.enToEs(s.teamName)
                 TopScorerDisplay(
                     rank = idx + 1,

@@ -162,7 +162,7 @@ class LiveScoreService @Inject constructor(
             }
         }
         
-        return allScorers.values.sortedByDescending { it.goals }.take(20)
+        return allScorers.values.sortedByDescending { it.goals }.take(50)
     }
 
     private fun findMatchingMatch(matches: List<MatchEntity>, homeName: String, awayName: String): MatchEntity? {

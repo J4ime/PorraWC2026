@@ -8,7 +8,7 @@ import javax.inject.Singleton
 
 @Singleton
 class GoalEventBus @Inject constructor() {
-    private val _goalScored = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    private val _goalScored = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1)
     val goalScored: SharedFlow<Unit> = _goalScored.asSharedFlow()
 
     fun notifyGoal() {

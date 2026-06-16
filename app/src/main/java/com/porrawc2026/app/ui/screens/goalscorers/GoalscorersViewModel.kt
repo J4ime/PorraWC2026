@@ -41,11 +41,21 @@ class GoalscorersViewModel @Inject constructor(
 
     init {
         loadPlayers()
-        viewModelScope.launch { fetchTopScorers() }
+        viewModelScope.launch { fetchWithRetry() }
         viewModelScope.launch {
             goalEventBus.goalScored.collect {
                 fetchTopScorers()
             }
+        }
+    }
+
+    private suspend fun fetchWithRetry() {
+        var attempt = 0
+        while (attempt < 5) {
+            fetchTopScorers()
+            if (_topScorers.value.isNotEmpty()) break
+            attempt++
+            if (attempt < 5) delay(10_000L * attempt)
         }
     }
 

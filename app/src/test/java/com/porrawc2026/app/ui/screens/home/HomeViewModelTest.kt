@@ -46,8 +46,7 @@ class HomeViewModelTest {
         coEvery { repository.getAllMatches() } returns flowOf(emptyList())
         coEvery { repository.getPlayerPredictions() } returns flowOf(emptyList())
         coEvery { repository.calculateTotalPoints() } returns 0
-        coEvery { liveScoreService.fetchScoreUpdates(any()) } returns Pair(emptyList(), emptyList())
-        coEvery { liveScoreService.fetchLiveMatchDetails(any()) } returns emptyList()
+        coEvery { liveScoreService.fetchScoreUpdates(any()) } returns emptyList()
         
         mockkStatic("com.tom_roush.pdfbox.android.PDFBoxResourceLoader")
         every { com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(any()) } just Runs

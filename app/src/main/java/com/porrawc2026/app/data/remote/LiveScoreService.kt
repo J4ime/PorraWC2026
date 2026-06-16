@@ -17,14 +17,6 @@ data class LiveScoreUpdate(
 
 data class LiveScorer(val playerName: String, val minute: Int)
 
-data class CardUpdate(
-    val matchId: Int,
-    val homeReds: Int,
-    val awayReds: Int,
-    val homeYellows: Int,
-    val awayYellows: Int
-)
-
 data class TopScorerData(
     val playerName: String,
     val teamName: String,
@@ -34,13 +26,11 @@ data class TopScorerData(
 @Singleton
 class LiveScoreService @Inject constructor(
     private val wc26: WorldCup26Service,
-    private val zafronix: ZafronixService,
     private val espnService: EspnService
 ) {
 
-    suspend fun fetchScoreUpdates(matches: List<MatchEntity>): Pair<List<LiveScoreUpdate>, List<CardUpdate>> {
+    suspend fun fetchScoreUpdates(matches: List<MatchEntity>): List<LiveScoreUpdate> {
         val scoreUpdates = mutableListOf<LiveScoreUpdate>()
-        val cardUpdates = mutableListOf<CardUpdate>()
 
         runCatching {
             val resp = wc26.getGames()
@@ -72,47 +62,7 @@ class LiveScoreService @Inject constructor(
             }
         }
 
-        runCatching {
-            val zaf = zafronix.getMatches()
-            zaf.data.forEach { m ->
-                val entity = findMatchingMatch(matches, m.homeTeam ?: "", m.awayTeam ?: "")
-                    ?: return@forEach
-                val cards = m.cards ?: return@forEach
-                val homeReds = cards.count { c -> c.team == "home" && c.color == "red" }
-                val awayReds = cards.count { c -> c.team == "away" && c.color == "red" }
-                val homeYellows = cards.count { c -> c.team == "home" && c.color == "yellow" }
-                val awayYellows = cards.count { c -> c.team == "away" && c.color == "yellow" }
-                cardUpdates.add(CardUpdate(entity.id, homeReds, awayReds, homeYellows, awayYellows))
-
-                val existingEntry = scoreUpdates.indexOfFirst { it.matchId == entity.id }
-                if (existingEntry < 0 || (scoreUpdates[existingEntry].homeScorers.isEmpty() && scoreUpdates[existingEntry].awayScorers.isEmpty())) {
-                    val goals = m.goals ?: return@forEach
-                    val homeG = goals.filter { it.team == "home" }.map { LiveScorer(it.scorer ?: "?", it.minute ?: 0) }
-                    val awayG = goals.filter { it.team == "away" }.map { LiveScorer(it.scorer ?: "?", it.minute ?: 0) }
-                    if (existingEntry >= 0) {
-                        scoreUpdates[existingEntry] = scoreUpdates[existingEntry].copy(
-                            homeScorers = homeG, awayScorers = awayG
-                        )
-                    } else if (homeG.isNotEmpty() || awayG.isNotEmpty()) {
-                        val hScore = m.homeScore ?: 0
-                        val aScore = m.awayScore ?: 0
-                        scoreUpdates.add(
-                            LiveScoreUpdate(
-                                matchId = entity.id,
-                                homeGoals = hScore,
-                                awayGoals = aScore,
-                                homeScorers = homeG,
-                                awayScorers = awayG,
-                                isFinished = m.status == "completed",
-                                liveMinute = null
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        return Pair(scoreUpdates, cardUpdates)
+        return scoreUpdates
     }
 
     suspend fun fetchEspnLiveMinutes(matches: List<MatchEntity>): List<LiveScoreUpdate> {
@@ -212,27 +162,6 @@ class LiveScoreService @Inject constructor(
             }
         }
         
-        runCatching {
-            val zaf = zafronix.getMatches()
-            zaf.data.forEach { m ->
-                val homeTeam = m.homeTeam ?: return@forEach
-                val awayTeam = m.awayTeam ?: return@forEach
-                val goals = m.goals ?: return@forEach
-                
-                goals.forEach { goal ->
-                    val scorerName = goal.scorer ?: return@forEach
-                    val team = if (goal.team == "home") homeTeam else awayTeam
-                    val key = scorerName.lowercase()
-                    val existing = allScorers[key]
-                    if (existing != null) {
-                        allScorers[key] = existing.copy(goals = existing.goals + 1)
-                    } else {
-                        allScorers[key] = TopScorerData(scorerName, team, 1)
-                    }
-                }
-            }
-        }
-        
         return allScorers.values.sortedByDescending { it.goals }.take(20)
     }
 
@@ -285,17 +214,16 @@ class LiveScoreService @Inject constructor(
     }
 
     private fun parseSingleScorer(entry: String): LiveScorer? {
-        val clean = entry.trim().removeSurrounding("\"").removeSurrounding("'")
+        val clean = entry.trim()
+            .removeSurrounding("\"").removeSurrounding("'")
             .replace("\"", "").trim()
-        if (clean.isBlank() || clean == "null") return null
+        if (clean.isBlank() || clean == "null" || clean == "{}") return null
 
-        val quoteIndex = clean.indexOf("'")
-        if (quoteIndex < 0) return null
+        val regex = Regex("^(.+?)\\s+(\\d+)'")
+        val match = regex.find(clean) ?: return null
 
-        val beforeQuote = clean.substring(0, quoteIndex).trim()
-        val parts = beforeQuote.split(" ")
-        val minute = parts.lastOrNull()?.toIntOrNull() ?: return null
-        val name = parts.dropLast(1).joinToString(" ").trim()
+        val name = match.groupValues[1].trim()
+        val minute = match.groupValues[2].toIntOrNull() ?: return null
         if (name.isBlank()) return null
 
         return LiveScorer(name, minute)

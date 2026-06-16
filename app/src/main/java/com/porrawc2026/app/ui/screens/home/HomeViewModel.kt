@@ -427,11 +427,13 @@ class HomeViewModel @Inject constructor(
 
     fun parseMadridDate(dateTime: String): Date? {
         if (dateTime.isBlank()) return null
-        return if (dateTime.endsWith("Z")) {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(dateTime)
-        } else {
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = madridTZ }.parse(dateTime)
-        }
+        return try {
+            if (dateTime.endsWith("Z")) {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(dateTime)
+            } else {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = madridTZ }.parse(dateTime)
+            }
+        } catch (_: Exception) { null }
     }
 
     private fun getTodayMatchesWithDates(): List<MatchEntity> {
@@ -450,7 +452,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults() {
-        val (scoreUpdates, cardUpdates) = liveScoreService.fetchScoreUpdates(cachedMatches)
+        val scoreUpdates = liveScoreService.fetchScoreUpdates(cachedMatches)
 
         scoreUpdates.forEach { update ->
             if (update.isFinished) liveMinutes[update.matchId] = "FINAL"
@@ -476,16 +478,6 @@ class HomeViewModel @Inject constructor(
             if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
                 goalScorers[update.matchId] = Pair(homeScr, awayScr)
             }
-        }
-
-        cardUpdates.forEach { card ->
-            cachedMatches = cachedMatches.map {
-                if (it.id == card.matchId) it.copy(
-                    homeRedCards = card.homeReds, awayRedCards = card.awayReds,
-                    homeYellowCards = card.homeYellows, awayYellowCards = card.awayYellows
-                ) else it
-            }
-            repository.updateMatchCards(card.matchId, card.homeReds, card.awayReds, card.homeYellows, card.awayYellows)
         }
 
         val espnUpdates = liveScoreService.fetchEspnLiveMinutes(cachedMatches)

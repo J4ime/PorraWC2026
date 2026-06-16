@@ -109,18 +109,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    @Named("zafronix")
-    fun provideZafronixClient(): OkHttpClient {
-        return OkHttpClient.Builder()
-            .addInterceptor(apiKeyInterceptor("X-API-Key", BuildConfig.ZAFRONIX_API_KEY))
-            .addInterceptor(loggingInterceptor())
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
-    }
-
-    @Provides
-    @Singleton
     fun provideRetrofit(@Named("football-data") client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
             .baseUrl(ApiConfig.BASE_URL)
@@ -184,23 +172,6 @@ object AppModule {
     @Singleton
     fun provideWorldCup26Service(@Named("worldcup26") retrofit: Retrofit): WorldCup26Service {
         return retrofit.create(WorldCup26Service::class.java)
-    }
-
-    @Provides
-    @Singleton
-    @Named("zafronix-retrofit")
-    fun provideZafronixRetrofit(@Named("zafronix") client: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(ZafronixConfig.BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideZafronixService(@Named("zafronix-retrofit") retrofit: Retrofit): ZafronixService {
-        return retrofit.create(ZafronixService::class.java)
     }
 
     @Provides

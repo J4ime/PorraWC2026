@@ -23,7 +23,6 @@ jobs:
       - name: Generate dummy local.properties
         run: |
           echo "FOOTBALL_DATA_API_KEY=test" >> local.properties
-          echo "ZAFRONIX_API_KEY=test" >> local.properties
           echo "API_SPORTS_KEY=test" >> local.properties
       - name: Run all tests
         run: ./gradlew :app:test --no-daemon
@@ -43,7 +42,6 @@ jobs:
       - name: Generate dummy local.properties
         run: |
           echo "FOOTBALL_DATA_API_KEY=test" >> local.properties
-          echo "ZAFRONIX_API_KEY=test" >> local.properties
           echo "API_SPORTS_KEY=test" >> local.properties
       - name: Run lint
         run: ./gradlew :app:lint --no-daemon
@@ -69,7 +67,6 @@ jobs:
       - name: Generate dummy local.properties
         run: |
           echo "FOOTBALL_DATA_API_KEY=test" >> local.properties
-          echo "ZAFRONIX_API_KEY=test" >> local.properties
           echo "API_SPORTS_KEY=test" >> local.properties
       - name: Assemble debug
         run: ./gradlew :app:assembleDebug --no-daemon

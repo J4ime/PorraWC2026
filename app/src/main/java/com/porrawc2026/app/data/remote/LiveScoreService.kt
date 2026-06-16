@@ -208,7 +208,7 @@ class LiveScoreService @Inject constructor(
 
     private fun parseScorerString(s: String): List<LiveScorer> {
         val clean = s.trim().removeSurrounding("\"").removePrefix("{").removeSuffix("}")
-            .replace("\"", "").trim()
+            .replace("\"", "").replace("\u201C", "").replace("\u201D", "").trim()
         if (clean.isBlank() || clean == "null" || clean == "[]") return emptyList()
         return clean.split(",").mapNotNull { parseSingleScorer(it.trim()) }
     }
@@ -216,7 +216,7 @@ class LiveScoreService @Inject constructor(
     private fun parseSingleScorer(entry: String): LiveScorer? {
         val clean = entry.trim()
             .removeSurrounding("\"").removeSurrounding("'")
-            .replace("\"", "").trim()
+            .replace("\"", "").replace("\u201C", "").replace("\u201D", "").trim()
         if (clean.isBlank() || clean == "null" || clean == "{}") return null
 
         val regex = Regex("^(.+?)\\s+(\\d+)'")

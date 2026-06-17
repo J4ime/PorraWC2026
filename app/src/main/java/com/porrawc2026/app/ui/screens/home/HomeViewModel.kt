@@ -293,6 +293,8 @@ class HomeViewModel @Inject constructor(
             _isBusy.value = true
             repository.clearAllMatchScores()
             repository.resetAllPlayerGoals()
+            val refreshed = repository.getPlayerPredictionsList().sortedBy { it.rank }
+            _players.value = refreshed
             prefsManager.clearProcessedGoalKeys()
             goalScorers.clear()
             liveMinutes.clear()
@@ -658,7 +660,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun updatePlayerGoal(scorerName: String): Boolean {
-        val currentPlayers = _players.value
+        val currentPlayers = repository.getPlayerPredictionsList()
         val scorerNorm = normalizeName(scorerName)
         val scorerLast = lastWord(scorerNorm)
         for (player in currentPlayers) {
@@ -668,7 +670,9 @@ class HomeViewModel @Inject constructor(
             if (predNorm.contains(scorerLast) || scorerNorm.contains(predLast) || predLast == scorerLast) {
                 val newGoals = player.goalsScored + 1
                 val newPoints = newGoals * player.pointsPerGoal
-                repository.updatePlayerPrediction(player.copy(goalsScored = newGoals, pointsEarned = newPoints))
+                val updated = player.copy(goalsScored = newGoals, pointsEarned = newPoints)
+                repository.updatePlayerPrediction(updated)
+                _players.value = _players.value.map { if (it.rank == updated.rank) updated else it }
                 return true
             }
         }

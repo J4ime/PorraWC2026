@@ -2,6 +2,8 @@ package com.porrawc2026.app.data.remote
 
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,45 +27,9 @@ data class TopScorerData(
 
 @Singleton
 class LiveScoreService @Inject constructor(
-    private val wc26: WorldCup26Service,
     private val espnService: EspnService
 ) {
-
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): List<LiveScoreUpdate> {
-        val scoreUpdates = mutableListOf<LiveScoreUpdate>()
-
-        val resp = wc26.getGames()
-        resp.games.forEach { g ->
-            if (g.time_elapsed == "notstarted") return@forEach
-            val hScore = g.home_score?.toIntOrNull() ?: return@forEach
-            val aScore = g.away_score?.toIntOrNull() ?: return@forEach
-            val entity = findMatchingMatch(matches, g.home_team_name_en ?: "", g.away_team_name_en ?: "")
-                ?: return@forEach
-            val homeScorers = parseScorers(g.home_scorers)
-            val awayScorers = parseScorers(g.away_scorers)
-            val isFinished = g.finished == "TRUE"
-            val minute = when (val te = g.time_elapsed) {
-                "finished" -> "FINAL"
-                "live" -> null
-                else -> te?.toIntOrNull()?.let { "${it}'" }
-            }
-            scoreUpdates.add(
-                LiveScoreUpdate(
-                    matchId = entity.id,
-                    homeGoals = hScore,
-                    awayGoals = aScore,
-                    homeScorers = homeScorers,
-                    awayScorers = awayScorers,
-                    isFinished = isFinished,
-                    liveMinute = minute
-                )
-            )
-        }
-
-        return scoreUpdates
-    }
-
-    suspend fun fetchEspnLiveMinutes(matches: List<MatchEntity>): List<LiveScoreUpdate> {
         val updates = mutableListOf<LiveScoreUpdate>()
         val scoreboard = espnService.getScoreboard()
         val events = scoreboard.events ?: return updates
@@ -98,12 +64,16 @@ class LiveScoreService @Inject constructor(
 
             val homeScorers = mutableListOf<LiveScorer>()
             val awayScorers = mutableListOf<LiveScorer>()
+            val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
             competition.details?.forEach { detail ->
                 val detailText = detail.type?.text ?: ""
-                if (detailText == "Goal" || detailText == "Own Goal") {
+                if (detailText.contains("Goal")) {
                     val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
                     val minuteStr = detail.clock?.displayValue ?: return@forEach
-                    val goalMinute = minuteStr.replace("'", "").replace("+", "").toIntOrNull() ?: 0
+                    val m = minuteRegex.find(minuteStr)
+                    val goalMinute = if (m != null) {
+                        (m.groupValues[1].toIntOrNull() ?: 0) + (m.groupValues[3].toIntOrNull() ?: 0)
+                    } else 0
                     val isHome = detail.team?.id == homeTeam.id
                     val scorer = LiveScorer(playerName, goalMinute)
                     if (isHome) homeScorers.add(scorer) else awayScorers.add(scorer)
@@ -124,39 +94,61 @@ class LiveScoreService @Inject constructor(
     }
 
     suspend fun fetchTopScorers(matches: List<MatchEntity>): List<TopScorerData> {
-        val allScorers = mutableMapOf<String, TopScorerData>()
-        
-        val resp = wc26.getGames()
-        resp.games.forEach { g ->
-            if (g.time_elapsed == "notstarted") return@forEach
-            val homeTeam = g.home_team_name_en ?: return@forEach
-            val awayTeam = g.away_team_name_en ?: return@forEach
-            
-            val homeScorers = parseScorers(g.home_scorers)
-            val awayScorers = parseScorers(g.away_scorers)
-            
-            homeScorers.forEach { scorer ->
-                val key = scorer.playerName.lowercase()
-                val existing = allScorers[key]
-                if (existing != null) {
-                    allScorers[key] = existing.copy(goals = existing.goals + 1)
-                } else {
-                    allScorers[key] = TopScorerData(scorer.playerName, homeTeam, 1)
-                }
+        val allScorers = mutableMapOf<String, MutableMap<String, Int>>()
+
+        val gson = Gson()
+        val type = object : TypeToken<List<LiveScorer>>() {}.type
+        for (match in matches) {
+            val homeRaw = match.homeScorers
+            val awayRaw = match.awayScorers
+            if (homeRaw != null) {
+                try {
+                    val scorers: List<LiveScorer> = gson.fromJson(homeRaw, type) ?: emptyList()
+                    scorers.forEach { s ->
+                        allScorers.getOrPut(match.homeTeam) { mutableMapOf() }
+                            .merge(s.playerName, 1) { a, b -> a + b }
+                    }
+                } catch (_: Exception) { }
             }
-            
-            awayScorers.forEach { scorer ->
-                val key = scorer.playerName.lowercase()
-                val existing = allScorers[key]
-                if (existing != null) {
-                    allScorers[key] = existing.copy(goals = existing.goals + 1)
-                } else {
-                    allScorers[key] = TopScorerData(scorer.playerName, awayTeam, 1)
-                }
+            if (awayRaw != null) {
+                try {
+                    val scorers: List<LiveScorer> = gson.fromJson(awayRaw, type) ?: emptyList()
+                    scorers.forEach { s ->
+                        allScorers.getOrPut(match.awayTeam) { mutableMapOf() }
+                            .merge(s.playerName, 1) { a, b -> a + b }
+                    }
+                } catch (_: Exception) { }
             }
         }
-        
-        return allScorers.values.sortedByDescending { it.goals }.take(50)
+
+        try {
+            val scoreboard = espnService.getScoreboard()
+            val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
+            scoreboard.events?.forEach { event ->
+                val competition = event.competitions?.firstOrNull() ?: return@forEach
+                val competitors = competition.competitors ?: return@forEach
+                val homeTeam = competitors.firstOrNull { it.homeAway == "home" } ?: return@forEach
+                val awayTeam = competitors.firstOrNull { it.homeAway == "away" } ?: return@forEach
+                val homeName = homeTeam.team?.displayName ?: homeTeam.team?.name ?: return@forEach
+                val awayName = awayTeam.team?.displayName ?: awayTeam.team?.name ?: return@forEach
+                competition.details?.forEach { detail ->
+                    val detailText = detail.type?.text ?: ""
+                    if (detailText.contains("Goal")) {
+                        val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
+                        val isHome = detail.team?.id == homeTeam.id
+                        val teamName = if (isHome) homeName else awayName
+                        allScorers.getOrPut(teamName) { mutableMapOf() }
+                            .merge(playerName, 1) { a, b -> a + b }
+                    }
+                }
+            }
+        } catch (_: Exception) { }
+
+        return allScorers.flatMap { (team, players) ->
+            players.map { (player, goals) ->
+                TopScorerData(player, team, goals)
+            }
+        }.sortedByDescending { it.goals }
     }
 
     private fun findMatchingMatch(matches: List<MatchEntity>, homeName: String, awayName: String): MatchEntity? {
@@ -165,121 +157,5 @@ class LiveScoreService @Inject constructor(
             TeamNameNormalizer.matches(it.awayTeam, awayName)
         }
         return if (candidates.size == 1) candidates.first() else null
-    }
-
-    private fun parseScorers(scorers: Any?): List<LiveScorer> {
-        if (scorers == null) return emptyList()
-        return when (scorers) {
-            is List<*> -> scorers.mapNotNull { entry ->
-                when (entry) {
-                    is Map<*, *> -> parseScorerMap(entry)
-                    is String -> parseSingleScorer(entry.trim())
-                    else -> parseSingleScorer(entry.toString().trim())
-                }
-            }
-            is Map<*, *> -> listOfNotNull(parseScorerMap(scorers))
-            is String -> parseScorerString(scorers)
-            else -> {
-                val s = scorers.toString().trim()
-                if (s.isBlank() || s == "null" || s == "[]" || s == "{}") emptyList()
-                else parseScorerString(s)
-            }
-        }
-    }
-
-    private fun parseScorerMap(map: Map<*, *>): LiveScorer? {
-        val name = (map["name"] as? String)?.trim()?.ifBlank { null }
-            ?: (map["player"] as? String)?.trim()?.ifBlank { null }
-            ?: (map["scorer"] as? String)?.trim()?.ifBlank { null }
-            ?: return null
-        val minute = when (val m = map["minute"]) {
-            is Number -> m.toInt()
-            is String -> m.replace("'", "").trim().toIntOrNull()
-            else -> null
-        } ?: return null
-        return LiveScorer(name, minute)
-    }
-
-    private fun parseScorerString(s: String): List<LiveScorer> {
-        val clean = s.trim().removeSurrounding("\"").removeSurrounding("'")
-            .replace("\u201C", "").replace("\u201D", "").trim()
-        if (clean.isBlank() || clean == "null" || clean == "[]" || clean == "{}") return emptyList()
-
-        if (clean.startsWith("[") && clean.endsWith("]")) {
-            return parseJsonArrayScorers(clean)
-        }
-
-        var data = clean
-        if (data.startsWith("{") && data.endsWith("}")) {
-            if (data.contains("\"name\"") || data.contains("\"player\"") || data.contains("\"scorer\"") || data.contains("\"minute\"")) {
-                return listOfNotNull(parseJsonObjectScorer(data))
-            }
-            data = data.removePrefix("{").removeSuffix("}")
-        }
-
-        val cleaned = data.replace("\"", "").trim()
-        return cleaned.split(",").mapNotNull { parseSingleScorer(it.trim()) }
-    }
-
-    private fun parseJsonArrayScorers(json: String): List<LiveScorer> {
-        val result = mutableListOf<LiveScorer>()
-        val inner = json.substring(1, json.length - 1).trim()
-        if (inner.isBlank()) return result
-
-        var i = 0
-        while (i < inner.length) {
-            val objStart = inner.indexOf('{', i)
-            if (objStart < 0) break
-            var depth = 0
-            var objEnd = objStart
-            while (objEnd < inner.length) {
-                when (inner[objEnd]) {
-                    '{' -> depth++
-                    '}' -> {
-                        depth--
-                        if (depth == 0) break
-                    }
-                }
-                objEnd++
-            }
-            if (depth != 0) break
-            val objStr = inner.substring(objStart, objEnd + 1)
-            val scorer = parseJsonObjectScorer(objStr)
-            if (scorer != null) result.add(scorer)
-            i = objEnd + 1
-        }
-        return result
-    }
-
-    private fun parseJsonObjectScorer(obj: String): LiveScorer? {
-        val namePattern = Regex(""""name"\s*:\s*"([^"]*)"""")
-        val playerPattern = Regex(""""player"\s*:\s*"([^"]*)"""")
-        val scorerPattern = Regex(""""scorer"\s*:\s*"([^"]*)"""")
-        val minutePattern = Regex(""""minute"\s*:\s*"?(\d+)"?""")
-
-        val name = namePattern.find(obj)?.groupValues?.get(1)
-            ?: playerPattern.find(obj)?.groupValues?.get(1)
-            ?: scorerPattern.find(obj)?.groupValues?.get(1)
-            ?: return null
-
-        val minute = minutePattern.find(obj)?.groupValues?.get(1)?.toIntOrNull() ?: return null
-        if (name.isBlank()) return null
-        return LiveScorer(name.trim(), minute)
-    }
-
-    private fun parseSingleScorer(entry: String): LiveScorer? {
-        val clean = entry.trim()
-            .removeSurrounding("\"").removeSurrounding("'")
-            .replace("\"", "").replace("\u201C", "").replace("\u201D", "").trim()
-        if (clean.isBlank() || clean == "null" || clean == "{}") return null
-
-        val regex = Regex("^(.+?)\\s+(\\d+)'")
-        val match = regex.find(clean) ?: return null
-
-        val name = match.groupValues[1].trim()
-        val minute = match.groupValues[2].toIntOrNull() ?: return null
-        if (name.isBlank()) return null
-
-        return LiveScorer(name, minute)
     }
 }

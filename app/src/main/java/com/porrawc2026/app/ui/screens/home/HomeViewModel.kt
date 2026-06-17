@@ -595,42 +595,6 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val liveToday = todayMatches.filter { it.id !in finishedByTimeIds }
-        if (liveToday.isNotEmpty()) {
-            val espnUpdates = fetchWithRetry { liveScoreService.fetchEspnLiveMinutes(liveToday) }.orEmpty()
-            espnUpdates.forEach { update ->
-                val match = cachedMatches.firstOrNull { it.id == update.matchId }
-                if (match != null) {
-                    val start = parseMadridDate(match.dateTime)
-                    if (start != null && start.after(Date())) return@forEach
-                }
-                if (update.liveMinute != null) {
-                    liveMinutes[update.matchId] = update.liveMinute
-                    liveMatchStore.liveMinutes[update.matchId] = update.liveMinute
-                }
-                val prev = lastWrittenScores[update.matchId]
-                if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
-                    lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
-                    cachedMatches = cachedMatches.map {
-                        if (it.id == update.matchId) it.copy(homeGoals = update.homeGoals, awayGoals = update.awayGoals) else it
-                    }
-                    recalcAllPoints(); refreshPoints()
-                    if (update.isFinished) {
-                        repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
-                    }
-                }
-                if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
-                    val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
-                    val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
-                    goalScorers[update.matchId] = Pair(homeScr, awayScr)
-                    liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
-                }
-                if (update.isFinished && (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty())) {
-                    saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
-                }
-            }
-        }
-
         for ((matchId, pair) in goalScorers) {
             if (relevantMatchIds.isNotEmpty() && matchId !in relevantMatchIds) continue
             var goalsChanged = false

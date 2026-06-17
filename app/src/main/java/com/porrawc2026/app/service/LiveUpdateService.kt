@@ -128,30 +128,6 @@ class LiveUpdateService : Service() {
             }
         }
 
-        val espnLiveMatches = matches.filter { m ->
-            val lm = liveMatchStore.liveMinutes[m.id]
-            m.id !in finishedIds && (lm == null || lm != "FINAL")
-        }
-        if (espnLiveMatches.isNotEmpty()) {
-            val espnUpdates = liveScoreService.fetchEspnLiveMinutes(espnLiveMatches)
-            espnUpdates.forEach { update ->
-                if (update.liveMinute != null) liveMatchStore.liveMinutes[update.matchId] = update.liveMinute
-                if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
-                    liveMatchStore.goalScorers[update.matchId] = Pair(
-                        update.homeScorers.map { GoalEvent(it.playerName, it.minute) },
-                        update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
-                    )
-                }
-                if (update.isFinished) {
-                    repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
-                    if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
-                        val homeJson = gson.toJson(update.homeScorers)
-                        val awayJson = gson.toJson(update.awayScorers)
-                        repository.updateMatchScorers(update.matchId, homeJson, awayJson)
-                    }
-                }
-            }
-        }
     }
 
     private fun isFinishedByTime(match: MatchEntity): Boolean {

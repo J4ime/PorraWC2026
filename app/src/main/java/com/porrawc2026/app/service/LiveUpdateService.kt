@@ -126,6 +126,9 @@ class LiveUpdateService : Service() {
                 val awayJson = gson.toJson(update.awayScorers)
                 repository.updateMatchScorers(update.matchId, homeJson, awayJson)
             }
+            if (update.isFinished) {
+                repository.updateMatchCards(update.matchId, update.homeRedCards, update.awayRedCards, update.homeYellowCards, update.awayYellowCards)
+            }
         }
 
     }

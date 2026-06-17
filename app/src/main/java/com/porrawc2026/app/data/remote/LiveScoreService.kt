@@ -14,7 +14,11 @@ data class LiveScoreUpdate(
     val homeScorers: List<LiveScorer> = emptyList(),
     val awayScorers: List<LiveScorer> = emptyList(),
     val isFinished: Boolean = false,
-    val liveMinute: String? = null
+    val liveMinute: String? = null,
+    val homeYellowCards: Int = 0,
+    val awayYellowCards: Int = 0,
+    val homeRedCards: Int = 0,
+    val awayRedCards: Int = 0
 )
 
 data class LiveScorer(val playerName: String, val minute: Int)
@@ -31,8 +35,10 @@ class LiveScoreService @Inject constructor(
 ) {
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): List<LiveScoreUpdate> {
         val updates = mutableListOf<LiveScoreUpdate>()
-        val dates = matches.mapNotNull { it.dateTime.take(10).replace("-", "").ifBlank { null } }.distinct()
-        val scoreboard = espnService.getScoreboard(dates = dates.ifEmpty { null })
+        val minDate = matches.minOfOrNull { it.dateTime.take(10).replace("-", "").ifBlank { "99999999" } }
+        val maxDate = matches.maxOfOrNull { it.dateTime.take(10).replace("-", "").ifBlank { "00000000" } }
+        val dateRange = if (minDate != null && maxDate != null) "$minDate-$maxDate" else null
+        val scoreboard = espnService.getScoreboard(dates = dateRange)
         val events = scoreboard.events ?: return updates
 
         events.forEach { event ->
@@ -65,6 +71,7 @@ class LiveScoreService @Inject constructor(
 
             val homeScorers = mutableListOf<LiveScorer>()
             val awayScorers = mutableListOf<LiveScorer>()
+            var hYellows = 0; var aYellows = 0; var hReds = 0; var aReds = 0
             val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
             competition.details?.forEach { detail ->
                 if (detail.scoringPlay == true) {
@@ -78,6 +85,12 @@ class LiveScoreService @Inject constructor(
                     val scorer = LiveScorer(playerName, goalMinute)
                     if (isHome) homeScorers.add(scorer) else awayScorers.add(scorer)
                 }
+                if (detail.yellowCard == true) {
+                    if (detail.team?.id == homeTeam.id) hYellows++ else aYellows++
+                }
+                if (detail.redCard == true) {
+                    if (detail.team?.id == homeTeam.id) hReds++ else aReds++
+                }
             }
 
             updates.add(LiveScoreUpdate(
@@ -87,7 +100,11 @@ class LiveScoreService @Inject constructor(
                 homeScorers = homeScorers,
                 awayScorers = awayScorers,
                 isFinished = statusType?.completed == true,
-                liveMinute = minute
+                liveMinute = minute,
+                homeYellowCards = hYellows,
+                awayYellowCards = aYellows,
+                homeRedCards = hReds,
+                awayRedCards = aReds
             ))
         }
         return updates
@@ -122,8 +139,10 @@ class LiveScoreService @Inject constructor(
         }
 
         try {
-            val dates = matches.mapNotNull { it.dateTime.take(10).replace("-", "").ifBlank { null } }.distinct()
-            val scoreboard = espnService.getScoreboard(dates = dates.ifEmpty { null })
+            val minDate = matches.minOfOrNull { it.dateTime.take(10).replace("-", "").ifBlank { "99999999" } }
+            val maxDate = matches.maxOfOrNull { it.dateTime.take(10).replace("-", "").ifBlank { "00000000" } }
+            val dateRange = if (minDate != null && maxDate != null) "$minDate-$maxDate" else null
+            val scoreboard = espnService.getScoreboard(dates = dateRange)
             val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
             scoreboard.events?.forEach { event ->
                 val competition = event.competitions?.firstOrNull() ?: return@forEach

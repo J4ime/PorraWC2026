@@ -297,7 +297,7 @@ class HomeViewModel @Inject constructor(
             lastWrittenScores.clear()
             liveMatchStore.goalScorers.clear()
             liveMatchStore.liveMinutes.clear()
-            cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null, homeScorers = null, awayScorers = null) }
+            cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null, homeScorers = null, awayScorers = null, homeRedCards = null, awayRedCards = null, homeYellowCards = null, awayYellowCards = null) }
             fetchLiveResults(fullFetch = true)
             _isBusy.value = false
         }
@@ -607,6 +607,9 @@ class HomeViewModel @Inject constructor(
             }
             if (update.isFinished && (homeScr.isNotEmpty() || awayScr.isNotEmpty())) {
                 saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
+            }
+            if (update.isFinished) {
+                repository.updateMatchCards(update.matchId, update.homeRedCards, update.awayRedCards, update.homeYellowCards, update.awayYellowCards)
             }
         }
 

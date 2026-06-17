@@ -60,7 +60,9 @@ data class EspnDetail(
     val clock: EspnClock?,
     val team: EspnTeam?,
     val athletesInvolved: List<EspnAthlete>?,
-    val scoringPlay: Boolean?
+    val scoringPlay: Boolean?,
+    val yellowCard: Boolean?,
+    val redCard: Boolean?
 )
 
 data class EspnDetailType(
@@ -82,7 +84,7 @@ data class EspnAthlete(
 interface EspnService {
     @GET("site/v2/sports/soccer/fifa.world/scoreboard")
     suspend fun getScoreboard(
-        @retrofit2.http.Query("dates") dates: List<String>? = null
+        @retrofit2.http.Query("dates") dates: String? = null
     ): EspnScoreboardResponse
 }
 

@@ -136,9 +136,9 @@ fun AjustesScreen(
                 item {
                     SquareButton(
                         icon = Icons.Filled.Cached,
-                        label = "Cache",
+                        label = "Reset",
                         color = Color(0xFF444444),
-                        loading = false,
+                        loading = isBusy,
                         onClick = { viewModel.refreshCache() }
                     )
                 }

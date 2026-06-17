@@ -288,8 +288,23 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun clearAndRefreshCache() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isBusy.value = true
+            repository.clearAllMatchScores()
+            goalScorers.clear()
+            liveMinutes.clear()
+            lastWrittenScores.clear()
+            liveMatchStore.goalScorers.clear()
+            liveMatchStore.liveMinutes.clear()
+            cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null, homeScorers = null, awayScorers = null) }
+            fetchLiveResults(fullFetch = true)
+            _isBusy.value = false
+        }
+    }
+
     fun refreshCache() {
-        refreshLiveScores()
+        clearAndRefreshCache()
     }
 
     fun setForegroundState(isForeground: Boolean) {

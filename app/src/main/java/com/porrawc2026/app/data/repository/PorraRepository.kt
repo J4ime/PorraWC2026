@@ -88,4 +88,8 @@ class PorraRepository @Inject constructor(
     suspend fun updateMatchScorers(matchId: Int, homeScorers: String?, awayScorers: String?) {
         matchDao.updateMatchScorers(matchId, homeScorers, awayScorers)
     }
+
+    suspend fun clearAllMatchScores() {
+        matchDao.clearAllMatchScores()
+    }
 }

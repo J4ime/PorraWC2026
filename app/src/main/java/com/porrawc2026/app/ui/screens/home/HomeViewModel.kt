@@ -611,8 +611,6 @@ class HomeViewModel @Inject constructor(
             if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
                 goalScorers[update.matchId] = Pair(homeScr, awayScr)
                 liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
-            }
-            if (update.isFinished && (homeScr.isNotEmpty() || awayScr.isNotEmpty())) {
                 saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
             }
             if (update.isFinished) {
@@ -627,17 +625,15 @@ class HomeViewModel @Inject constructor(
                 val key = "$matchId:${scorer.playerName}:${scorer.minute}"
                 if (notifiedScorers.add(key) && processedGoalKeys.add(key)) {
                     goalEventBus.notifyGoal()
-                    if (updatePlayerGoal(scorer.playerName)) {
-                        relevantMatchIds.add(matchId)
-                        goalsChanged = true
-                    }
+                    goalsChanged = true
                 }
             }
             if (goalsChanged) {
                 prefsManager.setProcessedGoalKeys(processedGoalKeys.toSet())
-                refreshPoints()
             }
         }
+        recalculateAllPlayerGoals()
+        refreshPoints()
         checkGoalNotifications()
         refreshUpcomingMatches()
     }
@@ -659,24 +655,49 @@ class HomeViewModel @Inject constructor(
         return if (parts.size > 1) parts.last() else name
     }
 
-    private suspend fun updatePlayerGoal(scorerName: String): Boolean {
-        val currentPlayers = repository.getPlayerPredictionsList()
-        val scorerNorm = normalizeName(scorerName)
-        val scorerLast = lastWord(scorerNorm)
-        for (player in currentPlayers) {
-            val pred = player.predictedName ?: continue
-            val predNorm = normalizeName(pred)
-            val predLast = lastWord(predNorm)
-            if (predNorm.contains(scorerLast) || scorerNorm.contains(predLast) || predLast == scorerLast) {
-                val newGoals = player.goalsScored + 1
-                val newPoints = newGoals * player.pointsPerGoal
-                val updated = player.copy(goalsScored = newGoals, pointsEarned = newPoints)
-                repository.updatePlayerPrediction(updated)
-                _players.value = _players.value.map { if (it.rank == updated.rank) updated else it }
-                return true
+    private suspend fun recalculateAllPlayerGoals() {
+        val goalCounts = mutableMapOf<String, Int>()
+        val gson = Gson()
+        val type = object : TypeToken<List<LiveScorer>>() {}.type
+        for (match in cachedMatches) {
+            val homeRaw = match.homeScorers
+            val awayRaw = match.awayScorers
+            if (homeRaw != null) {
+                try {
+                    val scorers: List<LiveScorer> = gson.fromJson(homeRaw, type) ?: emptyList()
+                    scorers.forEach { s -> goalCounts.merge(s.playerName, 1) { a, b -> a + b } }
+                } catch (_: Exception) { }
+            }
+            if (awayRaw != null) {
+                try {
+                    val scorers: List<LiveScorer> = gson.fromJson(awayRaw, type) ?: emptyList()
+                    scorers.forEach { s -> goalCounts.merge(s.playerName, 1) { a, b -> a + b } }
+                } catch (_: Exception) { }
             }
         }
-        return false
+        val currentPlayers = repository.getPlayerPredictionsList()
+        var anyChanged = false
+        for (player in currentPlayers) {
+            val predName = player.predictedName ?: continue
+            val predNorm = normalizeName(predName)
+            val predLast = lastWord(predNorm)
+            var totalGoals = 0
+            for ((scorerName, count) in goalCounts) {
+                val scorerNorm = normalizeName(scorerName)
+                val scorerLast = lastWord(scorerNorm)
+                if (predNorm.contains(scorerLast) || scorerNorm.contains(predLast) || predLast == scorerLast) {
+                    totalGoals += count
+                }
+            }
+            val newPoints = totalGoals * player.pointsPerGoal
+            if (totalGoals != player.goalsScored || newPoints != player.pointsEarned) {
+                repository.updatePlayerPrediction(player.copy(goalsScored = totalGoals, pointsEarned = newPoints))
+                anyChanged = true
+            }
+        }
+        if (anyChanged) {
+            _players.value = repository.getPlayerPredictionsList().sortedBy { it.rank }
+        }
     }
 
     fun refreshUpcomingMatches() {

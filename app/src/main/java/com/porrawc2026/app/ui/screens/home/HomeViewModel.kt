@@ -292,9 +292,14 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             repository.clearAllMatchScores()
+            repository.resetAllPlayerGoals()
+            prefsManager.clearProcessedGoalKeys()
             goalScorers.clear()
             liveMinutes.clear()
             lastWrittenScores.clear()
+            notifiedScorers.clear()
+            seenScorers.clear()
+            processedGoalKeys.clear()
             liveMatchStore.goalScorers.clear()
             liveMatchStore.liveMinutes.clear()
             cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null, homeScorers = null, awayScorers = null, homeRedCards = null, awayRedCards = null, homeYellowCards = null, awayYellowCards = null) }

@@ -92,4 +92,8 @@ class PorraRepository @Inject constructor(
     suspend fun clearAllMatchScores() {
         matchDao.clearAllMatchScores()
     }
+
+    suspend fun resetAllPlayerGoals() {
+        playerPredictionDao.resetAllPlayerGoals()
+    }
 }

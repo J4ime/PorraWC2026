@@ -138,31 +138,6 @@ class LiveScoreService @Inject constructor(
             }
         }
 
-        try {
-            val minDate = matches.minOfOrNull { it.dateTime.take(10).replace("-", "").ifBlank { "99999999" } }
-            val maxDate = matches.maxOfOrNull { it.dateTime.take(10).replace("-", "").ifBlank { "00000000" } }
-            val dateRange = if (minDate != null && maxDate != null) "$minDate-$maxDate" else null
-            val scoreboard = espnService.getScoreboard(dates = dateRange)
-            val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
-            scoreboard.events?.forEach { event ->
-                val competition = event.competitions?.firstOrNull() ?: return@forEach
-                val competitors = competition.competitors ?: return@forEach
-                val homeTeam = competitors.firstOrNull { it.homeAway == "home" } ?: return@forEach
-                val awayTeam = competitors.firstOrNull { it.homeAway == "away" } ?: return@forEach
-                val homeName = homeTeam.team?.displayName ?: homeTeam.team?.name ?: return@forEach
-                val awayName = awayTeam.team?.displayName ?: awayTeam.team?.name ?: return@forEach
-                competition.details?.forEach { detail ->
-                    if (detail.scoringPlay == true) {
-                        val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
-                        val isHome = detail.team?.id == homeTeam.id
-                        val teamName = if (isHome) homeName else awayName
-                        allScorers.getOrPut(teamName) { mutableMapOf() }
-                            .merge(playerName, 1) { a, b -> a + b }
-                    }
-                }
-            }
-        } catch (_: Exception) { }
-
         return allScorers.flatMap { (team, players) ->
             players.map { (player, goals) ->
                 TopScorerData(player, team, goals)

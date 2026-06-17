@@ -23,4 +23,7 @@ interface PlayerPredictionDao {
 
     @Query("SELECT SUM(pointsEarned) FROM player_predictions")
     suspend fun getTotalPoints(): Int
+
+    @Query("UPDATE player_predictions SET goalsScored = 0, pointsEarned = 0")
+    suspend fun resetAllPlayerGoals()
 }

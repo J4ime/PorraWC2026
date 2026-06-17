@@ -94,4 +94,8 @@ class PrefsManager(private val context: Context) {
         val raw = context.dataStore.data.first()[PROCESSED_GOAL_KEYS] ?: ""
         return raw.split(",").filter { it.isNotBlank() }.toSet()
     }
+
+    suspend fun clearProcessedGoalKeys() {
+        context.dataStore.edit { it.remove(PROCESSED_GOAL_KEYS) }
+    }
 }

@@ -1,6 +1,7 @@
 package com.porrawc2026.app.ui.screens.home
 
 import android.content.Context
+import android.util.Log
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
@@ -153,35 +154,40 @@ class HomeViewModel @Inject constructor(
         _isBusy.value = true
         cachedMatches = MatchScheduleProvider.buildMatchEntities()
         viewModelScope.launch(Dispatchers.IO) {
-            val dbMatches = repository.getAllMatches().first()
-            val staticSchedule = MatchScheduleProvider.buildMatchEntities()
+            try {
+                val dbMatches = repository.getAllMatches().first()
+                val staticSchedule = MatchScheduleProvider.buildMatchEntities()
 
-            if (dbMatches.isNotEmpty()) {
-                cachedMatches = dbMatches
-                val dbIds = dbMatches.map { it.id }.toSet()
-                val newMatches = staticSchedule.filter { it.id !in dbIds }
-                if (newMatches.isNotEmpty()) {
-                    cachedMatches = (cachedMatches + newMatches).sortedBy { it.id }
-                    repository.insertMatches(newMatches)
+                if (dbMatches.isNotEmpty()) {
+                    cachedMatches = dbMatches
+                    val dbIds = dbMatches.map { it.id }.toSet()
+                    val newMatches = staticSchedule.filter { it.id !in dbIds }
+                    if (newMatches.isNotEmpty()) {
+                        cachedMatches = (cachedMatches + newMatches).sortedBy { it.id }
+                        repository.insertMatches(newMatches)
+                    }
+                } else {
+                    repository.insertMatches(staticSchedule)
+                    prefsManager.setCacheTimestamp(System.currentTimeMillis())
                 }
-            } else {
-                repository.insertMatches(staticSchedule)
-                prefsManager.setCacheTimestamp(System.currentTimeMillis())
+                enrichSchedule()
+                recalcAllPoints()
+                refreshPoints()
+                loadPlayers()
+                processedGoalKeys.addAll(prefsManager.getProcessedGoalKeys())
+                startAutoRefresh()
+                lastWrittenScores.clear()
+                fetchLiveResults(fullFetch = true)
+                downloadPlayerPhotos()
+                precachePhotosInBackground()
+                refreshUpcomingMatches()
+                _hasData.value = true
+                _isReady.value = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in preloadSchedule", e)
+            } finally {
+                _isBusy.value = false
             }
-            enrichSchedule()
-            recalcAllPoints()
-            refreshPoints()
-            loadPlayers()
-            processedGoalKeys.addAll(prefsManager.getProcessedGoalKeys())
-            startAutoRefresh()
-            lastWrittenScores.clear()
-            fetchLiveResults()
-            downloadPlayerPhotos()
-            precachePhotosInBackground()
-            refreshUpcomingMatches()
-            _hasData.value = true
-            _isReady.value = true
-            _isBusy.value = false
         }
     }
 
@@ -479,11 +485,12 @@ class HomeViewModel @Inject constructor(
         return null
     }
 
-    private suspend fun fetchLiveResults() {
+    private suspend fun fetchLiveResults(fullFetch: Boolean = false) {
         val todayMatches = getTodayMatchesWithDates()
-        if (todayMatches.isEmpty()) return
+        val matchesForWc = if (fullFetch) cachedMatches else todayMatches
+        if (matchesForWc.isEmpty()) return
 
-        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(todayMatches) }.orEmpty()
+        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(matchesForWc) }.orEmpty()
 
         scoreUpdates.forEach { update ->
             if (update.isFinished) liveMinutes[update.matchId] = "FINAL"
@@ -511,20 +518,22 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val espnUpdates = fetchWithRetry { liveScoreService.fetchEspnLiveMinutes(todayMatches) }.orEmpty()
-        espnUpdates.forEach { update ->
-            val match = cachedMatches.firstOrNull { it.id == update.matchId }
-            if (match != null) {
-                val start = parseMadridDate(match.dateTime)
-                if (start != null && start.after(Date())) return@forEach
-            }
-            if (update.liveMinute != null) {
-                liveMinutes[update.matchId] = update.liveMinute
-            }
-            if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
-                val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
-                val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
-                goalScorers[update.matchId] = Pair(homeScr, awayScr)
+        if (todayMatches.isNotEmpty()) {
+            val espnUpdates = fetchWithRetry { liveScoreService.fetchEspnLiveMinutes(todayMatches) }.orEmpty()
+            espnUpdates.forEach { update ->
+                val match = cachedMatches.firstOrNull { it.id == update.matchId }
+                if (match != null) {
+                    val start = parseMadridDate(match.dateTime)
+                    if (start != null && start.after(Date())) return@forEach
+                }
+                if (update.liveMinute != null) {
+                    liveMinutes[update.matchId] = update.liveMinute
+                }
+                if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
+                    val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
+                    val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+                    goalScorers[update.matchId] = Pair(homeScr, awayScr)
+                }
             }
         }
 
@@ -546,13 +555,32 @@ class HomeViewModel @Inject constructor(
         refreshUpcomingMatches()
     }
 
+    private fun normalizeName(name: String): String {
+        return name.lowercase().trim()
+            .replace("á", "a").replace("à", "a").replace("â", "a").replace("ã", "a").replace("ä", "a")
+            .replace("é", "e").replace("è", "e").replace("ê", "e").replace("ë", "e")
+            .replace("í", "i").replace("ì", "i").replace("î", "i").replace("ï", "i")
+            .replace("ó", "o").replace("ò", "o").replace("ô", "o").replace("õ", "o").replace("ö", "o")
+            .replace("ú", "u").replace("ù", "u").replace("û", "u").replace("ü", "u")
+            .replace("ç", "c").replace("ñ", "n")
+            .replace(".", "").replace("-", " ").replace("'", " ")
+            .replace(Regex("\\s+"), " ").trim()
+    }
+
+    private fun lastWord(name: String): String {
+        val parts = name.split(" ")
+        return if (parts.size > 1) parts.last() else name
+    }
+
     private suspend fun updatePlayerGoal(scorerName: String): Boolean {
         val currentPlayers = _players.value
+        val scorerNorm = normalizeName(scorerName)
+        val scorerLast = lastWord(scorerNorm)
         for (player in currentPlayers) {
             val pred = player.predictedName ?: continue
-            val key = scorerName.lowercase().trim()
-            val predLower = pred.lowercase().trim()
-            if (key.contains(predLower, ignoreCase = true) || predLower.contains(key, ignoreCase = true)) {
+            val predNorm = normalizeName(pred)
+            val predLast = lastWord(predNorm)
+            if (predNorm.contains(scorerLast) || scorerNorm.contains(predLast) || predLast == scorerLast) {
                 val newGoals = player.goalsScored + 1
                 val newPoints = newGoals * player.pointsPerGoal
                 repository.updatePlayerPrediction(player.copy(goalsScored = newGoals, pointsEarned = newPoints))
@@ -699,5 +727,9 @@ class HomeViewModel @Inject constructor(
             }
         }
         return name.takeIf { it.matches(Regex(".*[a-zA-Z].*")) && it.length >= 3 }
+    }
+
+    companion object {
+        private const val TAG = "HomeViewModel"
     }
 }

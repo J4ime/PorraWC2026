@@ -71,15 +71,21 @@ fun HomeScreen(
         else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
         if (rawIdx < 0) return@LaunchedEffect
         val lazyIdx = rawIdx + 1
-        listState.animateScrollToItem(lazyIdx)
-        delay(350)
-        val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == lazyIdx } ?: return@LaunchedEffect
-        val viewportW = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-        val centeringOffset = (viewportW / 2 - itemInfo.size / 2).coerceAtLeast(0)
-        val currentOffset = itemInfo.offset
-        val diff = centeringOffset - currentOffset
-        if (diff > 2 || diff < -2) {
-            listState.animateScrollToItem(lazyIdx, scrollOffset = centeringOffset)
+        listState.scrollToItem(lazyIdx)
+        delay(100)
+        var attempts = 0
+        while (attempts < 10) {
+            val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == lazyIdx }
+            if (itemInfo != null) {
+                val viewportW = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
+                val centeringOffset = (viewportW / 2 - itemInfo.size / 2).coerceAtLeast(0)
+                if (kotlin.math.abs(itemInfo.offset - centeringOffset) > 2) {
+                    listState.animateScrollToItem(lazyIdx, scrollOffset = centeringOffset)
+                }
+                break
+            }
+            delay(50)
+            attempts++
         }
     }
 

@@ -7,11 +7,19 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.remote.LiveScoreService
+import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.ui.screens.home.GoalEvent
 import com.porrawc2026.app.util.LiveMatchStore
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.AndroidEntryPoint
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -90,10 +98,21 @@ class LiveUpdateService : Service() {
     private suspend fun fetchAndStore() {
         val matches = repository.getAllMatches().first()
         if (matches.isEmpty()) return
-        val updates = liveScoreService.fetchScoreUpdates(matches)
+
+        val finishedIds = matches.filter { isFinishedByTime(it) }.map { it.id }.toSet()
+
+        val liveMatches = matches.filter { it.id !in finishedIds }
+        if (liveMatches.isEmpty()) return
+
+        val updates = liveScoreService.fetchScoreUpdates(liveMatches)
+        val gson = Gson()
         updates.forEach { update ->
-            if (update.isFinished) liveMatchStore.liveMinutes[update.matchId] = "FINAL"
-            else if (update.liveMinute != null) liveMatchStore.liveMinutes[update.matchId] = update.liveMinute
+            if (update.isFinished) {
+                liveMatchStore.liveMinutes[update.matchId] = "FINAL"
+                repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+            } else if (update.liveMinute != null) {
+                liveMatchStore.liveMinutes[update.matchId] = update.liveMinute
+            }
 
             if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
                 liveMatchStore.goalScorers[update.matchId] = Pair(
@@ -102,23 +121,54 @@ class LiveUpdateService : Service() {
                 )
             }
 
-            if (update.isFinished) {
-                repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+            if (update.isFinished && (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty())) {
+                val homeJson = gson.toJson(update.homeScorers)
+                val awayJson = gson.toJson(update.awayScorers)
+                repository.updateMatchScorers(update.matchId, homeJson, awayJson)
             }
         }
-        val espnUpdates = liveScoreService.fetchEspnLiveMinutes(matches)
-        espnUpdates.forEach { update ->
-            if (update.liveMinute != null) liveMatchStore.liveMinutes[update.matchId] = update.liveMinute
-            if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
-                liveMatchStore.goalScorers[update.matchId] = Pair(
-                    update.homeScorers.map { GoalEvent(it.playerName, it.minute) },
-                    update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
-                )
-            }
-            if (update.isFinished) {
-                repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+
+        val espnLiveMatches = matches.filter { m ->
+            val lm = liveMatchStore.liveMinutes[m.id]
+            m.id !in finishedIds && (lm == null || lm != "FINAL")
+        }
+        if (espnLiveMatches.isNotEmpty()) {
+            val espnUpdates = liveScoreService.fetchEspnLiveMinutes(espnLiveMatches)
+            espnUpdates.forEach { update ->
+                if (update.liveMinute != null) liveMatchStore.liveMinutes[update.matchId] = update.liveMinute
+                if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
+                    liveMatchStore.goalScorers[update.matchId] = Pair(
+                        update.homeScorers.map { GoalEvent(it.playerName, it.minute) },
+                        update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+                    )
+                }
+                if (update.isFinished) {
+                    repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+                    if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
+                        val homeJson = gson.toJson(update.homeScorers)
+                        val awayJson = gson.toJson(update.awayScorers)
+                        repository.updateMatchScorers(update.matchId, homeJson, awayJson)
+                    }
+                }
             }
         }
+    }
+
+    private fun isFinishedByTime(match: MatchEntity): Boolean {
+        val start = parseMadridDate(match.dateTime) ?: return false
+        return match.homeGoals != null && match.awayGoals != null &&
+            Date().after(Date(start.time + 150L * 60 * 1000))
+    }
+
+    private fun parseMadridDate(dateTime: String): Date? {
+        if (dateTime.isBlank()) return null
+        return try {
+            if (dateTime.endsWith("Z")) {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(dateTime)
+            } else {
+                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("Europe/Madrid") }.parse(dateTime)
+            }
+        } catch (_: Exception) { null }
     }
 
     companion object {

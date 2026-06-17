@@ -15,6 +15,7 @@ import com.porrawc2026.app.data.remote.LiveScoreService
 import com.porrawc2026.app.data.remote.MatchScheduleProvider
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.PointsCalculator
+import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.GoalNotifier
@@ -24,6 +25,8 @@ import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.PrefsManager
 import com.porrawc2026.app.util.UpdateManager
 import com.porrawc2026.app.util.ValidationResult
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -497,12 +500,65 @@ class HomeViewModel @Inject constructor(
         return null
     }
 
+    private fun loadCachedScorers(): Set<Int> {
+        val cachedIds = mutableSetOf<Int>()
+        for (match in cachedMatches) {
+            val homeRaw = match.homeScorers
+            val awayRaw = match.awayScorers
+            if (homeRaw != null && awayRaw != null) {
+                try {
+                    val type = object : TypeToken<List<LiveScorer>>() {}.type
+                    val homeList: List<LiveScorer> = Gson().fromJson(homeRaw, type) ?: emptyList()
+                    val awayList: List<LiveScorer> = Gson().fromJson(awayRaw, type) ?: emptyList()
+                    val homeGoals = homeList.map { GoalEvent(it.playerName, it.minute) }
+                    val awayGoals = awayList.map { GoalEvent(it.playerName, it.minute) }
+                    goalScorers[match.id] = Pair(homeGoals, awayGoals)
+                    liveMatchStore.goalScorers[match.id] = Pair(homeGoals, awayGoals)
+                    cachedIds.add(match.id)
+                } catch (_: Exception) { }
+            }
+        }
+        return cachedIds
+    }
+
+    private suspend fun saveFinishedScorersToCache(
+        matchId: Int,
+        homeScorers: List<LiveScorer>,
+        awayScorers: List<LiveScorer>
+    ) {
+        val gson = Gson()
+        val homeJson = gson.toJson(homeScorers)
+        val awayJson = gson.toJson(awayScorers)
+        repository.updateMatchScorers(matchId, homeJson, awayJson)
+        cachedMatches = cachedMatches.map {
+            if (it.id == matchId) it.copy(homeScorers = homeJson, awayScorers = awayJson) else it
+        }
+    }
+
+    private fun isFinishedByTime(match: MatchEntity): Boolean {
+        val start = parseMadridDate(match.dateTime) ?: return false
+        return match.homeGoals != null && match.awayGoals != null &&
+            Date().after(Date(start.time + 150L * 60 * 1000))
+    }
+
     private suspend fun fetchLiveResults(fullFetch: Boolean = false) {
         val todayMatches = getTodayMatchesWithDates()
         val matchesForWc = if (fullFetch) cachedMatches else todayMatches
         if (matchesForWc.isEmpty()) return
 
-        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(matchesForWc) }.orEmpty()
+        val cachedIds = loadCachedScorers()
+        val finishedByTimeIds = matchesForWc.filter { isFinishedByTime(it) }.map { it.id }.toSet()
+        val skipApiIds = cachedIds.intersect(finishedByTimeIds)
+
+        val wcMatches = if (skipApiIds.size == matchesForWc.size) emptyList()
+        else matchesForWc.filter { it.id !in skipApiIds }
+
+        if (wcMatches.isEmpty()) {
+            refreshUpcomingMatches()
+            return
+        }
+
+        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(wcMatches) }.orEmpty()
 
         scoreUpdates.forEach { update ->
             if (update.isFinished) {
@@ -534,10 +590,14 @@ class HomeViewModel @Inject constructor(
                 goalScorers[update.matchId] = Pair(homeScr, awayScr)
                 liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
             }
+            if (update.isFinished && (homeScr.isNotEmpty() || awayScr.isNotEmpty())) {
+                saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
+            }
         }
 
-        if (todayMatches.isNotEmpty()) {
-            val espnUpdates = fetchWithRetry { liveScoreService.fetchEspnLiveMinutes(todayMatches) }.orEmpty()
+        val liveToday = todayMatches.filter { it.id !in finishedByTimeIds }
+        if (liveToday.isNotEmpty()) {
+            val espnUpdates = fetchWithRetry { liveScoreService.fetchEspnLiveMinutes(liveToday) }.orEmpty()
             espnUpdates.forEach { update ->
                 val match = cachedMatches.firstOrNull { it.id == update.matchId }
                 if (match != null) {
@@ -564,6 +624,9 @@ class HomeViewModel @Inject constructor(
                     val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
                     goalScorers[update.matchId] = Pair(homeScr, awayScr)
                     liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
+                }
+                if (update.isFinished && (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty())) {
+                    saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
                 }
             }
         }

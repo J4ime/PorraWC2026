@@ -23,5 +23,7 @@ data class MatchEntity(
     val homeRedCards: Int? = null,
     val awayRedCards: Int? = null,
     val homeYellowCards: Int? = null,
-    val awayYellowCards: Int? = null
+    val awayYellowCards: Int? = null,
+    val homeScorers: String? = null,
+    val awayScorers: String? = null
 )

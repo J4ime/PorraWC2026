@@ -78,7 +78,8 @@ fun HomeScreen(
         val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == lazyIdx }
         if (itemInfo != null) {
             val viewportW = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-            val targetOffset = ((viewportW - itemInfo.size) / 2).coerceAtLeast(0)
+            val targetChipsBefore = 2
+            val targetOffset = (targetChipsBefore * itemInfo.size).coerceAtMost(viewportW - itemInfo.size)
             val delta = targetOffset - itemInfo.offset
             if (abs(delta) > 5) {
                 listState.dispatchRawDelta(-delta.toFloat())

@@ -184,32 +184,34 @@ object AppModule {
             var idx = result.indexOf(key)
             while (idx >= 0) {
                 val start = idx + key.length
-                val braceIdx = result.indexOf('{', start)
+                val braceIdx = result.indexOfAny(charArrayOf('{', '['), start)
                 if (braceIdx < 0 || braceIdx > start + 5) break
-                var bracePos = braceIdx
+                val openChar = result[braceIdx]
+                val closeChar = if (openChar == '{') '}' else ']'
+                var pos = braceIdx
                 var depth = 0
                 var endPos = -1
-                while (bracePos < result.length) {
-                    when (result[bracePos]) {
-                        '{' -> depth++
-                        '}' -> {
+                while (pos < result.length) {
+                    when (result[pos]) {
+                        openChar -> depth++
+                        closeChar -> {
                             depth--
                             if (depth == 0) {
-                                if (bracePos + 1 < result.length && result[bracePos + 1] == '"') {
-                                    endPos = bracePos + 1
+                                if (pos + 1 < result.length && result[pos + 1] == '"') {
+                                    endPos = pos + 1
                                 }
                                 break
                             }
                         }
-                        '\\' -> bracePos++ // skip escaped char
+                        '\\' -> pos++
                     }
-                    bracePos++
+                    pos++
                 }
                 if (endPos < 0) break
-                val content = result.substring(braceIdx + 1, bracePos)
+                val content = result.substring(braceIdx + 1, pos)
                 if (content.contains("\"") && !content.contains("\\\"")) {
                     val escaped = content.replace("\"", "\\\"")
-                    result = result.substring(0, braceIdx + 1) + escaped + result.substring(bracePos)
+                    result = result.substring(0, braceIdx + 1) + escaped + result.substring(pos)
                 }
                 idx = result.indexOf(key, idx + 1)
             }

@@ -201,10 +201,65 @@ class LiveScoreService @Inject constructor(
     }
 
     private fun parseScorerString(s: String): List<LiveScorer> {
-        val clean = s.trim().removeSurrounding("\"").removePrefix("{").removeSuffix("}")
-            .replace("\"", "").replace("\u201C", "").replace("\u201D", "").trim()
-        if (clean.isBlank() || clean == "null" || clean == "[]") return emptyList()
-        return clean.split(",").mapNotNull { parseSingleScorer(it.trim()) }
+        val clean = s.trim().removeSurrounding("\"").removeSurrounding("'")
+            .replace("\u201C", "").replace("\u201D", "").trim()
+        if (clean.isBlank() || clean == "null" || clean == "[]" || clean == "{}") return emptyList()
+
+        if (clean.startsWith("[") && clean.endsWith("]")) {
+            return parseJsonArrayScorers(clean)
+        }
+        if (clean.startsWith("{") && clean.endsWith("}")) {
+            return listOfNotNull(parseJsonObjectScorer(clean))
+        }
+
+        val cleaned = clean.replace("\"", "").trim()
+        return cleaned.split(",").mapNotNull { parseSingleScorer(it.trim()) }
+    }
+
+    private fun parseJsonArrayScorers(json: String): List<LiveScorer> {
+        val result = mutableListOf<LiveScorer>()
+        val inner = json.substring(1, json.length - 1).trim()
+        if (inner.isBlank()) return result
+
+        var i = 0
+        while (i < inner.length) {
+            val objStart = inner.indexOf('{', i)
+            if (objStart < 0) break
+            var depth = 0
+            var objEnd = objStart
+            while (objEnd < inner.length) {
+                when (inner[objEnd]) {
+                    '{' -> depth++
+                    '}' -> {
+                        depth--
+                        if (depth == 0) break
+                    }
+                }
+                objEnd++
+            }
+            if (depth != 0) break
+            val objStr = inner.substring(objStart, objEnd + 1)
+            val scorer = parseJsonObjectScorer(objStr)
+            if (scorer != null) result.add(scorer)
+            i = objEnd + 1
+        }
+        return result
+    }
+
+    private fun parseJsonObjectScorer(obj: String): LiveScorer? {
+        val namePattern = Regex(""""name"\s*:\s*"([^"]*)"""")
+        val playerPattern = Regex(""""player"\s*:\s*"([^"]*)"""")
+        val scorerPattern = Regex(""""scorer"\s*:\s*"([^"]*)"""")
+        val minutePattern = Regex(""""minute"\s*:\s*"?(\d+)"?""")
+
+        val name = namePattern.find(obj)?.groupValues?.get(1)
+            ?: playerPattern.find(obj)?.groupValues?.get(1)
+            ?: scorerPattern.find(obj)?.groupValues?.get(1)
+            ?: return null
+
+        val minute = minutePattern.find(obj)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+        if (name.isBlank()) return null
+        return LiveScorer(name.trim(), minute)
     }
 
     private fun parseSingleScorer(entry: String): LiveScorer? {

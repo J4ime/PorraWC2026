@@ -73,17 +73,16 @@ fun HomeScreen(
         if (rawIdx < 0) return@LaunchedEffect
         val lazyIdx = rawIdx + 1
         delay(200)
-        listState.scrollToItem(lazyIdx)
-        delay(300)
         val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == lazyIdx }
         if (itemInfo != null) {
             val viewportW = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-            val targetChipsBefore = 2
-            val targetOffset = (targetChipsBefore * itemInfo.size).coerceAtMost(viewportW - itemInfo.size)
+            val targetOffset = (2 * itemInfo.size).coerceAtMost(viewportW - itemInfo.size)
             val delta = targetOffset - itemInfo.offset
             if (abs(delta) > 5) {
                 listState.dispatchRawDelta(-delta.toFloat())
             }
+        } else {
+            listState.scrollToItem(lazyIdx)
         }
     }
 

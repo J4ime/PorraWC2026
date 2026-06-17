@@ -31,7 +31,7 @@ class LiveScoreService @Inject constructor(
 ) {
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): List<LiveScoreUpdate> {
         val updates = mutableListOf<LiveScoreUpdate>()
-        val dates = matches.mapNotNull { it.dateTime.take(10).ifBlank { null } }.distinct()
+        val dates = matches.mapNotNull { it.dateTime.take(10).replace("-", "").ifBlank { null } }.distinct()
         val scoreboard = espnService.getScoreboard(dates = dates.ifEmpty { null })
         val events = scoreboard.events ?: return updates
 
@@ -122,7 +122,7 @@ class LiveScoreService @Inject constructor(
         }
 
         try {
-            val dates = matches.mapNotNull { it.dateTime.take(10).ifBlank { null } }.distinct()
+            val dates = matches.mapNotNull { it.dateTime.take(10).replace("-", "").ifBlank { null } }.distinct()
             val scoreboard = espnService.getScoreboard(dates = dates.ifEmpty { null })
             val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
             scoreboard.events?.forEach { event ->

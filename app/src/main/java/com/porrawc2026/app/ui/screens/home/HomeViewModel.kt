@@ -533,6 +533,17 @@ class HomeViewModel @Inject constructor(
                 if (update.liveMinute != null) {
                     liveMinutes[update.matchId] = update.liveMinute
                 }
+                val prev = lastWrittenScores[update.matchId]
+                if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
+                    lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
+                    cachedMatches = cachedMatches.map {
+                        if (it.id == update.matchId) it.copy(homeGoals = update.homeGoals, awayGoals = update.awayGoals) else it
+                    }
+                    recalcAllPoints(); refreshPoints()
+                    if (update.isFinished) {
+                        repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+                    }
+                }
                 if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
                     val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
                     val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }

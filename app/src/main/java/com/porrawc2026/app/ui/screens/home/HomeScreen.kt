@@ -66,15 +66,15 @@ fun HomeScreen(
     val todayIdx = allDaysSorted.indexOf(todayDayKey)
     val listState = rememberLazyListState()
 
-    LaunchedEffect(selectedDay, allDaysSorted.size) {
-        if (allDaysSorted.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(selectedDay) {
         val rawIdx = if (selectedDay == null) todayIdx
         else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
         if (rawIdx < 0) return@LaunchedEffect
         val lazyIdx = rawIdx + 1
+        listState.scrollToItem(lazyIdx)
         delay(200)
         var attempts = 0
-        while (attempts < 20) {
+        while (attempts < 10) {
             val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == lazyIdx }
             if (itemInfo != null) {
                 val viewportW = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset

@@ -42,10 +42,10 @@ class LiveScoreService @Inject constructor(
             val homeScorers = parseScorers(g.home_scorers)
             val awayScorers = parseScorers(g.away_scorers)
             val isFinished = g.finished == "TRUE"
-            val minute = when (g.time_elapsed) {
+            val minute = when (val te = g.time_elapsed) {
                 "finished" -> "FINAL"
-                "live" -> "LIVE"
-                else -> null
+                "live" -> null
+                else -> te?.toIntOrNull()?.let { "${it}'" }
             }
             scoreUpdates.add(
                 LiveScoreUpdate(

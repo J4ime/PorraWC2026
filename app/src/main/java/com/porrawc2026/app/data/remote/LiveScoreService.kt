@@ -208,11 +208,16 @@ class LiveScoreService @Inject constructor(
         if (clean.startsWith("[") && clean.endsWith("]")) {
             return parseJsonArrayScorers(clean)
         }
-        if (clean.startsWith("{") && clean.endsWith("}")) {
-            return listOfNotNull(parseJsonObjectScorer(clean))
+
+        var data = clean
+        if (data.startsWith("{") && data.endsWith("}")) {
+            if (data.contains("\"name\"") || data.contains("\"player\"") || data.contains("\"scorer\"") || data.contains("\"minute\"")) {
+                return listOfNotNull(parseJsonObjectScorer(data))
+            }
+            data = data.removePrefix("{").removeSuffix("}")
         }
 
-        val cleaned = clean.replace("\"", "").trim()
+        val cleaned = data.replace("\"", "").trim()
         return cleaned.split(",").mapNotNull { parseSingleScorer(it.trim()) }
     }
 

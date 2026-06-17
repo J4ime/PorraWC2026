@@ -1,9 +1,12 @@
 package com.porrawc2026.app.ui.screens.home
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.core.content.ContextCompat
+import com.porrawc2026.app.service.LiveUpdateService
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.MatchEntity
@@ -15,6 +18,7 @@ import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.GoalNotifier
+import com.porrawc2026.app.util.LiveMatchStore
 import com.porrawc2026.app.util.PdfRankingParser
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.PrefsManager
@@ -75,6 +79,7 @@ class HomeViewModel @Inject constructor(
     private val liveScoreService: LiveScoreService,
     private val prefsManager: PrefsManager,
     private val goalEventBus: GoalEventBus,
+    private val liveMatchStore: LiveMatchStore,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -146,9 +151,12 @@ class HomeViewModel @Inject constructor(
             _notificationsEnabled.value = prefsManager.getNotificationsSync()
             _userName.value = prefsManager.getUserNameSync()
             _userPosition.value = prefsManager.getUserPositionSync()
+            liveMinutes.putAll(liveMatchStore.liveMinutes)
+            goalScorers.putAll(liveMatchStore.goalScorers)
         }
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
+        startBackgroundService()
     }
 
     private fun preloadSchedule() {
@@ -497,8 +505,13 @@ class HomeViewModel @Inject constructor(
         val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(matchesForWc) }.orEmpty()
 
         scoreUpdates.forEach { update ->
-            if (update.isFinished) liveMinutes[update.matchId] = "FINAL"
-            else if (update.liveMinute != null) liveMinutes[update.matchId] = update.liveMinute
+            if (update.isFinished) {
+                liveMinutes[update.matchId] = "FINAL"
+                liveMatchStore.liveMinutes[update.matchId] = "FINAL"
+            } else if (update.liveMinute != null) {
+                liveMinutes[update.matchId] = update.liveMinute
+                liveMatchStore.liveMinutes[update.matchId] = update.liveMinute
+            }
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
             if (match != null) {
                 val start = parseMadridDate(match.dateTime)
@@ -519,6 +532,7 @@ class HomeViewModel @Inject constructor(
             val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
             if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
                 goalScorers[update.matchId] = Pair(homeScr, awayScr)
+                liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
             }
         }
 
@@ -532,6 +546,7 @@ class HomeViewModel @Inject constructor(
                 }
                 if (update.liveMinute != null) {
                     liveMinutes[update.matchId] = update.liveMinute
+                    liveMatchStore.liveMinutes[update.matchId] = update.liveMinute
                 }
                 val prev = lastWrittenScores[update.matchId]
                 if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
@@ -548,6 +563,7 @@ class HomeViewModel @Inject constructor(
                     val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
                     val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
                     goalScorers[update.matchId] = Pair(homeScr, awayScr)
+                    liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
                 }
             }
         }
@@ -717,12 +733,30 @@ class HomeViewModel @Inject constructor(
         val start = parseMadridDate(match.dateTime)
         if (start != null && start.after(Date())) return MatchStatus.UPCOMING
         val lm = liveMinutes[match.id]
+        if (lm == "FINAL") return MatchStatus.FINISHED
         if (lm != null && lm != "FINAL") return MatchStatus.LIVE
-        if (match.homeGoals != null && match.awayGoals != null) return MatchStatus.FINISHED
+        if (match.homeGoals != null && match.awayGoals != null) {
+            if (start != null) {
+                val now = Date()
+                val end = Date(start.time + 150L * 60 * 1000)
+                if (now.after(end)) return MatchStatus.FINISHED
+            }
+            return MatchStatus.LIVE
+        }
         val parsed = start ?: return MatchStatus.UPCOMING
         val now = Date()
         val end = Date(parsed.time + 150L * 60 * 1000)
         return if (now.after(parsed) && now.before(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
+    }
+
+    private fun startBackgroundService() {
+        val intent = Intent(context, LiveUpdateService::class.java)
+        ContextCompat.startForegroundService(context, intent)
+    }
+
+    private fun stopBackgroundService() {
+        val intent = Intent(context, LiveUpdateService::class.java)
+        context.stopService(intent)
     }
 
     override fun onCleared() {

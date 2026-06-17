@@ -33,6 +33,7 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 @Composable
 fun HomeScreen(
@@ -72,18 +73,16 @@ fun HomeScreen(
         if (rawIdx < 0) return@LaunchedEffect
         val lazyIdx = rawIdx + 1
         delay(200)
-        var attempts = 0
-        while (attempts < 10) {
-            val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == lazyIdx }
-            if (itemInfo != null) {
-                val viewportW = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
-                val centeringOffset = (viewportW / 2 - itemInfo.size / 2).coerceAtLeast(0)
-                listState.scrollToItem(lazyIdx, scrollOffset = centeringOffset)
-                break
+        listState.scrollToItem(lazyIdx)
+        delay(300)
+        val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.index == lazyIdx }
+        if (itemInfo != null) {
+            val viewportW = listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
+            val targetOffset = ((viewportW - itemInfo.size) / 2).coerceAtLeast(0)
+            val delta = targetOffset - itemInfo.offset
+            if (abs(delta) > 5) {
+                listState.dispatchRawDelta(-delta.toFloat())
             }
-            if (attempts == 0) listState.scrollToItem(lazyIdx)
-            delay(100)
-            attempts++
         }
     }
 

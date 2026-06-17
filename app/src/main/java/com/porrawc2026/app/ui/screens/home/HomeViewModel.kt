@@ -135,6 +135,7 @@ class HomeViewModel @Inject constructor(
     private val liveMinutes = mutableMapOf<Int, String>()
     private val notifiedScorers = mutableSetOf<String>()
     private val processedGoalKeys = mutableSetOf<String>()
+    private val relevantMatchIds = mutableSetOf<Int>()
     private val pdfParser = PdfRankingParser()
 
     init {
@@ -177,9 +178,6 @@ class HomeViewModel @Inject constructor(
                 processedGoalKeys.addAll(prefsManager.getProcessedGoalKeys())
                 startAutoRefresh()
                 lastWrittenScores.clear()
-                fetchLiveResults(fullFetch = true)
-                downloadPlayerPhotos()
-                precachePhotosInBackground()
                 refreshUpcomingMatches()
                 _hasData.value = true
                 _isReady.value = true
@@ -188,6 +186,12 @@ class HomeViewModel @Inject constructor(
             } finally {
                 _isBusy.value = false
             }
+        }
+        // Slow operations (API calls, photos) en segundo plano, sin bloquear la UI
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchLiveResults(fullFetch = true)
+            downloadPlayerPhotos()
+            precachePhotosInBackground()
         }
     }
 
@@ -538,12 +542,16 @@ class HomeViewModel @Inject constructor(
         }
 
         for ((matchId, pair) in goalScorers) {
+            if (relevantMatchIds.isNotEmpty() && matchId !in relevantMatchIds) continue
             var goalsChanged = false
             for (scorer in pair.first + pair.second) {
                 val key = "$matchId:${scorer.playerName}:${scorer.minute}"
                 if (notifiedScorers.add(key) && processedGoalKeys.add(key)) {
                     goalEventBus.notifyGoal()
-                    if (updatePlayerGoal(scorer.playerName)) goalsChanged = true
+                    if (updatePlayerGoal(scorer.playerName)) {
+                        relevantMatchIds.add(matchId)
+                        goalsChanged = true
+                    }
                 }
             }
             if (goalsChanged) {

@@ -31,7 +31,8 @@ class LiveScoreService @Inject constructor(
 ) {
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): List<LiveScoreUpdate> {
         val updates = mutableListOf<LiveScoreUpdate>()
-        val scoreboard = espnService.getScoreboard()
+        val dates = matches.mapNotNull { it.dateTime.take(10).ifBlank { null } }.distinct()
+        val scoreboard = espnService.getScoreboard(dates = dates.ifEmpty { null })
         val events = scoreboard.events ?: return updates
 
         events.forEach { event ->
@@ -66,8 +67,7 @@ class LiveScoreService @Inject constructor(
             val awayScorers = mutableListOf<LiveScorer>()
             val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
             competition.details?.forEach { detail ->
-                val detailText = detail.type?.text ?: ""
-                if (detailText.contains("Goal")) {
+                if (detail.scoringPlay == true) {
                     val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
                     val minuteStr = detail.clock?.displayValue ?: return@forEach
                     val m = minuteRegex.find(minuteStr)
@@ -122,7 +122,8 @@ class LiveScoreService @Inject constructor(
         }
 
         try {
-            val scoreboard = espnService.getScoreboard()
+            val dates = matches.mapNotNull { it.dateTime.take(10).ifBlank { null } }.distinct()
+            val scoreboard = espnService.getScoreboard(dates = dates.ifEmpty { null })
             val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
             scoreboard.events?.forEach { event ->
                 val competition = event.competitions?.firstOrNull() ?: return@forEach
@@ -132,8 +133,7 @@ class LiveScoreService @Inject constructor(
                 val homeName = homeTeam.team?.displayName ?: homeTeam.team?.name ?: return@forEach
                 val awayName = awayTeam.team?.displayName ?: awayTeam.team?.name ?: return@forEach
                 competition.details?.forEach { detail ->
-                    val detailText = detail.type?.text ?: ""
-                    if (detailText.contains("Goal")) {
+                    if (detail.scoringPlay == true) {
                         val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
                         val isHome = detail.team?.id == homeTeam.id
                         val teamName = if (isHome) homeName else awayName

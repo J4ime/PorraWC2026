@@ -81,7 +81,9 @@ data class EspnAthlete(
 
 interface EspnService {
     @GET("site/v2/sports/soccer/fifa.world/scoreboard")
-    suspend fun getScoreboard(): EspnScoreboardResponse
+    suspend fun getScoreboard(
+        @retrofit2.http.Query("dates") dates: List<String>? = null
+    ): EspnScoreboardResponse
 }
 
 object EspnConfig {

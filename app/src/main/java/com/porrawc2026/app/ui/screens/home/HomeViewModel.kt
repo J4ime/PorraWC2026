@@ -685,10 +685,10 @@ class HomeViewModel @Inject constructor(
             status == MatchStatus.FINISHED -> "FINAL"
             liveMinutes.containsKey(match.id) -> {
                 val lm = liveMinutes[match.id]
-                if (lm == "LIVE") "EN JUEGO" else lm
+                if (lm == "LIVE") null else lm
             }
             else -> null
-        } ?: if (status == MatchStatus.LIVE) "EN JUEGO" else null
+        } ?: if (status == MatchStatus.LIVE) "LIVE" else null
         val s = goalScorers[match.id]
         val homeScr = s?.first ?: emptyList()
         val awayScr = s?.second ?: emptyList()

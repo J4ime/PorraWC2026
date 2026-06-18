@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.LiveScoreService
+import com.porrawc2026.app.data.remote.LiveScoreUpdate
 import com.porrawc2026.app.data.remote.MatchScheduleProvider
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.PointsCalculator
@@ -20,6 +21,7 @@ import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.GoalNotifier
 import com.porrawc2026.app.util.LiveMatchStore
+import com.porrawc2026.app.util.LogManager
 import com.porrawc2026.app.util.PdfRankingParser
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.PrefsManager
@@ -31,6 +33,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,11 +46,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
+import java.text.Normalizer
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Collections
 import java.util.Locale
-import java.util.TimeZone
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 enum class MatchStatus { UPCOMING, LIVE, FINISHED }
@@ -86,7 +94,7 @@ class HomeViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private val madridTZ = TimeZone.getTimeZone("Europe/Madrid")
+
 
     private val _totalPoints = MutableStateFlow(0)
     val totalPoints: StateFlow<Int> = _totalPoints.asStateFlow()
@@ -114,7 +122,7 @@ class HomeViewModel @Inject constructor(
     val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
     private val _isUpdating = MutableStateFlow(false)
     val isUpdating: StateFlow<Boolean> = _isUpdating.asStateFlow()
-    private val _appVersion = MutableStateFlow(context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?")
+    private val _appVersion = MutableStateFlow("")
     val appVersion: StateFlow<String> = _appVersion.asStateFlow()
     private val _excelFileName = MutableStateFlow<String?>(null)
     val excelFileName: StateFlow<String?> = _excelFileName.asStateFlow()
@@ -135,19 +143,24 @@ class HomeViewModel @Inject constructor(
     private val _positionDiff = MutableStateFlow<Int?>(null)
     val positionDiff: StateFlow<Int?> = _positionDiff.asStateFlow()
 
+    @Volatile
     private var cachedMatches: List<MatchEntity> = emptyList()
     private var refreshJob: Job? = null
-    private val lastWrittenScores = mutableMapOf<Int, Pair<Int, Int>>()
-    private val goalScorers = mutableMapOf<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
-    private val seenScorers = mutableMapOf<Int, MutableSet<String>>()
-    private val liveMinutes = mutableMapOf<Int, String>()
-    private val notifiedScorers = mutableSetOf<String>()
-    private val processedGoalKeys = mutableSetOf<String>()
-    private val relevantMatchIds = mutableSetOf<Int>()
+    private val lastWrittenScores = ConcurrentHashMap<Int, Pair<Int, Int>>()
+    private val goalScorers = ConcurrentHashMap<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
+    private val seenScorers = ConcurrentHashMap<Int, MutableSet<String>>()
+    private val liveMinutes = ConcurrentHashMap<Int, String>()
+    private val notifiedScorers = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    private val processedGoalKeys = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    private val relevantMatchIds = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
     private val pdfParser = PdfRankingParser()
 
     init {
-        com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
+        LogManager.init(context)
+        viewModelScope.launch(Dispatchers.IO) {
+            com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
+            _appVersion.value = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+        }
         viewModelScope.launch {
             _excelFileName.value = prefsManager.getExcelFileNameSync()
             _autoRefreshEnabled.value = prefsManager.getAutoRefreshSync()
@@ -164,11 +177,11 @@ class HomeViewModel @Inject constructor(
 
     private fun preloadSchedule() {
         _isBusy.value = true
-        cachedMatches = MatchScheduleProvider.buildMatchEntities()
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val dbMatches = repository.getAllMatches().first()
                 val staticSchedule = MatchScheduleProvider.buildMatchEntities()
+                cachedMatches = staticSchedule
+                val dbMatches = repository.getAllMatches().first()
 
                 if (dbMatches.isNotEmpty()) {
                     cachedMatches = dbMatches
@@ -194,13 +207,14 @@ class HomeViewModel @Inject constructor(
                 _isReady.value = true
             } catch (e: Exception) {
                 Log.e(TAG, "Error in preloadSchedule", e)
+                LogManager.log(TAG, "Error in preloadSchedule", e)
             } finally {
                 _isBusy.value = false
             }
         }
         // Slow operations (API calls, photos) en segundo plano, sin bloquear la UI
         viewModelScope.launch(Dispatchers.IO) {
-            fetchLiveResults(fullFetch = true)
+            fetchLiveResults()
             downloadPlayerPhotos()
             precachePhotosInBackground()
         }
@@ -396,13 +410,17 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             val predictions = repository.getPlayerPredictionsList()
-            for (p in predictions) {
-                val name = p.predictedName ?: continue
-                if (!p.photoPath.isNullOrBlank()) continue
-                val path = PlayerPhotoDownloader.download(context, name)
-                if (path != null) {
-                    val updated = p.copy(photoPath = path)
-                    repository.updatePlayerPrediction(updated)
+            coroutineScope {
+                predictions.map { p ->
+                    async {
+                        val name = p.predictedName ?: return@async
+                        if (!p.photoPath.isNullOrBlank()) return@async
+                        val path = PlayerPhotoDownloader.download(context, name)
+                        if (path != null) {
+                            val updated = p.copy(photoPath = path)
+                            repository.updatePlayerPrediction(updated)
+                        }
+                    }
                 }
             }
             loadPlayers()
@@ -427,26 +445,31 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun checkGoalNotifications() {
+    private suspend fun checkGoalNotifications() {
         if (!_notificationsEnabled.value) return
         val predictedNames = _players.value.mapNotNull { it.predictedName }.map { it.lowercase() }.toSet()
         if (predictedNames.isEmpty()) return
+        var anyNotified = false
         for ((matchId, pair) in goalScorers) {
             val seen = seenScorers.getOrPut(matchId) { mutableSetOf() }
-            val allScorers = pair.first + pair.second
-            for (scorer in allScorers) {
-                val name = scorer.playerName
-                val key = name.lowercase().trim()
-                if (seen.add(key)) {
+            for (scorer in pair.first + pair.second) {
+                val name = scorer.playerName.lowercase().trim()
+                val notificationKey = "notif:$matchId:$name"
+                if (notificationKey !in processedGoalKeys && seen.add(name)) {
                     val matches = predictedNames.any { pred ->
-                        key.contains(pred, ignoreCase = true) || pred.contains(key, ignoreCase = true)
+                        name.contains(pred, ignoreCase = true) || pred.contains(name, ignoreCase = true)
                     }
                     if (matches) {
-                        val displayName = name.split(" ").last()
+                        val displayName = scorer.playerName.split(" ").last()
                         GoalNotifier.notifyGoal(context, displayName)
+                        processedGoalKeys.add(notificationKey)
+                        anyNotified = true
                     }
                 }
             }
+        }
+        if (anyNotified) {
+            prefsManager.setProcessedGoalKeys(processedGoalKeys.toSet())
         }
     }
 
@@ -457,10 +480,9 @@ class HomeViewModel @Inject constructor(
     private fun startAutoRefresh() {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch(Dispatchers.IO) {
-            var lastDay = Calendar.getInstance(madridTZ).get(Calendar.DAY_OF_YEAR)
+            var lastDay = LocalDate.now(madridZone)
             while (isActive) {
-                val now = Calendar.getInstance(madridTZ)
-                val currentDay = now.get(Calendar.DAY_OF_YEAR)
+                val currentDay = LocalDate.now(madridZone)
                 if (currentDay != lastDay) {
                     lastDay = currentDay
                     refreshUpcomingMatches()
@@ -475,34 +497,35 @@ class HomeViewModel @Inject constructor(
         if (!_autoRefreshEnabled.value) return
         val todayMatches = getTodayMatchesWithDates()
         if (todayMatches.isEmpty()) return
-        val now = Date()
-        val times = todayMatches.map { parseMadridDate(it.dateTime) }.filterNotNull()
-        val firstStart = times.minOrNull()
-        val lastEnd = times.maxOrNull()?.let { Date(it.time + 150L * 60 * 1000) }
-        if (firstStart != null && now.before(firstStart)) return
-        if (lastEnd != null && now.after(lastEnd)) return
+        val now = Instant.now()
+        val times = todayMatches.mapNotNull { parseMadridInstant(it.dateTime) }
+        if (times.isEmpty()) return
+        if (now.isBefore(times.min())) return
+        val anyNeedsUpdate = todayMatches.any { match ->
+            liveMinutes[match.id] != "FINAL" && !isFinishedByTime(match)
+        }
+        if (!anyNeedsUpdate) return
         fetchLiveResults()
     }
 
-    fun parseMadridDate(dateTime: String): Date? {
+    fun parseMadridInstant(dateTime: String): Instant? {
         if (dateTime.isBlank()) return null
         return try {
             if (dateTime.endsWith("Z")) {
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(dateTime)
+                Instant.parse(dateTime)
             } else {
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = madridTZ }.parse(dateTime)
+                val local = LocalDateTime.parse(dateTime, dateTimeFormatter)
+                local.atZone(madridZone).toInstant()
             }
         } catch (_: Exception) { null }
     }
 
     private fun getTodayMatchesWithDates(): List<MatchEntity> {
-        val cal = Calendar.getInstance(madridTZ)
-        val today = cal.get(Calendar.DAY_OF_YEAR)
-        val year = cal.get(Calendar.YEAR)
+        val todayZoned = LocalDate.now(madridZone)
         return cachedMatches.filter { m ->
-            val d = parseMadridDate(m.dateTime) ?: return@filter false
-            val c = Calendar.getInstance(madridTZ).apply { time = d }
-            c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today
+            val d = parseMadridInstant(m.dateTime) ?: return@filter false
+            val matchDate = d.atZone(madridZone).toLocalDate()
+            matchDate == todayZoned
         }
     }
 
@@ -529,15 +552,17 @@ class HomeViewModel @Inject constructor(
             val awayRaw = match.awayScorers
             if (homeRaw != null && awayRaw != null) {
                 try {
-                    val type = object : TypeToken<List<LiveScorer>>() {}.type
-                    val homeList: List<LiveScorer> = Gson().fromJson(homeRaw, type) ?: emptyList()
-                    val awayList: List<LiveScorer> = Gson().fromJson(awayRaw, type) ?: emptyList()
+                    val homeList: List<LiveScorer> = gson.fromJson(homeRaw, scorerListType) ?: emptyList()
+                    val awayList: List<LiveScorer> = gson.fromJson(awayRaw, scorerListType) ?: emptyList()
                     val homeGoals = homeList.map { GoalEvent(it.playerName, it.minute) }
                     val awayGoals = awayList.map { GoalEvent(it.playerName, it.minute) }
                     goalScorers[match.id] = Pair(homeGoals, awayGoals)
                     liveMatchStore.goalScorers[match.id] = Pair(homeGoals, awayGoals)
                     cachedIds.add(match.id)
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                Log.e(TAG, "Error loading cached scorers for match ${match.id}", e)
+                LogManager.log(TAG, "Error loading cached scorers for match ${match.id}", e)
+            }
             }
         }
         return cachedIds
@@ -548,7 +573,6 @@ class HomeViewModel @Inject constructor(
         homeScorers: List<LiveScorer>,
         awayScorers: List<LiveScorer>
     ) {
-        val gson = Gson()
         val homeJson = gson.toJson(homeScorers)
         val awayJson = gson.toJson(awayScorers)
         repository.updateMatchScorers(matchId, homeJson, awayJson)
@@ -558,15 +582,31 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun isFinishedByTime(match: MatchEntity): Boolean {
-        val start = parseMadridDate(match.dateTime) ?: return false
+        val start = parseMadridInstant(match.dateTime) ?: return false
         return match.homeGoals != null && match.awayGoals != null &&
-            Date().after(Date(start.time + 150L * 60 * 1000))
+            Instant.now().isAfter(start.plusSeconds(MATCH_WINDOW_SECONDS))
     }
 
     private suspend fun fetchLiveResults(fullFetch: Boolean = false) {
+        val wcMatches = filterMatchesForFetch(fullFetch) ?: return
+        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(wcMatches) }.orEmpty()
+        processScoreUpdates(scoreUpdates)
+        notifyGoalEvents()
+        recalculateAllPlayerGoals()
+        refreshPoints()
+        checkGoalNotifications()
+        refreshUpcomingMatches()
+    }
+
+    private suspend fun filterMatchesForFetch(fullFetch: Boolean): List<MatchEntity>? {
         val todayMatches = getTodayMatchesWithDates()
-        val matchesForWc = if (fullFetch) cachedMatches else todayMatches
-        if (matchesForWc.isEmpty()) return
+        val staleMatches = if (fullFetch) emptyList() else getStaleMatches()
+        val matchesForWc = if (fullFetch) {
+            cachedMatches
+        } else {
+            (todayMatches + staleMatches).distinctBy { it.id }
+        }
+        if (matchesForWc.isEmpty()) return null
 
         val cachedIds = loadCachedScorers()
         val finishedByTimeIds = matchesForWc.filter { isFinishedByTime(it) }.map { it.id }.toSet()
@@ -577,11 +617,23 @@ class HomeViewModel @Inject constructor(
 
         if (wcMatches.isEmpty()) {
             refreshUpcomingMatches()
-            return
+            return null
         }
+        return wcMatches
+    }
 
-        val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(wcMatches) }.orEmpty()
+    private fun getStaleMatches(): List<MatchEntity> {
+        val now = Instant.now()
+        return cachedMatches.filter { match ->
+            val start = parseMadridInstant(match.dateTime) ?: return@filter false
+            val matchEnd = start.plusSeconds(MATCH_WINDOW_SECONDS)
+            now.isAfter(matchEnd) &&
+                !isFinishedByTime(match) &&
+                liveMinutes[match.id] != "FINAL"
+        }
+    }
 
+    private suspend fun processScoreUpdates(scoreUpdates: List<LiveScoreUpdate>) {
         scoreUpdates.forEach { update ->
             if (update.isFinished) {
                 liveMinutes[update.matchId] = "FINAL"
@@ -592,32 +644,42 @@ class HomeViewModel @Inject constructor(
             }
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
             if (match != null) {
-                val start = parseMadridDate(match.dateTime)
-                if (start != null && start.after(Date())) return@forEach
+                val start = parseMadridInstant(match.dateTime)
+                if (start != null && start.isAfter(Instant.now())) return@forEach
             }
-            val prev = lastWrittenScores[update.matchId]
-            if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
-                lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
-                cachedMatches = cachedMatches.map {
-                    if (it.id == update.matchId) it.copy(homeGoals = update.homeGoals, awayGoals = update.awayGoals) else it
-                }
-                recalcAllPoints(); refreshPoints()
-                if (update.isFinished) {
-                    repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
-                }
-            }
-            val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
-            val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
-            if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
-                goalScorers[update.matchId] = Pair(homeScr, awayScr)
-                liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
-                saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
-            }
+            updateMatchScores(update)
+            updateGoalScorers(update)
             if (update.isFinished) {
                 repository.updateMatchCards(update.matchId, update.homeRedCards, update.awayRedCards, update.homeYellowCards, update.awayYellowCards)
             }
         }
+    }
 
+    private suspend fun updateMatchScores(update: LiveScoreUpdate) {
+        val prev = lastWrittenScores[update.matchId]
+        if (prev == null || prev.first != update.homeGoals || prev.second != update.awayGoals) {
+            lastWrittenScores[update.matchId] = update.homeGoals to update.awayGoals
+            cachedMatches = cachedMatches.map {
+                if (it.id == update.matchId) it.copy(homeGoals = update.homeGoals, awayGoals = update.awayGoals) else it
+            }
+            recalcAllPoints(); refreshPoints()
+            if (update.isFinished) {
+                repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+            }
+        }
+    }
+
+    private suspend fun updateGoalScorers(update: LiveScoreUpdate) {
+        val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
+        val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+        if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
+            goalScorers[update.matchId] = Pair(homeScr, awayScr)
+            liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
+            saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
+        }
+    }
+
+    private suspend fun notifyGoalEvents() {
         for ((matchId, pair) in goalScorers) {
             if (relevantMatchIds.isNotEmpty() && matchId !in relevantMatchIds) continue
             var goalsChanged = false
@@ -632,22 +694,13 @@ class HomeViewModel @Inject constructor(
                 prefsManager.setProcessedGoalKeys(processedGoalKeys.toSet())
             }
         }
-        recalculateAllPlayerGoals()
-        refreshPoints()
-        checkGoalNotifications()
-        refreshUpcomingMatches()
     }
 
     private fun normalizeName(name: String): String {
-        return name.lowercase().trim()
-            .replace("á", "a").replace("à", "a").replace("â", "a").replace("ã", "a").replace("ä", "a")
-            .replace("é", "e").replace("è", "e").replace("ê", "e").replace("ë", "e")
-            .replace("í", "i").replace("ì", "i").replace("î", "i").replace("ï", "i")
-            .replace("ó", "o").replace("ò", "o").replace("ô", "o").replace("õ", "o").replace("ö", "o")
-            .replace("ú", "u").replace("ù", "u").replace("û", "u").replace("ü", "u")
-            .replace("ç", "c").replace("ñ", "n")
+        return Normalizer.normalize(name.lowercase().trim(), Normalizer.Form.NFD)
+            .replace(diacriticsRegex, "")
             .replace(".", "").replace("-", " ").replace("'", " ")
-            .replace(Regex("\\s+"), " ").trim()
+            .replace(whitespaceRegex, " ").trim()
     }
 
     private fun lastWord(name: String): String {
@@ -657,22 +710,26 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun recalculateAllPlayerGoals() {
         val goalCounts = mutableMapOf<String, Int>()
-        val gson = Gson()
-        val type = object : TypeToken<List<LiveScorer>>() {}.type
         for (match in cachedMatches) {
             val homeRaw = match.homeScorers
             val awayRaw = match.awayScorers
             if (homeRaw != null) {
                 try {
-                    val scorers: List<LiveScorer> = gson.fromJson(homeRaw, type) ?: emptyList()
+                    val scorers: List<LiveScorer> = gson.fromJson(homeRaw, scorerListType) ?: emptyList()
                     scorers.forEach { s -> goalCounts.merge(s.playerName, 1) { a, b -> a + b } }
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing home scorers for match ${match.id}", e)
+                    LogManager.log(TAG, "Error parsing home scorers for match ${match.id}", e)
+                }
             }
             if (awayRaw != null) {
                 try {
-                    val scorers: List<LiveScorer> = gson.fromJson(awayRaw, type) ?: emptyList()
+                    val scorers: List<LiveScorer> = gson.fromJson(awayRaw, scorerListType) ?: emptyList()
                     scorers.forEach { s -> goalCounts.merge(s.playerName, 1) { a, b -> a + b } }
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing away scorers for match ${match.id}", e)
+                    LogManager.log(TAG, "Error parsing away scorers for match ${match.id}", e)
+                }
             }
         }
         val currentPlayers = repository.getPlayerPredictionsList()
@@ -701,27 +758,25 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshUpcomingMatches() {
-        val cal = Calendar.getInstance(madridTZ)
-        val today = cal.get(Calendar.DAY_OF_YEAR)
-        val year = cal.get(Calendar.YEAR)
+        val todayZoned = LocalDate.now(madridZone)
 
-        val groupMatches = cachedMatches.filter { !it.isKnockout && it.id < 900 }
+        val groupMatches = cachedMatches.filter { !it.isKnockout && it.id < KNOCKOUT_START_ID }
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = groupMatches.map { match -> toDisplay(match) }
 
         val yesterdayMatches = allDisplay.filter { display ->
-            val d = parseMadridDate(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
-            val c = Calendar.getInstance(madridTZ).apply { time = d }
-            c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today - 1
+            val d = parseMadridInstant(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
+            val matchDate = d.atZone(madridZone).toLocalDate()
+            matchDate == todayZoned.minusDays(1)
         }.sortedBy { display ->
-            parseMadridDate(cachedMatches.first { it.id == display.id }.dateTime)
+            parseMadridInstant(cachedMatches.first { it.id == display.id }.dateTime)
         }
         _yesterdayMatches.value = yesterdayMatches
 
         val todayMatches = allDisplay.filter { display ->
-            val d = parseMadridDate(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
-            val c = Calendar.getInstance(madridTZ).apply { time = d }
-            c.get(Calendar.YEAR) == year && c.get(Calendar.DAY_OF_YEAR) == today
+            val d = parseMadridInstant(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
+            val matchDate = d.atZone(madridZone).toLocalDate()
+            matchDate == todayZoned
         }
 
         if (todayMatches.isNotEmpty()) {
@@ -729,8 +784,8 @@ class HomeViewModel @Inject constructor(
             _upcomingMatches.value = todayMatches
         } else {
             val futureMatches = allDisplay.filter { display ->
-                val d = parseMadridDate(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
-                d.after(Date())
+                val d = parseMadridInstant(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
+                d.isAfter(Instant.now())
             }
             if (futureMatches.isNotEmpty()) {
                 val firstDate = futureMatches.first().dateLabel
@@ -750,29 +805,22 @@ class HomeViewModel @Inject constructor(
     }
 
     fun toDisplay(match: MatchEntity): MatchDisplay {
-        val date = parseMadridDate(match.dateTime)
-        val timeFmt = SimpleDateFormat("HH:mm", Locale.US).apply { timeZone = madridTZ }
-        val dateFmt = SimpleDateFormat("EEE d MMM", Locale("es", "ES")).apply { timeZone = madridTZ }
-        val dayAbbrFmt = SimpleDateFormat("EEE", Locale("es", "ES")).apply { timeZone = madridTZ }
-        val dayNumFmt = SimpleDateFormat("dd", Locale.US).apply { timeZone = madridTZ }
-        val time = if (date != null) timeFmt.format(date) else ""
-        val dateLabel = if (date != null) {
-            val cal = Calendar.getInstance(madridTZ)
-            val today = cal.get(Calendar.DAY_OF_YEAR)
-            val year = cal.get(Calendar.YEAR)
-            val matchCal = Calendar.getInstance(madridTZ).also { it.time = date }
-            val matchDay = matchCal.get(Calendar.DAY_OF_YEAR)
-            val matchYear = matchCal.get(Calendar.YEAR)
+        val date = parseMadridInstant(match.dateTime)
+        val zoned = date?.atZone(madridZone)
+        val time = if (zoned != null) timeFormatter.format(zoned) else ""
+        val dateLabel = if (zoned != null) {
+            val today = LocalDate.now(madridZone)
+            val matchDate = zoned.toLocalDate()
             when {
-                matchYear == year && matchDay == today - 1 -> "AYER"
-                matchYear == year && matchDay == today -> "HOY"
-                matchYear == year && matchDay == today + 1 -> "MA\u00D1ANA"
-                else -> dateFmt.format(date).replace(".", "")
+                matchDate == today.minusDays(1) -> "AYER"
+                matchDate == today -> "HOY"
+                matchDate == today.plusDays(1) -> "MA\u00D1ANA"
+                else -> dateFormatter.format(zoned).replace(".", "")
             }
         } else ""
         val status = matchStatus(match)
 
-        val liveMin = if (date != null && date.after(Date())) null else when {
+        val liveMin = if (date != null && date.isAfter(Instant.now())) null else when {
             status == MatchStatus.FINISHED -> "FINAL"
             liveMinutes.containsKey(match.id) -> {
                 val lm = liveMinutes[match.id]
@@ -783,8 +831,8 @@ class HomeViewModel @Inject constructor(
         val s = goalScorers[match.id]
         val homeScr = s?.first ?: emptyList()
         val awayScr = s?.second ?: emptyList()
-        val dayKey = if (date != null) "${dayAbbrFmt.format(date).replace(".", "").uppercase()} ${dayNumFmt.format(date)}" else ""
-        val sortKey = if (date != null) dayNumFmt.format(date) else ""
+        val dayKey = if (zoned != null) "${dayAbbrFormatter.format(zoned).replace(".", "").uppercase(Locale.ROOT)} ${dayNumFormatter.format(zoned)}" else ""
+        val sortKey = if (zoned != null) dayNumFormatter.format(zoned) else ""
 
         return MatchDisplay(
             id = match.id, dateLabel = dateLabel, time = time,
@@ -805,33 +853,28 @@ class HomeViewModel @Inject constructor(
     }
 
     fun matchStatus(match: MatchEntity): MatchStatus {
-        val start = parseMadridDate(match.dateTime)
-        if (start != null && start.after(Date())) return MatchStatus.UPCOMING
+        val start = parseMadridInstant(match.dateTime)
+        if (start != null && start.isAfter(Instant.now())) return MatchStatus.UPCOMING
         val lm = liveMinutes[match.id]
         if (lm == "FINAL") return MatchStatus.FINISHED
         if (lm != null && lm != "FINAL") return MatchStatus.LIVE
         if (match.homeGoals != null && match.awayGoals != null) {
             if (start != null) {
-                val now = Date()
-                val end = Date(start.time + 150L * 60 * 1000)
-                if (now.after(end)) return MatchStatus.FINISHED
+                val now = Instant.now()
+                val end = start.plusSeconds(MATCH_WINDOW_SECONDS)
+                if (now.isAfter(end)) return MatchStatus.FINISHED
             }
             return MatchStatus.LIVE
         }
         val parsed = start ?: return MatchStatus.UPCOMING
-        val now = Date()
-        val end = Date(parsed.time + 150L * 60 * 1000)
-        return if (now.after(parsed) && now.before(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
+        val now = Instant.now()
+        val end = parsed.plusSeconds(MATCH_WINDOW_SECONDS)
+        return if (now.isAfter(parsed) && now.isBefore(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
     }
 
     private fun startBackgroundService() {
         val intent = Intent(context, LiveUpdateService::class.java)
         ContextCompat.startForegroundService(context, intent)
-    }
-
-    private fun stopBackgroundService() {
-        val intent = Intent(context, LiveUpdateService::class.java)
-        context.stopService(intent)
     }
 
     override fun onCleared() {
@@ -849,15 +892,28 @@ class HomeViewModel @Inject constructor(
             val parts = name.split(sep)
             if (parts.size >= 2) {
                 val last = parts.last().trim()
-                if (last.matches(Regex(".*[a-zA-Z].*")) && last.length >= 3) {
+                if (last.matches(nameRegex) && last.length >= 3) {
                     return last
                 }
             }
         }
-        return name.takeIf { it.matches(Regex(".*[a-zA-Z].*")) && it.length >= 3 }
+        return name.takeIf { it.matches(nameRegex) && it.length >= 3 }
     }
 
     companion object {
         private const val TAG = "HomeViewModel"
+        private const val MATCH_WINDOW_SECONDS = 150L * 60
+        private const val KNOCKOUT_START_ID = 900
+        private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
+        private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+        private val dateFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale("es", "ES"))
+        private val dayAbbrFormatter = DateTimeFormatter.ofPattern("EEE", Locale("es", "ES"))
+        private val dayNumFormatter = DateTimeFormatter.ofPattern("dd", Locale.US)
+        private val diacriticsRegex = Regex("\\p{M}")
+        private val whitespaceRegex = Regex("\\s+")
+        private val nameRegex = Regex(".*[a-zA-Z].*")
+        private val gson = Gson()
+        private val scorerListType = object : TypeToken<List<LiveScorer>>() {}.type
+        private val madridZone = ZoneId.of("Europe/Madrid")
     }
 }

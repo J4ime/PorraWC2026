@@ -6,7 +6,8 @@ import com.porrawc2026.app.data.local.entity.*
 import org.apache.poi.ss.usermodel.*
 import java.io.InputStream
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 data class ExcelData(
     val teams: List<TeamEntity>,
@@ -32,6 +33,8 @@ data class ValidationResult(
 
 object ExcelParser {
 
+    private val dateTimeFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+
     private const val COL_MATCH_HOME = 26
     private const val COL_MATCH_AWAY = 31
     private const val COL_MATCH_DATE = 23
@@ -52,7 +55,6 @@ object ExcelParser {
     private const val COL_TV = 33
 
     private lateinit var formatter: DataFormatter
-    private var cachedSheet: Sheet? = null
     private var cachedValidation: ValidationResult? = null
 
     fun parse(context: Context, uri: Uri): ExcelData {
@@ -405,16 +407,15 @@ object ExcelParser {
     }
 
     private fun readDateCell(row: Row): String {
-        val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
         for (col in listOf(COL_MATCH_DATE, 24, 25, 22, 20, 21, 26)) {
             val cell = row.getCell(col) ?: continue
             val value = formatter.formatCellValue(cell).trim()
             if (value.isBlank()) continue
             val d = runCatching { cell.dateCellValue }.getOrNull()
-            if (d != null) return fmt.format(d)
+            if (d != null) return dateTimeFmt.format(d)
             val n = runCatching { cell.numericCellValue }.getOrNull()
             if (n != null && DateUtil.isCellDateFormatted(cell)) {
-                return fmt.format(cell.dateCellValue)
+                return dateTimeFmt.format(cell.dateCellValue)
             }
             if (value.matches(Regex("\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}.*"))) {
                 return value

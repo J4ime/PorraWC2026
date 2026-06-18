@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.remote.LiveScoreService
@@ -13,13 +14,14 @@ import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.ui.screens.home.GoalEvent
 import com.porrawc2026.app.util.LiveMatchStore
+import com.porrawc2026.app.util.LogManager
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.AndroidEntryPoint
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.TimeZone
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -43,6 +45,7 @@ class LiveUpdateService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        LogManager.init(this)
         createNotificationChannel()
     }
 
@@ -89,23 +92,27 @@ class LiveUpdateService : Service() {
             while (isActive) {
                 try {
                     fetchAndStore()
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    Log.e("LiveUpdateService", "Error in refresh loop", e)
+                    LogManager.log("LiveUpdateService", "Error in refresh loop", e)
+                }
                 delay(60_000)
             }
         }
     }
 
     private suspend fun fetchAndStore() {
-        val matches = repository.getAllMatches().first()
-        if (matches.isEmpty()) return
+        val allMatches = repository.getAllMatches().first()
+        if (allMatches.isEmpty()) return
 
-        val finishedIds = matches.filter { isFinishedByTime(it) }.map { it.id }.toSet()
+        val todayAndStale = getTodayAndStaleMatches(allMatches)
+        if (todayAndStale.isEmpty()) return
 
-        val liveMatches = matches.filter { it.id !in finishedIds }
+        val finishedIds = todayAndStale.filter { isFinishedByTime(it) }.map { it.id }.toSet()
+        val liveMatches = todayAndStale.filter { it.id !in finishedIds }
         if (liveMatches.isEmpty()) return
 
         val updates = liveScoreService.fetchScoreUpdates(liveMatches)
-        val gson = Gson()
         updates.forEach { update ->
             if (update.isFinished) {
                 liveMatchStore.liveMinutes[update.matchId] = "FINAL"
@@ -134,18 +141,36 @@ class LiveUpdateService : Service() {
     }
 
     private fun isFinishedByTime(match: MatchEntity): Boolean {
-        val start = parseMadridDate(match.dateTime) ?: return false
+        val start = parseInstant(match.dateTime) ?: return false
         return match.homeGoals != null && match.awayGoals != null &&
-            Date().after(Date(start.time + 150L * 60 * 1000))
+            Instant.now().isAfter(start.plusSeconds(MATCH_WINDOW_SECONDS))
     }
 
-    private fun parseMadridDate(dateTime: String): Date? {
+    private fun getTodayAndStaleMatches(matches: List<MatchEntity>): List<MatchEntity> {
+        val now = Instant.now()
+        val madridZone = ZoneId.of("Europe/Madrid")
+        val today = LocalDate.now(madridZone)
+        return matches.filter { match ->
+            val start = parseInstant(match.dateTime) ?: return@filter false
+            val matchDate = start.atZone(madridZone).toLocalDate()
+            if (matchDate == today) return@filter true
+            if (matchDate.isBefore(today) && now.isAfter(start.plusSeconds(MATCH_WINDOW_SECONDS))) {
+                val isFinal = liveMatchStore.liveMinutes[match.id] == "FINAL" ||
+                    (match.homeGoals != null && match.awayGoals != null)
+                return@filter !isFinal
+            }
+            return@filter false
+        }
+    }
+
+    private fun parseInstant(dateTime: String): Instant? {
         if (dateTime.isBlank()) return null
         return try {
             if (dateTime.endsWith("Z")) {
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(dateTime)
+                Instant.parse(dateTime)
             } else {
-                SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("Europe/Madrid") }.parse(dateTime)
+                val local = java.time.LocalDateTime.parse(dateTime, dateTimeFormatter)
+                local.atZone(ZoneId.of("Europe/Madrid")).toInstant()
             }
         } catch (_: Exception) { null }
     }
@@ -153,5 +178,8 @@ class LiveUpdateService : Service() {
     companion object {
         private const val CHANNEL_ID = "live_updates"
         private const val NOTIFICATION_ID = 1001
+        private const val MATCH_WINDOW_SECONDS = 150L * 60
+        private val gson = Gson()
+        private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
     }
 }

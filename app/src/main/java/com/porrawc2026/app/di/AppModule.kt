@@ -5,7 +5,10 @@ import androidx.room.Room
 import com.porrawc2026.app.BuildConfig
 import com.porrawc2026.app.data.local.AppDatabase
 import com.porrawc2026.app.data.local.dao.*
-import com.porrawc2026.app.data.remote.*
+import com.porrawc2026.app.data.remote.ApiConfig
+import com.porrawc2026.app.data.remote.ApiService
+import com.porrawc2026.app.data.remote.EspnConfig
+import com.porrawc2026.app.data.remote.EspnService
 import com.porrawc2026.app.util.PrefsManager
 import dagger.Module
 import dagger.Provides
@@ -97,18 +100,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    @Named("api-sports")
-    fun provideApiSportsClient(): OkHttpClient {
-        return OkHttpClient.Builder()
-            .addInterceptor(apiKeyInterceptor("x-apisports-key", BuildConfig.API_SPORTS_KEY))
-            .addInterceptor(loggingInterceptor())
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
-    }
-
-    @Provides
-    @Singleton
     fun provideRetrofit(@Named("football-data") client: OkHttpClient): Retrofit {
         return Retrofit.Builder()
             .baseUrl(ApiConfig.BASE_URL)
@@ -121,40 +112,6 @@ object AppModule {
     @Singleton
     fun provideApiService(retrofit: Retrofit): ApiService {
         return retrofit.create(ApiService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    @Named("sofascore")
-    fun provideSofascoreRetrofit(client: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(SofascoreConfig.BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideSofascoreApiService(@Named("sofascore") retrofit: Retrofit): SofascoreApiService {
-        return retrofit.create(SofascoreApiService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    @Named("apifootball")
-    fun provideApiFootballRetrofit(@Named("api-sports") client: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(ApiFootballConfig.BASE_URL)
-            .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideApiFootballService(@Named("apifootball") retrofit: Retrofit): ApiFootballService {
-        return retrofit.create(ApiFootballService::class.java)
     }
 
     @Provides

@@ -190,13 +190,4 @@ class PointsCalculationTest {
         assertEquals(150, PointsCalculator.getPlayerPointsForEntity(player))
     }
 
-    @Test
-    fun `calculateTotalMatchPoints sums all`() {
-        val matches = listOf(
-            MatchEntity(1, "A", "J1", "", "A", "B", pointsEarned = 50),
-            MatchEntity(2, "A", "J1", "", "C", "D", pointsEarned = 30),
-            MatchEntity(3, "A", "J1", "", "E", "F", pointsEarned = 0)
-        )
-        assertEquals(80, PointsCalculator.calculateTotalMatchPoints(matches))
-    }
 }

@@ -59,10 +59,6 @@ object PointsCalculator {
         return player.goalsScored * player.pointsPerGoal
     }
 
-    fun calculateTotalMatchPoints(matches: List<MatchEntity>): Int {
-        return matches.sumOf { it.pointsEarned }
-    }
-
     private fun matchResult(home: Int, away: Int): String = when {
         home > away -> "h"
         home < away -> "a"

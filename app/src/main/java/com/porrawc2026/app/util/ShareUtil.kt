@@ -2,7 +2,6 @@ package com.porrawc2026.app.util
 
 import android.content.Context
 import android.content.Intent
-import com.porrawc2026.app.data.local.entity.*
 
 object ShareUtil {
 

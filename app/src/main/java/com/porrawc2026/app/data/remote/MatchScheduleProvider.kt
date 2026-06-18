@@ -2,13 +2,8 @@ package com.porrawc2026.app.data.remote
 
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
 
 object MatchScheduleProvider {
-
-    private val madridTZ = TimeZone.getTimeZone("Europe/Madrid")
 
     private val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
 
@@ -22,10 +17,11 @@ object MatchScheduleProvider {
         val away: String
     )
 
-    fun getHardcodedSchedule(): Map<Int, MatchSchedule> {
-        val fmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        fmt.timeZone = madridTZ
+    private val scheduleCache by lazy { buildHardcodedSchedule() }
 
+    fun getHardcodedSchedule(): Map<Int, MatchSchedule> = scheduleCache
+
+    private fun buildHardcodedSchedule(): Map<Int, MatchSchedule> {
         val data = mutableMapOf<Int, MatchSchedule>()
 
         data[1] = MatchSchedule(1, "2026-06-11T21:00:00", "RTVE", "México", "Sudáfrica")

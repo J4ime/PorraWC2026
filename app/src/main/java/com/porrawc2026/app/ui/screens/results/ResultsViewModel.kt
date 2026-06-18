@@ -14,10 +14,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.TimeZone
 import javax.inject.Inject
 
 @HiltViewModel
@@ -65,10 +66,8 @@ class ResultsViewModel @Inject constructor(
                         TeamNameNormalizer.matches(m.homeTeam, liveMatch.homeTeam?.name ?: "") &&
                         TeamNameNormalizer.matches(m.awayTeam, liveMatch.awayTeam?.name ?: "")
                     } ?: return@forEach
-                    val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-                    sdf.timeZone = TimeZone.getTimeZone("Europe/Madrid")
-                    val matchDate = sdf.parse(localMatch.dateTime)
-                    if (matchDate != null && matchDate.after(Date())) return@forEach
+                    val matchInstant = parseInstant(localMatch.dateTime)
+                    if (matchInstant != null && matchInstant.isAfter(Instant.now())) return@forEach
                     if (localMatch.homeGoals != homeGoals || localMatch.awayGoals != awayGoals) {
                         repository.updateMatchResults(localMatch.id, homeGoals, awayGoals)
                         val pts = PointsCalculator.calculateMatchPoints(
@@ -92,19 +91,20 @@ class ResultsViewModel @Inject constructor(
         }
     }
 
-    fun getGroupPoints(): Int {
-        return allMatches.value.sumOf { it.pointsEarned }
+    private fun parseInstant(dateTime: String): Instant? {
+        if (dateTime.isBlank()) return null
+        return try {
+            if (dateTime.endsWith("Z")) {
+                Instant.parse(dateTime)
+            } else {
+                val local = LocalDateTime.parse(dateTime, dateTimeFormatter)
+                local.atZone(madridZone).toInstant()
+            }
+        } catch (_: Exception) { null }
     }
 
-    fun getKnockoutPoints(): Int {
-        return knockoutPredictions.value.sumOf { it.pointsEarned }
-    }
-
-    fun getQuestionPoints(): Int {
-        return questions.value.sumOf { it.pointsEarned }
-    }
-
-    fun getPlayerPoints(): Int {
-        return playerPredictions.value.sumOf { it.pointsEarned }
+    companion object {
+        private val madridZone = ZoneId.of("Europe/Madrid")
+        private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
     }
 }

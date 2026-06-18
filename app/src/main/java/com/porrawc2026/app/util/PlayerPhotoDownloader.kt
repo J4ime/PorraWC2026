@@ -1,7 +1,10 @@
 package com.porrawc2026.app.util
 
 import android.content.Context
+import com.porrawc2026.app.util.LogManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -36,6 +39,11 @@ object PlayerPhotoDownloader {
         "Cody Gakpo", "Phil Foden", "Cole Palmer"
     )
 
+    private val diacriticsRegex = Regex("\\p{InCombiningDiacriticalMarks}+")
+    private val nonAlphanumRegex = Regex("[^a-z0-9 ]")
+    private val whitespaceRegex = Regex("\\s+")
+    private val fileNameRegex = Regex("[^a-z0-9-]")
+
     private var squadEntryMap: Map<String, SquadEntry>? = null
 
     data class SquadEntry(val fullName: String, val wikiUrl: String)
@@ -43,10 +51,10 @@ object PlayerPhotoDownloader {
     suspend fun precacheTopPlayers(context: Context) {
         withContext(Dispatchers.IO) {
             ensureSquadMap(context)
-            var downloaded = 0
-            for (name in topGoalScorers) {
-                val result = download(context, name)
-                if (result != null) downloaded++
+            coroutineScope {
+                topGoalScorers.map { name ->
+                    async { download(context, name) }
+                }
             }
         }
     }
@@ -129,6 +137,8 @@ object PlayerPhotoDownloader {
             )
             val match = ogRegex.find(html)
             match?.groupValues?.get(1)
+        }.onFailure { e ->
+            LogManager.log("PlayerPhotoDownloader", "Failed to fetch OG image for $wikiUrl", e)
         }.getOrNull()
     }
 
@@ -203,6 +213,8 @@ object PlayerPhotoDownloader {
             }
             cacheFile.parentFile?.mkdirs()
             cacheFile.writeText(saveJson.toString())
+        }.onFailure { e ->
+            LogManager.log("PlayerPhotoDownloader", "Failed to load squad map", e)
         }
     }
 
@@ -238,16 +250,16 @@ object PlayerPhotoDownloader {
 
     private fun normalize(s: String): String {
         return Normalizer.normalize(s.trim().lowercase(Locale.ROOT), Normalizer.Form.NFD)
-            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
-            .replace(Regex("[^a-z0-9 ]"), "")
-            .replace(Regex("\\s+"), " ")
+            .replace(diacriticsRegex, "")
+            .replace(nonAlphanumRegex, "")
+            .replace(whitespaceRegex, " ")
             .trim()
     }
 
     private fun sanitizeForFile(s: String): String {
         return s.trim().lowercase()
             .replace(" ", "-")
-            .replace(Regex("[^a-z0-9-]"), "")
+            .replace(fileNameRegex, "")
     }
 
     private fun similarity(a: String, b: String): Float {
@@ -271,16 +283,17 @@ object PlayerPhotoDownloader {
     private fun levenshteinRatio(a: String, b: String): Float {
         val maxLen = maxOf(a.length, b.length)
         if (maxLen == 0) return 1f
-        val prev = IntArray(b.length + 1) { it }
-        val curr = IntArray(b.length + 1)
+        var prev = IntArray(b.length + 1) { it }
+        var curr = IntArray(b.length + 1)
         for (i in a.indices) {
             curr[0] = i + 1
             for (j in b.indices) {
                 val cost = if (a[i] == b[j]) 0 else 1
                 curr[j + 1] = minOf(curr[j] + 1, prev[j + 1] + 1, prev[j] + cost)
             }
-            prev.copyInto(curr)
-            curr.copyInto(prev)
+            val tmp = prev
+            prev = curr
+            curr = tmp
         }
         val distance = prev[b.length]
         return 1f - (distance.toFloat() / maxLen)

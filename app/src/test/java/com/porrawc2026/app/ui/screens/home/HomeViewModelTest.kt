@@ -5,7 +5,9 @@ import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.remote.LiveScoreService
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.util.GoalEventBus
+import com.porrawc2026.app.util.LiveMatchStore
 import com.porrawc2026.app.util.PrefsManager
+import java.util.concurrent.ConcurrentHashMap
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,7 +19,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import java.util.*
+
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -27,6 +29,7 @@ class HomeViewModelTest {
     private lateinit var liveScoreService: LiveScoreService
     private lateinit var prefsManager: PrefsManager
     private lateinit var goalEventBus: GoalEventBus
+    private lateinit var liveMatchStore: LiveMatchStore
     private lateinit var context: Context
     private lateinit var viewModel: HomeViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -38,6 +41,7 @@ class HomeViewModelTest {
         liveScoreService = mockk(relaxed = true)
         prefsManager = mockk(relaxed = true)
         goalEventBus = GoalEventBus()
+        liveMatchStore = mockk(relaxed = true)
         context = mockk(relaxed = true)
         
         coEvery { prefsManager.getExcelFileNameSync() } returns null
@@ -47,11 +51,13 @@ class HomeViewModelTest {
         coEvery { repository.getPlayerPredictions() } returns flowOf(emptyList())
         coEvery { repository.calculateTotalPoints() } returns 0
         coEvery { liveScoreService.fetchScoreUpdates(any()) } returns emptyList()
+        every { liveMatchStore.liveMinutes } returns ConcurrentHashMap()
+        every { liveMatchStore.goalScorers } returns ConcurrentHashMap()
         
         mockkStatic("com.tom_roush.pdfbox.android.PDFBoxResourceLoader")
         every { com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(any()) } just Runs
         
-        viewModel = HomeViewModel(repository, liveScoreService, prefsManager, goalEventBus, context)
+        viewModel = HomeViewModel(repository, liveScoreService, prefsManager, goalEventBus, liveMatchStore, context)
     }
 
     @After
@@ -61,38 +67,50 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `parseMadridDate handles ISO format correctly`() {
-        val date = viewModel.parseMadridDate("2026-06-11T21:00:00")
+    fun `parseMadridInstant handles ISO format correctly`() {
+        val date = viewModel.parseMadridInstant("2026-06-11T21:00:00")
         assertNotNull(date)
     }
 
     @Test
-    fun `parseMadridDate handles UTC format correctly`() {
-        val date = viewModel.parseMadridDate("2026-06-11T21:00:00Z")
+    fun `parseMadridInstant handles UTC format correctly`() {
+        val date = viewModel.parseMadridInstant("2026-06-11T21:00:00Z")
         assertNotNull(date)
     }
 
     @Test
-    fun `parseMadridDate returns null for blank string`() {
-        val date = viewModel.parseMadridDate("")
+    fun `parseMadridInstant returns null for blank string`() {
+        val date = viewModel.parseMadridInstant("")
         assertNull(date)
     }
 
     @Test
-    fun `parseMadridDate returns null for invalid format`() {
-        val date = viewModel.parseMadridDate("invalid-date")
+    fun `parseMadridInstant returns null for invalid format`() {
+        val date = viewModel.parseMadridInstant("invalid-date")
         assertNull(date)
     }
 
     @Test
-    fun `matchStatus returns FINISHED when goals are present`() {
+    fun `matchStatus returns LIVE when goals are present with past dateTime`() {
+        val pastDate = "2020-06-11T21:00:00"
+        val match = MatchEntity(
+            id = 1, groupName = "A", matchday = "J1", dateTime = pastDate,
+            homeTeam = "A", awayTeam = "B",
+            homeGoals = 2, awayGoals = 1
+        )
+        
+        assertEquals(MatchStatus.FINISHED, viewModel.matchStatus(match))
+    }
+
+    @Test
+    fun `matchStatus returns LIVE when goals present without start time`() {
         val match = MatchEntity(
             id = 1, groupName = "A", matchday = "J1", dateTime = "",
             homeTeam = "A", awayTeam = "B",
             homeGoals = 2, awayGoals = 1
         )
         
-        assertEquals(MatchStatus.FINISHED, viewModel.matchStatus(match))
+        assertEquals(MatchStatus.LIVE, viewModel.matchStatus(match))
     }
 
     @Test

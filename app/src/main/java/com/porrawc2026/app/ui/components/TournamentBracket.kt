@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
+import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.ui.theme.*
 
 @Composable
@@ -45,25 +46,19 @@ fun TournamentBracket(
         "Final" to WCGold
     )
 
-    val roundPoints = mapOf(
-        "Dieciseisavos" to 20,
-        "Octavos" to 40,
-        "Cuartos" to 80,
-        "Semifinales" to 160,
-        "Final" to 500
-    )
-
     Column(
         modifier = modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(8.dp)
     ) {
-        rounds.forEach { (round, count) ->
-            val roundPredictions = predictions.filter { it.round == round }
+        val predictionsByRound = predictions.groupBy { it.round }
+
+        rounds.forEach { (round, _) ->
+            val roundPredictions = predictionsByRound[round].orEmpty()
             if (roundPredictions.isNotEmpty()) {
                 val color = roundColors[round] ?: WCGold
-                val pts = roundPoints[round] ?: 0
+                val pts = PointsCalculator.getKnockoutPoints(round)
 
                 Text(
                     text = "${round.uppercase()} — $pts pts",
@@ -89,11 +84,12 @@ fun TournamentBracket(
         }
 
         // 3rd place
-        val thirdPlace = predictions.find { it.round == "3er puesto" }
+        val thirdPlace = predictionsByRound["3er puesto"]?.firstOrNull()
         if (thirdPlace != null) {
+            val pts = PointsCalculator.getKnockoutPoints("3er puesto")
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "3er PUESTO — 250 pts",
+                text = "3er PUESTO — $pts pts",
                 style = MaterialTheme.typography.titleMedium,
                 color = AccentOrange,
                 fontWeight = FontWeight.Bold,
@@ -102,7 +98,7 @@ fun TournamentBracket(
             BracketMatchRow(
                 prediction = thirdPlace,
                 roundColor = AccentOrange,
-                roundPoints = 250
+                roundPoints = pts
             )
         }
     }

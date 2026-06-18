@@ -1,6 +1,10 @@
 package com.porrawc2026.app.ui.screens.home
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
@@ -10,10 +14,13 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -29,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.porrawc2026.app.util.LogManager
 import com.porrawc2026.app.util.ValidationResult
 
 @Composable
@@ -161,6 +171,19 @@ fun AjustesScreen(
                         onClick = { pdfLauncher.launch(arrayOf("application/pdf")) }
                     )
                 }
+                item {
+                    var showLogs by remember { mutableStateOf(false) }
+                    SquareButton(
+                        icon = Icons.Filled.BugReport,
+                        label = "Logs",
+                        color = Color(0xFF444444),
+                        loading = false,
+                        onClick = { showLogs = true }
+                    )
+                    if (showLogs) {
+                        LogDialog(onDismiss = { showLogs = false })
+                    }
+                }
             }
 
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -203,6 +226,69 @@ private fun SquareButton(icon: androidx.compose.ui.graphics.vector.ImageVector, 
             }
             Spacer(Modifier.height(4.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, maxLines = 1, softWrap = false, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun LogDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var logs by remember { mutableStateOf(LogManager.getLogs()) }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.95f).fillMaxHeight(0.85f).padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Registro de errores", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Row {
+                        TextButton(onClick = {
+                            LogManager.clearLogs()
+                            logs = ""
+                        }) { Text("LIMPIAR", color = Color(0xFFE53935), fontSize = 12.sp) }
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("app_logs", logs))
+                            Toast.makeText(context, "Logs copiados al portapapeles", Toast.LENGTH_SHORT).show()
+                        }) { Text("COPIAR", color = Color(0xFF4CAF50), fontSize = 12.sp) }
+                        Spacer(Modifier.width(8.dp))
+                        TextButton(onClick = { onDismiss() }) { Text("CERRAR", color = Color(0xFF888888), fontSize = 12.sp) }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(Color(0xFF0E0E0E), RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    if (logs.isBlank()) {
+                        Text(
+                            "Sin errores registrados",
+                            color = Color(0xFF555555),
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    } else {
+                        Text(
+                            text = logs,
+                            color = Color(0xFFCCCCCC),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .horizontalScroll(rememberScrollState())
+                        )
+                    }
+                }
+            }
         }
     }
 }

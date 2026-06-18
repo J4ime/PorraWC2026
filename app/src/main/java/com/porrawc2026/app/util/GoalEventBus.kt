@@ -8,10 +8,13 @@ import javax.inject.Singleton
 
 @Singleton
 class GoalEventBus @Inject constructor() {
-    private val _goalScored = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1)
+    private val _goalScored = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
     val goalScored: SharedFlow<Unit> = _goalScored.asSharedFlow()
 
     fun notifyGoal() {
-        _goalScored.tryEmit(Unit)
+        val emitted = _goalScored.tryEmit(Unit)
+        if (!emitted) {
+            LogManager.log("GoalEventBus", "Failed to emit goal event - buffer full or no subscribers")
+        }
     }
 }

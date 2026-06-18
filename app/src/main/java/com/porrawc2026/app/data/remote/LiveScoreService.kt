@@ -2,6 +2,7 @@ package com.porrawc2026.app.data.remote
 
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
+import com.porrawc2026.app.util.LogManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import javax.inject.Inject
@@ -71,8 +72,10 @@ class LiveScoreService @Inject constructor(
 
             val homeScorers = mutableListOf<LiveScorer>()
             val awayScorers = mutableListOf<LiveScorer>()
-            var hYellows = 0; var aYellows = 0; var hReds = 0; var aReds = 0
-            val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
+            var hYellows = 0
+            var aYellows = 0
+            var hReds = 0
+            var aReds = 0
             competition.details?.forEach { detail ->
                 if (detail.scoringPlay == true) {
                     val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
@@ -113,28 +116,30 @@ class LiveScoreService @Inject constructor(
     suspend fun fetchTopScorers(matches: List<MatchEntity>): List<TopScorerData> {
         val allScorers = mutableMapOf<String, MutableMap<String, Int>>()
 
-        val gson = Gson()
-        val type = object : TypeToken<List<LiveScorer>>() {}.type
         for (match in matches) {
             val homeRaw = match.homeScorers
             val awayRaw = match.awayScorers
             if (homeRaw != null) {
                 try {
-                    val scorers: List<LiveScorer> = gson.fromJson(homeRaw, type) ?: emptyList()
+                    val scorers: List<LiveScorer> = gson.fromJson(homeRaw, scorerListType) ?: emptyList()
                     scorers.forEach { s ->
                         allScorers.getOrPut(match.homeTeam) { mutableMapOf() }
                             .merge(s.playerName, 1) { a, b -> a + b }
                     }
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    LogManager.log("LiveScoreService", "Error parsing home scorers for match ${match.id}", e)
+                }
             }
             if (awayRaw != null) {
                 try {
-                    val scorers: List<LiveScorer> = gson.fromJson(awayRaw, type) ?: emptyList()
+                    val scorers: List<LiveScorer> = gson.fromJson(awayRaw, scorerListType) ?: emptyList()
                     scorers.forEach { s ->
                         allScorers.getOrPut(match.awayTeam) { mutableMapOf() }
                             .merge(s.playerName, 1) { a, b -> a + b }
                     }
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    LogManager.log("LiveScoreService", "Error parsing away scorers for match ${match.id}", e)
+                }
             }
         }
 
@@ -151,5 +156,11 @@ class LiveScoreService @Inject constructor(
             TeamNameNormalizer.matches(it.awayTeam, awayName)
         }
         return if (candidates.size == 1) candidates.first() else null
+    }
+
+    companion object {
+        private val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
+        private val gson = Gson()
+        private val scorerListType = object : TypeToken<List<LiveScorer>>() {}.type
     }
 }

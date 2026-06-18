@@ -45,7 +45,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.Normalizer
 import java.time.Instant
 import java.time.LocalDate
@@ -162,11 +161,13 @@ class HomeViewModel @Inject constructor(
             _appVersion.value = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
         }
         viewModelScope.launch {
-            _excelFileName.value = prefsManager.getExcelFileNameSync()
-            _autoRefreshEnabled.value = prefsManager.getAutoRefreshSync()
-            _notificationsEnabled.value = prefsManager.getNotificationsSync()
-            _userName.value = prefsManager.getUserNameSync()
-            _userPosition.value = prefsManager.getUserPositionSync()
+            runCatching {
+                _excelFileName.value = prefsManager.getExcelFileNameSync()
+                _autoRefreshEnabled.value = prefsManager.getAutoRefreshSync()
+                _notificationsEnabled.value = prefsManager.getNotificationsSync()
+                _userName.value = prefsManager.getUserNameSync()
+                _userPosition.value = prefsManager.getUserPositionSync()
+            }
             liveMinutes.putAll(liveMatchStore.liveMinutes)
             goalScorers.putAll(liveMatchStore.goalScorers)
         }
@@ -322,14 +323,6 @@ class HomeViewModel @Inject constructor(
             fetchLiveResults(fullFetch = true)
             _isBusy.value = false
         }
-    }
-
-    fun refreshCache() {
-        clearAndRefreshCache()
-    }
-
-    fun setForegroundState(isForeground: Boolean) {
-        // Lifecycle hook - no-op since polling is handled by startAutoRefresh
     }
 
     fun loadPdfResult(uri: Uri) {

@@ -5,8 +5,7 @@ import android.net.Uri
 import com.porrawc2026.app.data.local.entity.*
 import org.apache.poi.ss.usermodel.*
 import java.io.InputStream
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 data class ExcelData(
@@ -33,7 +32,8 @@ data class ValidationResult(
 
 object ExcelParser {
 
-    private val dateTimeFmt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+    private val dateTimeFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+    private val madridZone = java.time.ZoneId.of("Europe/Madrid")
 
     private const val COL_MATCH_HOME = 26
     private const val COL_MATCH_AWAY = 31
@@ -60,26 +60,25 @@ object ExcelParser {
     fun parse(context: Context, uri: Uri): ExcelData {
         val inputStream: InputStream = context.contentResolver.openInputStream(uri)
             ?: throw Exception("No se pudo abrir el archivo")
-        val workbook = WorkbookFactory.create(inputStream, "")
-        formatter = DataFormatter()
+        return inputStream.use { stream ->
+            val workbook = WorkbookFactory.create(stream, "")
+            workbook.use { wb ->
+                formatter = DataFormatter()
 
-        val sheet = workbook.getSheet("WORLDCUP") ?: workbook.getSheetAt(1)
+                val sheet = wb.getSheet("WORLDCUP") ?: wb.getSheetAt(1)
 
-        runCatching { sheet.protectSheet(null) }
+                val teams = parseTeams(wb)
+                val matches = parseMatches(sheet)
+                val questions = parseQuestions(sheet)
+                val playerPredictions = parsePlayers(sheet)
+                val knockoutPredictions = parseKnockout(sheet)
+                val standings = parseStandings(teams)
 
-        val teams = parseTeams(workbook)
-        val matches = parseMatches(sheet)
-        val questions = parseQuestions(sheet)
-        val playerPredictions = parsePlayers(sheet)
-        val knockoutPredictions = parseKnockout(sheet)
-        val standings = parseStandings(teams)
+                cachedValidation = doValidate(sheet)
 
-        cachedValidation = doValidate(sheet)
-
-        workbook.close()
-        inputStream.close()
-
-        return ExcelData(teams, matches, questions, playerPredictions, knockoutPredictions, standings)
+                ExcelData(teams, matches, questions, playerPredictions, knockoutPredictions, standings)
+            }
+        }
     }
 
     fun validate(): ValidationResult {
@@ -92,7 +91,7 @@ object ExcelParser {
     }
 
     private fun doValidate(sheet: Sheet): ValidationResult {
-        return runCatching {
+        return try {
             val errors = mutableListOf<String>()
             val warnings = mutableListOf<String>()
 
@@ -116,12 +115,12 @@ object ExcelParser {
                 errors = errors,
                 warnings = warnings
             )
-        }.getOrElse { e ->
+        } catch (e: Exception) {
             ValidationResult(
-                isValid = true,
-                totalChecks = 1, passedChecks = 1, failedChecks = 0,
-                errors = emptyList(),
-                warnings = listOf("Validacion omitida por error: ${e.message}")
+                isValid = false,
+                totalChecks = 1, passedChecks = 0, failedChecks = 1,
+                errors = listOf("Error de validación: ${e.message}"),
+                warnings = emptyList()
             )
         }
     }
@@ -412,10 +411,10 @@ object ExcelParser {
             val value = formatter.formatCellValue(cell).trim()
             if (value.isBlank()) continue
             val d = runCatching { cell.dateCellValue }.getOrNull()
-            if (d != null) return dateTimeFmt.format(d)
+            if (d != null) return d.toInstant().atZone(madridZone).format(dateTimeFmt)
             val n = runCatching { cell.numericCellValue }.getOrNull()
             if (n != null && DateUtil.isCellDateFormatted(cell)) {
-                return dateTimeFmt.format(cell.dateCellValue)
+                return cell.dateCellValue.toInstant().atZone(madridZone).format(dateTimeFmt)
             }
             if (value.matches(Regex("\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}.*"))) {
                 return value

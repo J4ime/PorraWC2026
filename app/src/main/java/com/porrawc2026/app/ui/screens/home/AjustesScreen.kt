@@ -8,7 +8,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -149,7 +148,7 @@ fun AjustesScreen(
                         label = "Reset",
                         color = Color(0xFF444444),
                         loading = isBusy,
-                        onClick = { viewModel.refreshCache() }
+                        onClick = {                         viewModel.clearAndRefreshCache() }
                     )
                 }
                 item {

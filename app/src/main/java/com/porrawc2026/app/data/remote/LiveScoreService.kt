@@ -35,83 +35,88 @@ class LiveScoreService @Inject constructor(
     private val espnService: EspnService
 ) {
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): List<LiveScoreUpdate> {
-        val updates = mutableListOf<LiveScoreUpdate>()
-        val minDate = matches.minOfOrNull { it.dateTime.take(10).replace("-", "").ifBlank { "99999999" } }
-        val maxDate = matches.maxOfOrNull { it.dateTime.take(10).replace("-", "").ifBlank { "00000000" } }
-        val dateRange = if (minDate != null && maxDate != null) "$minDate-$maxDate" else null
+        val dateRange = buildDateRange(matches)
         val scoreboard = espnService.getScoreboard(dates = dateRange)
-        val events = scoreboard.events ?: return updates
-
-        events.forEach { event ->
-            val competition = event.competitions?.firstOrNull() ?: return@forEach
-            val status = competition.status ?: return@forEach
-            val competitors = competition.competitors ?: return@forEach
-
-            val homeTeam = competitors.firstOrNull { it.homeAway == "home" } ?: return@forEach
-            val awayTeam = competitors.firstOrNull { it.homeAway == "away" } ?: return@forEach
-
-            val homeName = homeTeam.team?.displayName ?: homeTeam.team?.name ?: return@forEach
-            val awayName = awayTeam.team?.displayName ?: awayTeam.team?.name ?: return@forEach
-
-            val entity = findMatchingMatch(matches, homeName, awayName) ?: return@forEach
-
-            val hScore = homeTeam.score?.toIntOrNull() ?: 0
-            val aScore = awayTeam.score?.toIntOrNull() ?: 0
-
-            val statusType = status.type
-            val state = statusType?.state ?: ""
-            val displayClock = status.displayClock ?: ""
-            val shortDetail = statusType?.shortDetail ?: ""
-
-            val minute = when {
-                statusType?.completed == true -> "FINAL"
-                state == "in" && displayClock.isNotBlank() -> displayClock
-                shortDetail == "Halftime" || shortDetail == "HT" -> "HT"
-                else -> null
-            }
-
-            val homeScorers = mutableListOf<LiveScorer>()
-            val awayScorers = mutableListOf<LiveScorer>()
-            var hYellows = 0
-            var aYellows = 0
-            var hReds = 0
-            var aReds = 0
-            competition.details?.forEach { detail ->
-                if (detail.scoringPlay == true) {
-                    val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
-                    val minuteStr = detail.clock?.displayValue ?: return@forEach
-                    val m = minuteRegex.find(minuteStr)
-                    val goalMinute = if (m != null) {
-                        (m.groupValues[1].toIntOrNull() ?: 0) + (m.groupValues[3].toIntOrNull() ?: 0)
-                    } else 0
-                    val isHome = detail.team?.id == homeTeam.id
-                    val scorer = LiveScorer(playerName, goalMinute)
-                    if (isHome) homeScorers.add(scorer) else awayScorers.add(scorer)
-                }
-                if (detail.yellowCard == true) {
-                    if (detail.team?.id == homeTeam.id) hYellows++ else aYellows++
-                }
-                if (detail.redCard == true) {
-                    if (detail.team?.id == homeTeam.id) hReds++ else aReds++
-                }
-            }
-
-            updates.add(LiveScoreUpdate(
-                matchId = entity.id,
-                homeGoals = hScore,
-                awayGoals = aScore,
-                homeScorers = homeScorers,
-                awayScorers = awayScorers,
-                isFinished = statusType?.completed == true,
-                liveMinute = minute,
-                homeYellowCards = hYellows,
-                awayYellowCards = aYellows,
-                homeRedCards = hReds,
-                awayRedCards = aReds
-            ))
-        }
-        return updates
+        val events = scoreboard.events ?: return emptyList()
+        return events.mapNotNull { event -> parseEvent(event, matches) }
     }
+
+    private fun buildDateRange(matches: List<MatchEntity>): String? {
+        val minDate = matches.minOfOrNull { it.dateTime.take(10).replace("-", "") }
+            ?.ifBlank { null } ?: return null
+        val maxDate = matches.maxOfOrNull { it.dateTime.take(10).replace("-", "") }
+            ?.ifBlank { null } ?: return null
+        return "$minDate-$maxDate"
+    }
+
+    private fun parseEvent(event: EspnEvent, matches: List<MatchEntity>): LiveScoreUpdate? {
+        val competition = event.competitions?.firstOrNull() ?: return null
+        val status = competition.status ?: return null
+        val competitors = competition.competitors ?: return null
+
+        val homeTeam = competitors.firstOrNull { it.homeAway == "home" } ?: return null
+        val awayTeam = competitors.firstOrNull { it.homeAway == "away" } ?: return null
+
+        val homeName = homeTeam.team?.displayName ?: homeTeam.team?.name ?: return null
+        val awayName = awayTeam.team?.displayName ?: awayTeam.team?.name ?: return null
+
+        val entity = findMatchingMatch(matches, homeName, awayName)
+        if (entity == null) {
+            LogManager.log("LiveScoreService", "No match found for $homeName vs $awayName")
+            return null
+        }
+
+        val hScore = homeTeam.score?.toIntOrNull() ?: 0
+        val aScore = awayTeam.score?.toIntOrNull() ?: 0
+        val minute = computeMinute(status)
+        val (homeScorers, awayScorers, hYellows, aYellows, hReds, aReds) = parseDetails(competition.details, homeTeam.id)
+
+        return LiveScoreUpdate(
+            matchId = entity.id, homeGoals = hScore, awayGoals = aScore,
+            homeScorers = homeScorers, awayScorers = awayScorers,
+            isFinished = status.type?.completed == true, liveMinute = minute,
+            homeYellowCards = hYellows, awayYellowCards = aYellows,
+            homeRedCards = hReds, awayRedCards = aReds
+        )
+    }
+
+    private fun computeMinute(status: EspnStatus): String? {
+        val statusType = status.type ?: return null
+        return when {
+            statusType.completed == true -> "FINAL"
+            statusType.state == "in" && !status.displayClock.isNullOrBlank() -> status.displayClock
+            statusType.shortDetail == "Halftime" || statusType.shortDetail == "HT" -> "HT"
+            else -> null
+        }
+    }
+
+    private fun parseDetails(details: List<EspnDetail>?, homeTeamId: String?): ParsedDetails {
+        val homeScorers = mutableListOf<LiveScorer>()
+        val awayScorers = mutableListOf<LiveScorer>()
+        var hYellows = 0; var aYellows = 0; var hReds = 0; var aReds = 0
+        details?.forEach { detail ->
+            if (detail.scoringPlay == true) {
+                val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
+                val minuteStr = detail.clock?.displayValue ?: return@forEach
+                val m = minuteRegex.find(minuteStr)
+                val goalMinute = if (m != null) {
+                    (m.groupValues[1].toIntOrNull() ?: 0) + (m.groupValues[3].toIntOrNull() ?: 0)
+                } else 0
+                val isHome = detail.team?.id == homeTeamId
+                if (isHome) homeScorers.add(LiveScorer(playerName, goalMinute))
+                else awayScorers.add(LiveScorer(playerName, goalMinute))
+            }
+            if (detail.yellowCard == true) { if (detail.team?.id == homeTeamId) hYellows++ else aYellows++ }
+            if (detail.redCard == true) { if (detail.team?.id == homeTeamId) hReds++ else aReds++ }
+        }
+        return ParsedDetails(homeScorers, awayScorers, hYellows, aYellows, hReds, aReds)
+    }
+
+    private data class ParsedDetails(
+        val homeScorers: List<LiveScorer>, val awayScorers: List<LiveScorer>,
+        val homeYellowCards: Int, val awayYellowCards: Int,
+        val homeRedCards: Int, val awayRedCards: Int
+    )
 
     suspend fun fetchTopScorers(matches: List<MatchEntity>): List<TopScorerData> {
         val allScorers = mutableMapOf<String, MutableMap<String, Int>>()

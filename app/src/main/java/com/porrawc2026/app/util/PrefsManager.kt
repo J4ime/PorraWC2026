@@ -87,12 +87,12 @@ class PrefsManager(private val context: Context) {
     suspend fun getLastCacheVersionSync(): Int? = lastCacheVersion.first()
 
     suspend fun setProcessedGoalKeys(keys: Set<String>) {
-        context.dataStore.edit { it[PROCESSED_GOAL_KEYS] = keys.joinToString(",") }
+        context.dataStore.edit { it[PROCESSED_GOAL_KEYS] = keys.joinToString("\u001D") }
     }
 
     suspend fun getProcessedGoalKeys(): Set<String> {
         val raw = context.dataStore.data.first()[PROCESSED_GOAL_KEYS] ?: ""
-        return raw.split(",").filter { it.isNotBlank() }.toSet()
+        return raw.split("\u001D").filter { it.isNotBlank() }.toSet()
     }
 
     suspend fun clearProcessedGoalKeys() {

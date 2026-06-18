@@ -1,6 +1,5 @@
 package com.porrawc2026.app.ui.screens.results
 
-import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,16 +37,10 @@ fun ResultsScreen(
     val playerPredictions by viewModel.playerPredictions.collectAsState()
     val knockoutPredictions by viewModel.knockoutPredictions.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.errorMessage.collect { msg ->
-            // Handle error
-        }
-    }
-
-    val groupPoints = matches.filter { !it.isKnockout }.sumOf { it.pointsEarned }
-    val kokoPoints = knockoutPredictions.sumOf { it.pointsEarned }
-    val qPoints = questions.sumOf { it.pointsEarned }
-    val pPoints = playerPredictions.sumOf { it.pointsEarned }
+    val groupPoints by remember(matches) { derivedStateOf { matches.filter { !it.isKnockout }.sumOf { it.pointsEarned } } }
+    val kokoPoints by remember(knockoutPredictions) { derivedStateOf { knockoutPredictions.sumOf { it.pointsEarned } } }
+    val qPoints by remember(questions) { derivedStateOf { questions.sumOf { it.pointsEarned } } }
+    val pPoints by remember(playerPredictions) { derivedStateOf { playerPredictions.sumOf { it.pointsEarned } } }
 
     Column(
         modifier = Modifier
@@ -65,7 +58,7 @@ fun ResultsScreen(
             },
             navigationIcon = {
                 IconButton(onClick = onBackClick) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = TextPrimary)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextPrimary)
                 }
             },
             actions = {
@@ -264,10 +257,13 @@ private fun SectionHeader(title: String, points: String) {
 
 @Composable
 private fun ResultRow(match: MatchEntity) {
+    val dateFormat = remember {
+        java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("Europe/Madrid")
+        }
+    }
     val isFuture = kotlin.run {
-        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-        sdf.timeZone = java.util.TimeZone.getTimeZone("Europe/Madrid")
-        sdf.parse(match.dateTime)?.after(java.util.Date()) ?: false
+        dateFormat.parse(match.dateTime)?.after(java.util.Date()) ?: false
     }
     val showScore = !isFuture && match.homeGoals != null && match.awayGoals != null
     Row(

@@ -28,9 +28,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.min
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -40,8 +42,9 @@ class LiveUpdateService : Service() {
     @Inject lateinit var repository: PorraRepository
     @Inject lateinit var liveMatchStore: LiveMatchStore
 
-    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var refreshJob: Job? = null
+    private var consecutiveErrors = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -91,18 +94,21 @@ class LiveUpdateService : Service() {
         refreshJob = serviceScope.launch {
             while (isActive) {
                 try {
-                    fetchAndStore()
+                    withContext(Dispatchers.IO) { fetchAndStore() }
+                    consecutiveErrors = 0
                 } catch (e: Exception) {
+                    consecutiveErrors++
                     Log.e("LiveUpdateService", "Error in refresh loop", e)
                     LogManager.log("LiveUpdateService", "Error in refresh loop", e)
                 }
-                delay(60_000)
+                val backoff = min(consecutiveErrors.toLong(), 10L) * 60_000L
+                delay(maxOf(60_000L - backoff, 10_000L))
             }
         }
     }
 
     private suspend fun fetchAndStore() {
-        val allMatches = repository.getAllMatches().first()
+        val allMatches = withContext(Dispatchers.IO) { repository.getAllMatches().first() }
         if (allMatches.isEmpty()) return
 
         val todayAndStale = getTodayAndStaleMatches(allMatches)

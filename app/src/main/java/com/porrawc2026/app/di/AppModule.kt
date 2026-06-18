@@ -39,28 +39,36 @@ object AppModule {
     }
 
     @Provides
+    @Singleton
     fun provideTeamDao(db: AppDatabase): TeamDao = db.teamDao()
 
     @Provides
+    @Singleton
     fun provideMatchDao(db: AppDatabase): MatchDao = db.matchDao()
 
     @Provides
+    @Singleton
     fun provideQuestionDao(db: AppDatabase): QuestionDao = db.questionDao()
 
     @Provides
+    @Singleton
     fun providePlayerPredictionDao(db: AppDatabase): PlayerPredictionDao = db.playerPredictionDao()
 
     @Provides
+    @Singleton
     fun provideKnockoutPredictionDao(db: AppDatabase): KnockoutPredictionDao = db.knockoutPredictionDao()
 
     @Provides
+    @Singleton
     fun provideGroupStandingDao(db: AppDatabase): GroupStandingDao = db.groupStandingDao()
 
     @Provides
     @Singleton
     fun providePrefsManager(@ApplicationContext context: Context): PrefsManager = PrefsManager(context)
 
-    private fun loggingInterceptor(): HttpLoggingInterceptor {
+    @Provides
+    @Singleton
+    fun provideLoggingInterceptor(): HttpLoggingInterceptor {
         return HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
                     else HttpLoggingInterceptor.Level.NONE
@@ -78,9 +86,9 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideOkHttpClient(logging: HttpLoggingInterceptor): OkHttpClient {
         return OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor())
+            .addInterceptor(logging)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
@@ -89,10 +97,10 @@ object AppModule {
     @Provides
     @Singleton
     @Named("football-data")
-    fun provideFootballDataClient(): OkHttpClient {
+    fun provideFootballDataClient(logging: HttpLoggingInterceptor): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(apiKeyInterceptor("X-Auth-Token", BuildConfig.FOOTBALL_DATA_API_KEY))
-            .addInterceptor(loggingInterceptor())
+            .addInterceptor(logging)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()

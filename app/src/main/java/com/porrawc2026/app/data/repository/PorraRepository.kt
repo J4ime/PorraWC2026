@@ -1,5 +1,6 @@
 package com.porrawc2026.app.data.repository
 
+import androidx.room.Transaction
 import com.porrawc2026.app.data.local.dao.*
 import com.porrawc2026.app.data.local.entity.*
 import kotlinx.coroutines.flow.Flow
@@ -52,6 +53,7 @@ class PorraRepository @Inject constructor(
         return matchPoints + questionPoints + playerPoints + knockoutPoints
     }
 
+    @Transaction
     suspend fun insertAllData(
         teams: List<TeamEntity>,
         matches: List<MatchEntity>,

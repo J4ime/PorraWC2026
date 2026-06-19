@@ -7,6 +7,7 @@ import org.apache.poi.ss.usermodel.*
 import java.io.InputStream
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.TimeZone
 
 data class ExcelData(
     val teams: List<TeamEntity>,
@@ -144,7 +145,7 @@ object ExcelParser {
             val row = sheet.getRow(rowIdx) ?: continue
             val cellValue = runCatching { formatter.formatCellValue(row.getCell(31)).trim() }.getOrDefault("")
             total++
-            if (cellValue.isBlank() || cellValue == "0" || cellValue == "0.0") {
+            if (cellValue.isBlank()) {
                 questionsEmpty++
                 failed++
             } else {
@@ -406,15 +407,14 @@ object ExcelParser {
     }
 
     private fun readDateCell(row: Row): String {
+        val madridTz = TimeZone.getTimeZone(madridZone.id)
         for (col in listOf(COL_MATCH_DATE, 24, 25, 22, 20, 21, 26)) {
             val cell = row.getCell(col) ?: continue
             val value = formatter.formatCellValue(cell).trim()
             if (value.isBlank()) continue
-            val d = runCatching { cell.dateCellValue }.getOrNull()
-            if (d != null) return d.toInstant().atZone(madridZone).format(dateTimeFmt)
             val n = runCatching { cell.numericCellValue }.getOrNull()
             if (n != null && DateUtil.isCellDateFormatted(cell)) {
-                return cell.dateCellValue.toInstant().atZone(madridZone).format(dateTimeFmt)
+                return DateUtil.getJavaDate(n, madridTz).toInstant().atZone(madridZone).format(dateTimeFmt)
             }
             if (value.matches(Regex("\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}.*"))) {
                 return value

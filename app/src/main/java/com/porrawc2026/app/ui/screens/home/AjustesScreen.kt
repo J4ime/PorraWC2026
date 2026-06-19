@@ -248,18 +248,18 @@ private fun LogDialog(onDismiss: () -> Unit) {
                 ) {
                     Text("Registro de errores", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Row {
-                        TextButton(onClick = {
+                        IconButton(onClick = {
                             LogManager.clearLogs()
                             logs = ""
-                        }) { Text("LIMPIAR", color = Color(0xFFE53935), fontSize = 12.sp) }
-                        Spacer(Modifier.width(8.dp))
-                        TextButton(onClick = {
+                        }) { Icon(Icons.Filled.Delete, "Limpiar logs", tint = Color(0xFFE53935), modifier = Modifier.size(20.dp)) }
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("app_logs", logs))
                             Toast.makeText(context, "Logs copiados al portapapeles", Toast.LENGTH_SHORT).show()
-                        }) { Text("COPIAR", color = Color(0xFF4CAF50), fontSize = 12.sp) }
-                        Spacer(Modifier.width(8.dp))
-                        TextButton(onClick = { onDismiss() }) { Text("CERRAR", color = Color(0xFF888888), fontSize = 12.sp) }
+                        }) { Icon(Icons.Filled.ContentCopy, "Copiar logs", tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp)) }
+                        Spacer(Modifier.width(4.dp))
+                        IconButton(onClick = { onDismiss() }) { Icon(Icons.Filled.Close, "Cerrar", tint = Color(0xFF888888), modifier = Modifier.size(20.dp)) }
                     }
                 }
                 Spacer(Modifier.height(12.dp))

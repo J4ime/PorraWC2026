@@ -5,6 +5,7 @@ import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import com.porrawc2026.app.util.LogManager
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,7 +20,13 @@ data class LiveScoreUpdate(
     val homeYellowCards: Int = 0,
     val awayYellowCards: Int = 0,
     val homeRedCards: Int = 0,
-    val awayRedCards: Int = 0
+    val awayRedCards: Int = 0,
+    val homeMissedPenalties: Int = 0,
+    val awayMissedPenalties: Int = 0,
+    val winnerTeam: String? = null,
+    val homeHeadedGoals: Int = 0,
+    val awayHeadedGoals: Int = 0,
+    val hasSubGoal: Boolean = false
 )
 
 data class LiveScorer(val playerName: String, val minute: Int)
@@ -38,7 +45,7 @@ class LiveScoreService @Inject constructor(
         val dateRange = buildDateRange(matches)
         val scoreboard = espnService.getScoreboard(dates = dateRange)
         val events = scoreboard.events ?: return emptyList()
-        return events.mapNotNull { event -> parseEvent(event, matches) }
+        return coroutineScope { events.mapNotNull { parseEvent(it, matches) } }
     }
 
     private fun buildDateRange(matches: List<MatchEntity>): String? {
@@ -49,7 +56,7 @@ class LiveScoreService @Inject constructor(
         return "$minDate-$maxDate"
     }
 
-    private fun parseEvent(event: EspnEvent, matches: List<MatchEntity>): LiveScoreUpdate? {
+    private suspend fun parseEvent(event: EspnEvent, matches: List<MatchEntity>): LiveScoreUpdate? {
         val competition = event.competitions?.firstOrNull() ?: return null
         val status = competition.status ?: return null
         val competitors = competition.competitors ?: return null
@@ -69,14 +76,27 @@ class LiveScoreService @Inject constructor(
         val hScore = homeTeam.score?.toIntOrNull() ?: 0
         val aScore = awayTeam.score?.toIntOrNull() ?: 0
         val minute = computeMinute(status)
-        val (homeScorers, awayScorers, hYellows, aYellows, hReds, aReds) = parseDetails(competition.details, homeTeam.id)
+        val (homeScorers, awayScorers, hYellows, aYellows, hReds, aReds, hMissedPens, aMissedPens, hHeaded, aHeaded) = parseDetails(competition.details, homeTeam.id)
+
+        val isFinished = status.type?.completed == true
+        val winnerName = if (isFinished) {
+            competitors.firstOrNull { it.winner == true }?.team?.displayName
+        } else null
+
+        val hasSubGoal = if (isFinished && entity.knockoutRound == "Semifinales") {
+            checkSubstituteGoals(event, competition)
+        } else false
 
         return LiveScoreUpdate(
             matchId = entity.id, homeGoals = hScore, awayGoals = aScore,
             homeScorers = homeScorers, awayScorers = awayScorers,
-            isFinished = status.type?.completed == true, liveMinute = minute,
+            isFinished = isFinished, liveMinute = minute,
             homeYellowCards = hYellows, awayYellowCards = aYellows,
-            homeRedCards = hReds, awayRedCards = aReds
+            homeRedCards = hReds, awayRedCards = aReds,
+            homeMissedPenalties = hMissedPens, awayMissedPenalties = aMissedPens,
+            winnerTeam = winnerName,
+            homeHeadedGoals = hHeaded, awayHeadedGoals = aHeaded,
+            hasSubGoal = hasSubGoal
         )
     }
 
@@ -94,9 +114,12 @@ class LiveScoreService @Inject constructor(
         val homeScorers = mutableListOf<LiveScorer>()
         val awayScorers = mutableListOf<LiveScorer>()
         var hYellows = 0; var aYellows = 0; var hReds = 0; var aReds = 0
+        var hMissedPens = 0; var aMissedPens = 0
+        var hHeaded = 0; var aHeaded = 0
         details?.forEach { detail ->
             if (detail.scoringPlay == true) {
-                val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
+                val playerNameBase = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
+                val playerName = if (detail.ownGoal == true) "$playerNameBase (OG)" else playerNameBase
                 val minuteStr = detail.clock?.displayValue ?: return@forEach
                 val m = minuteRegex.find(minuteStr)
                 val goalMinute = if (m != null) {
@@ -105,18 +128,55 @@ class LiveScoreService @Inject constructor(
                 val isHome = detail.team?.id == homeTeamId
                 if (isHome) homeScorers.add(LiveScorer(playerName, goalMinute))
                 else awayScorers.add(LiveScorer(playerName, goalMinute))
+                if (detail.type?.id == "137") {
+                    if (isHome) hHeaded++ else aHeaded++
+                }
             }
             if (detail.yellowCard == true) { if (detail.team?.id == homeTeamId) hYellows++ else aYellows++ }
             if (detail.redCard == true) { if (detail.team?.id == homeTeamId) hReds++ else aReds++ }
+            if (detail.penaltyKick == true && detail.scoringPlay == false) {
+                if (detail.team?.id == homeTeamId) hMissedPens++ else aMissedPens++
+            }
         }
-        return ParsedDetails(homeScorers, awayScorers, hYellows, aYellows, hReds, aReds)
+        return ParsedDetails(homeScorers, awayScorers, hYellows, aYellows, hReds, aReds, hMissedPens, aMissedPens, hHeaded, aHeaded)
     }
 
     private data class ParsedDetails(
         val homeScorers: List<LiveScorer>, val awayScorers: List<LiveScorer>,
         val homeYellowCards: Int, val awayYellowCards: Int,
-        val homeRedCards: Int, val awayRedCards: Int
+        val homeRedCards: Int, val awayRedCards: Int,
+        val homeMissedPenalties: Int, val awayMissedPenalties: Int,
+        val homeHeadedGoals: Int, val awayHeadedGoals: Int
     )
+
+    private suspend fun checkSubstituteGoals(event: EspnEvent, competition: EspnCompetition): Boolean {
+        val eventId = event.id ?: return false
+        val compId = competition.id ?: return false
+        return try {
+            val plays = espnService.getPlays(eventId, compId)
+            val items = plays.items ?: return false
+
+            val subbedInIds = mutableSetOf<String>()
+            val scorerIds = mutableSetOf<String>()
+
+            for (play in items) {
+                val pid = play.type?.id ?: continue
+                if (pid == "76") {
+                    play.participants?.forEach { p ->
+                        if (p.type == "subbed-in") p.athlete?.id?.let { subbedInIds.add(it) }
+                    }
+                }
+                play.participants?.forEach { p ->
+                    if (p.type == "scorer") p.athlete?.id?.let { scorerIds.add(it) }
+                }
+            }
+
+            scorerIds.any { it in subbedInIds }
+        } catch (e: Exception) {
+            LogManager.log("LiveScoreService", "Error checking substitute goals for event $eventId", e)
+            false
+        }
+    }
 
     suspend fun fetchTopScorers(matches: List<MatchEntity>): List<TopScorerData> {
         val allScorers = mutableMapOf<String, MutableMap<String, Int>>()

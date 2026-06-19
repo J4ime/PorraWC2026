@@ -66,7 +66,7 @@ fun HomeScreen(
     val todayIdx = allDaysSorted.indexOf(todayDayKey)
     val listState = rememberLazyListState()
 
-    LaunchedEffect(selectedDay) {
+    LaunchedEffect(selectedDay, todayIdx) {
         val rawIdx = if (selectedDay == null) todayIdx
         else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
         if (rawIdx < 0) return@LaunchedEffect

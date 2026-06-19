@@ -39,6 +39,18 @@ interface MatchDao {
     @Query("UPDATE matches SET homeScorers = :homeScorers, awayScorers = :awayScorers WHERE id = :matchId")
     suspend fun updateMatchScorers(matchId: Int, homeScorers: String?, awayScorers: String?)
 
-    @Query("UPDATE matches SET homeScorers = NULL, awayScorers = NULL, homeGoals = NULL, awayGoals = NULL, homeRedCards = NULL, awayRedCards = NULL, homeYellowCards = NULL, awayYellowCards = NULL")
+    @Query("UPDATE matches SET homeMissedPenalties = :homePens, awayMissedPenalties = :awayPens WHERE id = :matchId")
+    suspend fun updateMatchMissedPenalties(matchId: Int, homePens: Int, awayPens: Int)
+
+    @Query("UPDATE matches SET winnerTeam = :winnerTeam WHERE id = :matchId")
+    suspend fun updateMatchWinner(matchId: Int, winnerTeam: String)
+
+    @Query("UPDATE matches SET homeHeadedGoals = :homeHeads, awayHeadedGoals = :awayHeads WHERE id = :matchId")
+    suspend fun updateMatchHeadedGoals(matchId: Int, homeHeads: Int, awayHeads: Int)
+
+    @Query("UPDATE matches SET hasSubGoal = :hasSubGoal WHERE id = :matchId")
+    suspend fun updateMatchSubGoal(matchId: Int, hasSubGoal: Boolean)
+
+    @Query("UPDATE matches SET homeScorers = NULL, awayScorers = NULL, homeGoals = NULL, awayGoals = NULL, homeRedCards = NULL, awayRedCards = NULL, homeYellowCards = NULL, awayYellowCards = NULL, homeMissedPenalties = 0, awayMissedPenalties = 0, winnerTeam = NULL, homeHeadedGoals = 0, awayHeadedGoals = 0, hasSubGoal = 0")
     suspend fun clearAllMatchScores()
 }

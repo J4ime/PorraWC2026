@@ -1,6 +1,7 @@
 package com.porrawc2026.app.ui.screens.questions
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -29,6 +30,9 @@ fun QuestionsScreen(
     val questions by viewModel.questions.collectAsState()
     val isEvaluating by viewModel.isEvaluating.collectAsState()
     val evalMessage by viewModel.evalMessage.collectAsState()
+    val pendingManual by viewModel.pendingManualAnswer.collectAsState()
+
+    var showSelectionFor by remember { mutableStateOf<QuestionEntity?>(null) }
 
     val pullRefreshState = rememberPullToRefreshState()
     LaunchedEffect(pullRefreshState.isRefreshing) {
@@ -36,6 +40,51 @@ fun QuestionsScreen(
             viewModel.evaluateQuestions()
             pullRefreshState.endRefresh()
         }
+    }
+
+    // Selection dialog: choose V or F
+    showSelectionFor?.let { q ->
+        AlertDialog(
+            onDismissRequest = { showSelectionFor = null },
+            title = { Text("Pregunta ${q.id}", color = TextPrimary) },
+            text = { Text(q.text, color = TextSecondary) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.showManualDialog(q, true); showSelectionFor = null }) {
+                    Text("Verdadero", color = AccentGreen)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.showManualDialog(q, false); showSelectionFor = null }) {
+                    Text("Falso", color = AccentRed)
+                }
+            },
+            containerColor = SurfaceMedium
+        )
+    }
+
+    // Confirmation dialog
+    pendingManual?.let { (q, answer) ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelManualAnswer() },
+            title = { Text("Confirmar", color = TextPrimary) },
+            text = {
+                Text(
+                    "¿Estás seguro de que la respuesta correcta es ${if (answer) "VERDADERO" else "FALSO"} para la pregunta ${q.id}?",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmManualAnswer() }) {
+                    Text("Confirmar", color = AccentGreen)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelManualAnswer() }) {
+                    Text("Cancelar", color = TextMuted)
+                }
+            },
+            containerColor = SurfaceMedium
+        )
     }
 
     Box(Modifier.fillMaxSize().background(SurfaceDark)) {
@@ -57,14 +106,13 @@ fun QuestionsScreen(
             }
 
             itemsIndexed(questions) { _, q ->
-                QuestionRow(q)
+                QuestionRow(q, onClick = { showSelectionFor = it })
             }
             item { Spacer(Modifier.height(16.dp)) }
         }
 
         PullToRefreshContainer(state = pullRefreshState, modifier = Modifier.align(Alignment.TopCenter), containerColor = Color.Transparent, contentColor = TextPrimary)
 
-        // Show message only when there are new resolved questions
         LaunchedEffect(evalMessage) {
             delay(3000); viewModel.clearMessage()
         }
@@ -80,7 +128,7 @@ fun QuestionsScreen(
 }
 
 @Composable
-private fun QuestionRow(q: QuestionEntity) {
+private fun QuestionRow(q: QuestionEntity, onClick: (QuestionEntity) -> Unit) {
     val closed = q.correctAnswer != null
     val bg = when {
         closed && q.pointsEarned > 0 -> CorrectBg
@@ -88,7 +136,7 @@ private fun QuestionRow(q: QuestionEntity) {
         q.id % 2 == 0 -> MatchBg
         else -> MatchBgAlternate
     }
-    Column(Modifier.fillMaxWidth().background(bg, RoundedCornerShape(6.dp)).padding(8.dp)) {
+    Column(Modifier.fillMaxWidth().clickable { onClick(q) }.background(bg, RoundedCornerShape(6.dp)).padding(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("${q.id}", Modifier.width(24.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted, fontWeight = FontWeight.Bold)
             Text(q.text, Modifier.weight(1f).padding(vertical = 2.dp), style = MaterialTheme.typography.bodySmall, color = TextPrimary, softWrap = true)

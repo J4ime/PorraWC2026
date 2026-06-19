@@ -1,6 +1,8 @@
 package com.porrawc2026.app.data.remote
 
 import retrofit2.http.GET
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 data class EspnScoreboardResponse(
     val events: List<EspnEvent>?
@@ -62,7 +64,9 @@ data class EspnDetail(
     val athletesInvolved: List<EspnAthlete>?,
     val scoringPlay: Boolean?,
     val yellowCard: Boolean?,
-    val redCard: Boolean?
+    val redCard: Boolean?,
+    val ownGoal: Boolean?,
+    val penaltyKick: Boolean?
 )
 
 data class EspnDetailType(
@@ -81,11 +85,32 @@ data class EspnAthlete(
     val shortName: String?
 )
 
+data class EspnPlaysResponse(
+    val items: List<EspnPlayItem>?
+)
+
+data class EspnPlayItem(
+    val type: EspnDetailType?,
+    val participants: List<EspnPlayParticipant>?
+)
+
+data class EspnPlayParticipant(
+    val type: String?,
+    val athlete: EspnAthlete?
+)
+
 interface EspnService {
     @GET("site/v2/sports/soccer/fifa.world/scoreboard")
     suspend fun getScoreboard(
-        @retrofit2.http.Query("dates") dates: String? = null
+        @Query("dates") dates: String? = null
     ): EspnScoreboardResponse
+
+    @GET("https://sports.core.api.espn.com/v2/sports/soccer/leagues/fifa.world/events/{eventId}/competitions/{competitionId}/plays")
+    suspend fun getPlays(
+        @Path("eventId") eventId: String,
+        @Path("competitionId") competitionId: String,
+        @Query("limit") limit: Int = 300
+    ): EspnPlaysResponse
 }
 
 object EspnConfig {

@@ -91,6 +91,22 @@ class PorraRepository @Inject constructor(
         matchDao.updateMatchScorers(matchId, homeScorers, awayScorers)
     }
 
+    suspend fun updateMatchMissedPenalties(matchId: Int, homePens: Int, awayPens: Int) {
+        matchDao.updateMatchMissedPenalties(matchId, homePens, awayPens)
+    }
+
+    suspend fun updateMatchWinner(matchId: Int, winnerTeam: String) {
+        matchDao.updateMatchWinner(matchId, winnerTeam)
+    }
+
+    suspend fun updateMatchHeadedGoals(matchId: Int, homeHeads: Int, awayHeads: Int) {
+        matchDao.updateMatchHeadedGoals(matchId, homeHeads, awayHeads)
+    }
+
+    suspend fun updateMatchSubGoal(matchId: Int, hasSubGoal: Boolean) {
+        matchDao.updateMatchSubGoal(matchId, hasSubGoal)
+    }
+
     suspend fun clearAllMatchScores() {
         matchDao.clearAllMatchScores()
     }

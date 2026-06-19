@@ -444,11 +444,14 @@ class HomeViewModel @Inject constructor(
         if (predictedNames.isEmpty()) return
         var anyNotified = false
         for ((matchId, pair) in goalScorers) {
+            val status = liveMinutes[matchId]
+            if (status == null || status == "FINAL") continue
             val seen = seenScorers.getOrPut(matchId) { mutableSetOf() }
             for (scorer in pair.first + pair.second) {
                 val name = scorer.playerName.lowercase().trim()
-                val notificationKey = "notif:$matchId:$name"
-                if (notificationKey !in processedGoalKeys && seen.add(name)) {
+                val key = "$name:${scorer.minute}"
+                val notificationKey = "notif:$matchId:$key"
+                if (notificationKey !in processedGoalKeys && seen.add(key)) {
                     val matches = predictedNames.any { pred ->
                         name.contains(pred, ignoreCase = true) || pred.contains(name, ignoreCase = true)
                     }
@@ -644,6 +647,12 @@ class HomeViewModel @Inject constructor(
             updateGoalScorers(update)
             if (update.isFinished) {
                 repository.updateMatchCards(update.matchId, update.homeRedCards, update.awayRedCards, update.homeYellowCards, update.awayYellowCards)
+                repository.updateMatchMissedPenalties(update.matchId, update.homeMissedPenalties, update.awayMissedPenalties)
+                repository.updateMatchHeadedGoals(update.matchId, update.homeHeadedGoals, update.awayHeadedGoals)
+                repository.updateMatchSubGoal(update.matchId, update.hasSubGoal)
+                if (update.winnerTeam != null) {
+                    repository.updateMatchWinner(update.matchId, update.winnerTeam)
+                }
             }
         }
     }
@@ -668,7 +677,9 @@ class HomeViewModel @Inject constructor(
         if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
             goalScorers[update.matchId] = Pair(homeScr, awayScr)
             liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
-            saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
+            if (update.isFinished) {
+                saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
+            }
         }
     }
 

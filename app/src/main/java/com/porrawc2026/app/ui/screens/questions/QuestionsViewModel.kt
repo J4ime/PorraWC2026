@@ -54,6 +54,14 @@ class QuestionsViewModel @Inject constructor(
         _pendingManualAnswer.value = null
     }
 
+    fun clearResolvedQuestion(question: QuestionEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.updateQuestionPrediction(question.copy(correctAnswer = null, pointsEarned = 0))
+            val pts = repository.calculateTotalPoints()
+            _evalMessage.value = "Pregunta ${question.id} reiniciada ($pts pts)"
+        }
+    }
+
     private fun parseScorers(json: String?): List<LiveScorer> {
         if (json == null) return emptyList()
         return try { gson.fromJson(json, scorerListType) ?: emptyList() } catch (_: Exception) { emptyList() }
@@ -163,11 +171,7 @@ class QuestionsViewModel @Inject constructor(
                         }
                         30 -> null
                         31 -> { val f = finished.any { val h=it.homeGoals?:0; val a=it.awayGoals?:0; (h>a && (it.homeRedCards?:0)>0) || (a>h && (it.awayRedCards?:0)>0) }; if(f) true else if(allDone) false else null }
-                        32 -> {
-                            val spainRound = advancement.entries.firstOrNull { matchName(it.key, "España") }?.value
-                            if (spainRound == "Semifinales" || spainRound == "Final" || spainRound == "Campeón") true
-                            else if (allDone) false else if (spainRound != null) false else null
-                        }
+                        32 -> teamReachesRound("España", "Semifinales", advancement, finished)
                         33 -> false
                         34 -> {
                             val african = listOf("Marruecos", "Senegal", "Túnez", "Argelia", "Egipto", "Nigeria", "Camerún", "Ghana", "Costa de Marfil", "Mali", "Burkina Faso", "Sudáfrica", "RD Congo")
@@ -233,11 +237,7 @@ class QuestionsViewModel @Inject constructor(
                             }
                             if (inSemis >= 1) true else if (allDone) false else null
                         }
-                        44 -> {
-                            val usaRound = advancement.entries.firstOrNull { matchName(it.key, "Estados Unidos") }?.value
-                            if (usaRound == "Dieciseisavos" || usaRound == "Octavos" || usaRound == "Cuartos" || usaRound == "Semifinales" || usaRound == "Final" || usaRound == "Campeón") true
-                            else if (allDone) false else if (groupsDone && usaRound == null) false else null
-                        }
+                        44 -> teamReachesRound("Estados Unidos", "Dieciseisavos", advancement, finished)
                         45 -> {
                             val f = finished.any { m ->
                                 m.knockoutRound == "Cuartos" && ((m.homeYellowCards ?: 0) + (m.awayYellowCards ?: 0) + (m.homeRedCards ?: 0) + (m.awayRedCards ?: 0)) >= 6
@@ -253,10 +253,24 @@ class QuestionsViewModel @Inject constructor(
                             if (f != null) true else if (allDone) false else null
                         }
                         48 -> {
-                            val canRoundNum = advancement.entries.firstOrNull { matchName(it.key, "Canadá") }?.let { roundNum(it.value) }
-                            val mexRoundNum = advancement.entries.firstOrNull { matchName(it.key, "México") }?.let { roundNum(it.value) }
-                            if (canRoundNum != null && mexRoundNum != null) canRoundNum > mexRoundNum
-                            else if (allDone) false else null
+                            val canEntry = advancement.entries.firstOrNull { matchName(it.key, "Canadá") }
+                            val mexEntry = advancement.entries.firstOrNull { matchName(it.key, "México") }
+                            val canR = canEntry?.let { roundNum(it.value) } ?: 0
+                            val mexR = mexEntry?.let { roundNum(it.value) } ?: 0
+                            if (canR > mexR) true
+                            else if (canR < mexR) false
+                            else if (canR == 0 && mexR == 0) if (allDone) false else null
+                            else {
+                                val roundName = (canEntry ?: mexEntry)?.value ?: null
+                                if (roundName == null) null
+                                else {
+                                    val total = when (roundName) {
+                                        "Dieciseisavos" -> 16; "Octavos" -> 8; "Cuartos" -> 4; "Semifinales" -> 2; else -> 999
+                                    }
+                                    val played = finished.count { it.knockoutRound == roundName }
+                                    if (played >= total) false else null
+                                }
+                            }
                         }
                         49 -> {
                             val final = finished.firstOrNull { it.knockoutRound == "Final" }
@@ -386,5 +400,25 @@ class QuestionsViewModel @Inject constructor(
         "Dieciseisavos" -> 1; "Octavos" -> 2; "Cuartos" -> 3
         "Semifinales" -> 4; "Final" -> 5; "Campeón" -> 6
         else -> 0
+    }
+
+    private fun teamReachesRound(team: String, targetRound: String, advancement: Map<String, String>, finished: List<MatchEntity>): Boolean? {
+        val currentRound = advancement.entries.firstOrNull { matchName(it.key, team) }?.value ?: return null
+        val rounds = listOf("Dieciseisavos", "Octavos", "Cuartos", "Semifinales", "Final", "Campeón")
+        val targetIdx = rounds.indexOf(targetRound)
+        val currentIdx = rounds.indexOf(currentRound)
+        if (currentIdx < 0) return null
+        if (currentIdx >= targetIdx) return true
+        // Check each round between current and target; if any is fully finished
+        // and team didn't advance there, team was eliminated
+        for (i in currentIdx until targetIdx) {
+            val r = rounds[i]
+            val next = rounds[i + 1]
+            val totalNext = when (next) {
+                "Octavos" -> 8; "Cuartos" -> 4; "Semifinales" -> 2; "Final" -> 1; else -> 0
+            }
+            if (totalNext > 0 && finished.count { it.knockoutRound == next } >= totalNext) return false
+        }
+        return null
     }
 }

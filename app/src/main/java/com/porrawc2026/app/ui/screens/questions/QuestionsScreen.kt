@@ -42,20 +42,30 @@ fun QuestionsScreen(
         }
     }
 
-    // Selection dialog: choose V or F
+    // Selection dialog: choose V, F, or Borrar (resolved)
     showSelectionFor?.let { q ->
         AlertDialog(
             onDismissRequest = { showSelectionFor = null },
             title = { Text("Pregunta ${q.id}", color = TextPrimary) },
             text = { Text(q.text, color = TextSecondary) },
             confirmButton = {
-                TextButton(onClick = { viewModel.showManualDialog(q, true); showSelectionFor = null }) {
-                    Text("Verdadero", color = AccentGreen)
+                Row {
+                    TextButton(onClick = { viewModel.showManualDialog(q, true); showSelectionFor = null }) {
+                        Text("Verdadero", color = AccentGreen)
+                    }
+                    TextButton(onClick = { viewModel.showManualDialog(q, false); showSelectionFor = null }) {
+                        Text("Falso", color = AccentRed)
+                    }
+                    if (q.correctAnswer != null) {
+                        TextButton(onClick = { viewModel.clearResolvedQuestion(q); showSelectionFor = null }) {
+                            Text("Borrar", color = AccentRed)
+                        }
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.showManualDialog(q, false); showSelectionFor = null }) {
-                    Text("Falso", color = AccentRed)
+                TextButton(onClick = { showSelectionFor = null }) {
+                    Text("Cancelar", color = TextMuted)
                 }
             },
             containerColor = SurfaceMedium

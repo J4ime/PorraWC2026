@@ -1,5 +1,6 @@
 package com.porrawc2026.app.util
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -23,6 +24,7 @@ object GoalNotifier {
         manager.createNotificationChannel(channel)
     }
 
+    @SuppressLint("MissingPermission")
     fun notifyGoal(context: Context, playerName: String) {
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         val pending = PendingIntent.getActivity(

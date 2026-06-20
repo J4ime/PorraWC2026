@@ -569,10 +569,6 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun tryGenerateDieciseisavos() {
-        val groupMatches = cachedMatches.filter { !it.isKnockout }
-        val hasAnyResult = groupMatches.any { it.homeGoals != null && it.awayGoals != null }
-        if (!hasAnyResult) return
-
         val existingDieciseisavos = cachedMatches.filter { it.id in 73..88 }
         val teams = repository.getAllTeams().first()
         val dieciseisavos = KnockoutBracketGenerator.generateDieciseisavos(cachedMatches, teams)

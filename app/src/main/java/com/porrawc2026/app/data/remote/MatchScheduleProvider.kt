@@ -2,6 +2,11 @@ package com.porrawc2026.app.data.remote
 
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 object MatchScheduleProvider {
 
@@ -126,44 +131,148 @@ object MatchScheduleProvider {
         data[87] = MatchSchedule(87, "2026-07-03T23:00:00", "DAZN", "1º Grupo K", "3º (D/E/I/J/L)")
         data[88] = MatchSchedule(88, "2026-07-03T21:30:00", "DAZN", "2º Grupo D", "2º Grupo G")
 
+        // Octavos (Round of 16) — IDs 89-96
+        data[89] = MatchSchedule(89, "2026-07-04T23:00:00", "DAZN", "Ganador 74", "Ganador 77")
+        data[90] = MatchSchedule(90, "2026-07-05T03:00:00", "DAZN", "Ganador 73", "Ganador 75")
+        data[91] = MatchSchedule(91, "2026-07-05T21:00:00", "DAZN", "Ganador 76", "Ganador 78")
+        data[92] = MatchSchedule(92, "2026-07-06T01:00:00", "DAZN", "Ganador 79", "Ganador 80")
+        data[93] = MatchSchedule(93, "2026-07-06T22:00:00", "DAZN", "Ganador 83", "Ganador 84")
+        data[94] = MatchSchedule(94, "2026-07-07T04:00:00", "DAZN", "Ganador 81", "Ganador 82")
+        data[95] = MatchSchedule(95, "2026-07-07T23:00:00", "DAZN", "Ganador 86", "Ganador 88")
+        data[96] = MatchSchedule(96, "2026-07-08T03:00:00", "DAZN", "Ganador 85", "Ganador 87")
+
+        // Cuartos (Quarter-finals) — IDs 97-100
+        data[97] = MatchSchedule(97, "2026-07-09T22:00:00", "DAZN", "Ganador 89", "Ganador 90")
+        data[98] = MatchSchedule(98, "2026-07-10T22:00:00", "DAZN", "Ganador 93", "Ganador 94")
+        data[99] = MatchSchedule(99, "2026-07-11T21:00:00", "DAZN", "Ganador 91", "Ganador 92")
+        data[100] = MatchSchedule(100, "2026-07-11T23:30:00", "DAZN", "Ganador 95", "Ganador 96")
+
+        // Semifinales — IDs 101-102
+        data[101] = MatchSchedule(101, "2026-07-14T22:00:00", "DAZN", "Ganador 97", "Ganador 98")
+        data[102] = MatchSchedule(102, "2026-07-15T21:00:00", "DAZN", "Ganador 99", "Ganador 100")
+
+        // Tercer puesto — ID 103
+        data[103] = MatchSchedule(103, "2026-07-18T21:00:00", "DAZN", "Perdedor 101", "Perdedor 102")
+
+        // Final — ID 104
+        data[104] = MatchSchedule(104, "2026-07-19T21:00:00", "DAZN", "Ganador 101", "Ganador 102")
+
         return data
     }
 
     fun buildMatchEntities(): List<MatchEntity> {
         val schedule = getHardcodedSchedule()
         return schedule.mapNotNull { (id, s) ->
-            if (id > 88) return@mapNotNull null
-            if (id > 72) {
-                MatchEntity(
-                    id = id,
-                    groupName = "Dieciseisavos",
-                    matchday = "Dieciseisavos",
-                    dateTime = s.date,
-                    homeTeam = s.home,
-                    awayTeam = s.away,
-                    isKnockout = true,
-                    knockoutRound = "Dieciseisavos",
-                    matchNumber = id,
-                    tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
-                )
-            } else {
-                val groupIndex = (id - 1) / 6
-                MatchEntity(
-                    id = id,
-                    groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
-                    matchday = "J${(id - 1) % 6 + 1}",
-                    dateTime = s.date,
-                    homeTeam = s.home,
-                    awayTeam = s.away,
-                    tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN",
-                    isKnockout = false
-                )
+            if (id > 104) return@mapNotNull null
+            when {
+                id > 100 -> {
+                    val round = when (id) {
+                        101, 102 -> "Semifinales"
+                        103 -> "Tercer puesto"
+                        104 -> "Final"
+                        else -> "Fase final"
+                    }
+                    MatchEntity(
+                        id = id,
+                        groupName = round,
+                        matchday = round,
+                        dateTime = s.date,
+                        homeTeam = s.home,
+                        awayTeam = s.away,
+                        isKnockout = true,
+                        knockoutRound = round,
+                        matchNumber = id,
+                        tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
+                    )
+                }
+                id > 96 -> {
+                    MatchEntity(
+                        id = id,
+                        groupName = "Cuartos",
+                        matchday = "Cuartos",
+                        dateTime = s.date,
+                        homeTeam = s.home,
+                        awayTeam = s.away,
+                        isKnockout = true,
+                        knockoutRound = "Cuartos",
+                        matchNumber = id,
+                        tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
+                    )
+                }
+                id > 88 -> {
+                    MatchEntity(
+                        id = id,
+                        groupName = "Octavos",
+                        matchday = "Octavos",
+                        dateTime = s.date,
+                        homeTeam = s.home,
+                        awayTeam = s.away,
+                        isKnockout = true,
+                        knockoutRound = "Octavos",
+                        matchNumber = id,
+                        tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
+                    )
+                }
+                id > 72 -> {
+                    MatchEntity(
+                        id = id,
+                        groupName = "Dieciseisavos",
+                        matchday = "Dieciseisavos",
+                        dateTime = s.date,
+                        homeTeam = s.home,
+                        awayTeam = s.away,
+                        isKnockout = true,
+                        knockoutRound = "Dieciseisavos",
+                        matchNumber = id,
+                        tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
+                    )
+                }
+                else -> {
+                    val groupIndex = (id - 1) / 6
+                    MatchEntity(
+                        id = id,
+                        groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
+                        matchday = "J${(id - 1) % 6 + 1}",
+                        dateTime = s.date,
+                        homeTeam = s.home,
+                        awayTeam = s.away,
+                        tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN",
+                        isKnockout = false
+                    )
+                }
             }
         }.sortedBy { it.id }
     }
 
     fun getDieciseisavosSchedule(): Map<Int, MatchSchedule> =
         getHardcodedSchedule().filterKeys { it in 73..88 }
+
+    fun getMaxVisibleRoundId(): Int {
+        val schedule = getHardcodedSchedule()
+        val now = Instant.now()
+        val madridZone = ZoneId.of("Europe/Madrid")
+        val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+
+        fun parseInstant(dateStr: String): Instant? {
+            if (dateStr.isBlank()) return null
+            return try {
+                LocalDateTime.parse(dateStr, fmt).atZone(madridZone).toInstant()
+            } catch (_: Exception) { null }
+        }
+
+        val firstSemi = parseInstant(schedule[101]?.date ?: "")
+        val firstCuarto = parseInstant(schedule[97]?.date ?: "")
+        val firstOctavo = parseInstant(schedule[89]?.date ?: "")
+        val firstDieciseisavo = parseInstant(schedule[73]?.date ?: "")
+
+        return when {
+            firstSemi != null && now.isAfter(firstSemi) -> 104
+            firstCuarto != null && now.isAfter(firstCuarto) -> 102
+            firstOctavo != null && now.isAfter(firstOctavo) -> 100
+            firstDieciseisavo != null && now.isAfter(firstDieciseisavo) -> 96
+            else -> 88
+        }
+    }
 
     fun enrichSchedule(matches: List<MatchEntity>): List<MatchEntity> {
         val fallback = getHardcodedSchedule()

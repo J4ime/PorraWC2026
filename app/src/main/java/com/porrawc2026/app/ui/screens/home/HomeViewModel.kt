@@ -882,7 +882,10 @@ class HomeViewModel @Inject constructor(
             }
         }
         _allMatches.value = allDisplay
-        _dayKeys.value = allDisplay.mapNotNull { d -> if (d.dayKey.isBlank()) null else d.dayKey }.distinct()
+        val maxVisibleId = MatchScheduleProvider.getMaxVisibleRoundId()
+        _dayKeys.value = allDisplay
+            .filter { it.id <= maxVisibleId }
+            .mapNotNull { d -> if (d.dayKey.isBlank()) null else d.dayKey }.distinct()
             .sortedBy { d -> allDisplay.firstOrNull { it.dayKey == d }?.sortKey ?: d }
     }
 

@@ -6,23 +6,24 @@ import org.junit.Test
 class MatchScheduleProviderTest {
 
     @Test
-    fun `getHardcodedSchedule returns 72 matches`() {
+    fun `getHardcodedSchedule returns 88 matches`() {
         val schedule = MatchScheduleProvider.getHardcodedSchedule()
-        assertEquals(72, schedule.size)
+        assertEquals(88, schedule.size)
     }
 
     @Test
-    fun `getHardcodedSchedule contains all match IDs from 1 to 72`() {
+    fun `getHardcodedSchedule contains all match IDs from 1 to 88`() {
         val schedule = MatchScheduleProvider.getHardcodedSchedule()
-        for (id in 1..72) {
+        for (id in 1..88) {
             assertTrue("Match $id should exist", schedule.containsKey(id))
         }
     }
 
     @Test
-    fun `buildMatchEntities creates correct number of matches`() {
+    fun `buildMatchEntities creates 72 group matches`() {
         val entities = MatchScheduleProvider.buildMatchEntities()
         assertEquals(72, entities.size)
+        assertTrue(entities.all { it.id <= 72 })
     }
 
     @Test

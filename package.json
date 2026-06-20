@@ -1,5 +1,7 @@
 {
   "dependencies": {
-    "pdfjs-dist": "^3.11.174"
+    "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^3.11.174",
+    "xlsx": "^0.18.5"
   }
 }

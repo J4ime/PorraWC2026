@@ -51,6 +51,9 @@ interface MatchDao {
     @Query("UPDATE matches SET hasSubGoal = :hasSubGoal WHERE id = :matchId")
     suspend fun updateMatchSubGoal(matchId: Int, hasSubGoal: Boolean)
 
+    @Query("UPDATE matches SET pointsEarned = :points WHERE id = :matchId")
+    suspend fun updateMatchPoints(matchId: Int, points: Int)
+
     @Query("UPDATE matches SET homeScorers = NULL, awayScorers = NULL, homeGoals = NULL, awayGoals = NULL, homeRedCards = NULL, awayRedCards = NULL, homeYellowCards = NULL, awayYellowCards = NULL, homeMissedPenalties = 0, awayMissedPenalties = 0, winnerTeam = NULL, homeHeadedGoals = 0, awayHeadedGoals = 0, hasSubGoal = 0")
     suspend fun clearAllMatchScores()
 }

@@ -16,13 +16,17 @@ import com.porrawc2026.app.data.remote.LiveScoreUpdate
 import com.porrawc2026.app.data.remote.MatchScheduleProvider
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.PointsCalculator
+import com.porrawc2026.app.domain.model.KnockoutBracketGenerator
 import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.GoalNotifier
 import com.porrawc2026.app.util.LiveMatchStore
 import com.porrawc2026.app.util.LogManager
+import com.porrawc2026.app.util.PdfRankingExtractor
 import com.porrawc2026.app.util.PdfRankingParser
+import com.porrawc2026.app.util.RankingEntry
+import java.io.File
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.PrefsManager
 import com.porrawc2026.app.util.UpdateManager
@@ -153,6 +157,7 @@ class HomeViewModel @Inject constructor(
     private val processedGoalKeys = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val relevantMatchIds = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
     private val pdfParser = PdfRankingParser()
+    private val pdfExtractor = PdfRankingExtractor()
 
     init {
         LogManager.init(context)
@@ -216,6 +221,7 @@ class HomeViewModel @Inject constructor(
         // Slow operations (API calls, photos) en segundo plano, sin bloquear la UI
         viewModelScope.launch(Dispatchers.IO) {
             fetchLiveResults()
+            tryGenerateDieciseisavos()
             downloadPlayerPhotos()
             precachePhotosInBackground()
         }
@@ -333,17 +339,28 @@ class HomeViewModel @Inject constructor(
                 val inputStream = context.contentResolver.openInputStream(uri)
                     ?: error("No se pudo abrir el PDF")
                 val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
-                val position = pdfParser.findNamePosition(doc, searchName)
+
+                val entries = pdfExtractor.extract(doc)
+
+                runCatching {
+                    val xlsmFile = File(context.cacheDir, "ClasificacionMundial_2026.xlsm")
+                    pdfExtractor.saveAsXlsm(entries, xlsmFile)
+                }.onFailure { e ->
+                    Log.e(TAG, "Failed to save XLSM", e)
+                }
+
                 doc.close()
                 inputStream.close()
 
-                if (position > 0) {
+                val match = findUserInEntries(entries, searchName)
+
+                if (match != null) {
                     val oldPos = _userPosition.value
-                    _positionDiff.value = if (oldPos != null && oldPos > 0) oldPos - position else null
-                    _userPosition.value = position
-                    prefsManager.setUserPosition(position)
+                    _positionDiff.value = if (oldPos != null && oldPos > 0) oldPos - match.position else null
+                    _userPosition.value = match.position
+                    prefsManager.setUserPosition(match.position)
                     prefsManager.setPreviousPosition(oldPos)
-                    _pdfResult.value = "$position"
+                    _pdfResult.value = "${match.position}"
                 } else {
                     _userPosition.value = null
                     _positionDiff.value = null
@@ -354,6 +371,26 @@ class HomeViewModel @Inject constructor(
             }
             _isBusy.value = false
         }
+    }
+
+    private fun findUserInEntries(entries: List<RankingEntry>, searchName: String): RankingEntry? {
+        val searchNorm = normalizeName(searchName)
+
+        for (entry in entries) {
+            val nameNorm = normalizeName(entry.name)
+            if (nameNorm.contains(searchNorm)) return entry
+        }
+
+        val searchLast = lastWord(searchNorm)
+        if (searchLast.length >= 3 && searchLast != searchNorm) {
+            for (entry in entries) {
+                val nameNorm = normalizeName(entry.name)
+                val nameLast = lastWord(nameNorm)
+                if (nameLast == searchLast || nameNorm.contains(searchLast)) return entry
+            }
+        }
+
+        return null
     }
 
     fun installUpdate() {
@@ -432,7 +469,7 @@ class HomeViewModel @Inject constructor(
             if (realHome != null && realAway != null) {
                 val pts = PointsCalculator.calculateMatchPoints(match)
                 val updated = match.copy(pointsEarned = pts)
-                repository.updateMatchPrediction(updated)
+                repository.updateMatchPoints(match.id, pts)
                 updated
             } else match
         }
@@ -478,12 +515,17 @@ class HomeViewModel @Inject constructor(
         refreshJob = viewModelScope.launch(Dispatchers.IO) {
             var lastDay = LocalDate.now(madridZone)
             while (isActive) {
-                val currentDay = LocalDate.now(madridZone)
-                if (currentDay != lastDay) {
-                    lastDay = currentDay
-                    refreshUpcomingMatches()
+                try {
+                    val currentDay = LocalDate.now(madridZone)
+                    if (currentDay != lastDay) {
+                        lastDay = currentDay
+                        refreshUpcomingMatches()
+                    }
+                    checkLiveWindow()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in auto-refresh loop", e)
+                    LogManager.log(TAG, "Error in auto-refresh loop", e)
                 }
-                checkLiveWindow()
                 delay(60_000)
             }
         }
@@ -492,12 +534,8 @@ class HomeViewModel @Inject constructor(
     private suspend fun checkLiveWindow() {
         if (!_autoRefreshEnabled.value) return
         val todayMatches = getTodayMatchesWithDates()
-        if (todayMatches.isEmpty()) return
-        val now = Instant.now()
-        val times = todayMatches.mapNotNull { parseMadridInstant(it.dateTime) }
-        if (times.isEmpty()) return
-        if (now.isBefore(times.min())) return
-        val anyNeedsUpdate = todayMatches.any { match ->
+        val staleMatches = getStaleMatches()
+        val anyNeedsUpdate = (todayMatches + staleMatches).any { match ->
             liveMinutes[match.id] != "FINAL" && !isFinishedByTime(match)
         }
         if (!anyNeedsUpdate) return
@@ -527,6 +565,48 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun refreshAll() {
         fetchLiveResults()
+        tryGenerateDieciseisavos()
+    }
+
+    private suspend fun tryGenerateDieciseisavos() {
+        val groupMatches = cachedMatches.filter { !it.isKnockout }
+        val hasAnyResult = groupMatches.any { it.homeGoals != null && it.awayGoals != null }
+        if (!hasAnyResult) return
+
+        val existingDieciseisavos = cachedMatches.filter { it.id in 73..88 }
+        val teams = repository.getAllTeams().first()
+        val dieciseisavos = KnockoutBracketGenerator.generateDieciseisavos(cachedMatches, teams)
+        if (dieciseisavos.isEmpty()) return
+
+        val preserved = dieciseisavos.map { gen ->
+            val existing = existingDieciseisavos.firstOrNull { it.id == gen.id }
+            if (existing != null && existing.homeTeam == gen.homeTeam && existing.awayTeam == gen.awayTeam) {
+                return@map existing
+            }
+            if (existing != null) {
+                gen.copy(
+                    homeGoals = existing.homeGoals, awayGoals = existing.awayGoals,
+                    predictedHomeGoals = existing.predictedHomeGoals,
+                    predictedAwayGoals = existing.predictedAwayGoals,
+                    pointsEarned = existing.pointsEarned,
+                    homeRedCards = existing.homeRedCards, awayRedCards = existing.awayRedCards,
+                    homeYellowCards = existing.homeYellowCards, awayYellowCards = existing.awayYellowCards,
+                    homeScorers = existing.homeScorers, awayScorers = existing.awayScorers,
+                    homeMissedPenalties = existing.homeMissedPenalties,
+                    awayMissedPenalties = existing.awayMissedPenalties,
+                    winnerTeam = existing.winnerTeam,
+                    homeHeadedGoals = existing.homeHeadedGoals, awayHeadedGoals = existing.awayHeadedGoals,
+                    hasSubGoal = existing.hasSubGoal
+                )
+            } else gen
+        }
+
+        val changed = preserved != existingDieciseisavos.sortedBy { it.id }
+        if (!changed) return
+
+        repository.insertMatches(preserved)
+        cachedMatches = (cachedMatches.filter { it.id !in 73..88 } + preserved).sortedBy { it.id }
+        refreshUpcomingMatches()
     }
 
     private suspend fun <T> fetchWithRetry(maxAttempts: Int = 10, block: suspend () -> T?): T? {
@@ -763,22 +843,23 @@ class HomeViewModel @Inject constructor(
 
     fun refreshUpcomingMatches() {
         val todayZoned = LocalDate.now(madridZone)
+        val matches = cachedMatches
 
-        val groupMatches = cachedMatches.filter { !it.isKnockout && it.id < KNOCKOUT_START_ID }
+        val groupMatches = matches.filter { !it.isKnockout && it.id < KNOCKOUT_START_ID }
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = groupMatches.map { match -> toDisplay(match) }
 
         val yesterdayMatches = allDisplay.filter { display ->
-            val d = parseMadridInstant(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
+            val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false
             val matchDate = d.atZone(madridZone).toLocalDate()
             matchDate == todayZoned.minusDays(1)
         }.sortedBy { display ->
-            parseMadridInstant(cachedMatches.first { it.id == display.id }.dateTime)
+            parseMadridInstant(matches.first { it.id == display.id }.dateTime)
         }
         _yesterdayMatches.value = yesterdayMatches
 
         val todayMatches = allDisplay.filter { display ->
-            val d = parseMadridInstant(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
+            val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false
             val matchDate = d.atZone(madridZone).toLocalDate()
             matchDate == todayZoned
         }
@@ -788,7 +869,7 @@ class HomeViewModel @Inject constructor(
             _upcomingMatches.value = todayMatches
         } else {
             val futureMatches = allDisplay.filter { display ->
-                val d = parseMadridInstant(cachedMatches.first { it.id == display.id }.dateTime) ?: return@filter false
+                val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false
                 d.isAfter(Instant.now())
             }
             if (futureMatches.isNotEmpty()) {
@@ -861,7 +942,14 @@ class HomeViewModel @Inject constructor(
         if (start != null && start.isAfter(Instant.now())) return MatchStatus.UPCOMING
         val lm = liveMinutes[match.id]
         if (lm == "FINAL") return MatchStatus.FINISHED
-        if (lm != null && lm != "FINAL") return MatchStatus.LIVE
+        if (lm != null && lm != "FINAL") {
+            if (start != null && match.homeGoals != null && match.awayGoals != null) {
+                val now = Instant.now()
+                val end = start.plusSeconds(MATCH_WINDOW_SECONDS)
+                if (now.isAfter(end)) return MatchStatus.FINISHED
+            }
+            return MatchStatus.LIVE
+        }
         if (match.homeGoals != null && match.awayGoals != null) {
             if (start != null) {
                 val now = Instant.now()

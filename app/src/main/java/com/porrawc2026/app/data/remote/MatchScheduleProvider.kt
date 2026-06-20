@@ -108,12 +108,31 @@ object MatchScheduleProvider {
         data[71] = MatchSchedule(71, "2026-06-27T23:00:00", "RTVE", "Panamá", "Inglaterra")
         data[72] = MatchSchedule(72, "2026-06-27T23:00:00", "DAZN", "Croacia", "Ghana")
 
+        // Dieciseisavos (Round of 32) — IDs 73-88
+        data[73] = MatchSchedule(73, "2026-06-28T21:00:00", "DAZN", "2º Grupo A", "2º Grupo B")
+        data[74] = MatchSchedule(74, "2026-06-29T22:30:00", "DAZN", "1º Grupo E", "3º (A/B/C/D/F)")
+        data[75] = MatchSchedule(75, "2026-06-30T03:00:00", "DAZN", "1º Grupo F", "2º Grupo C")
+        data[76] = MatchSchedule(76, "2026-06-29T19:00:00", "DAZN", "1º Grupo C", "2º Grupo F")
+        data[77] = MatchSchedule(77, "2026-06-30T23:00:00", "DAZN", "1º Grupo I", "3º (C/D/F/G/H)")
+        data[78] = MatchSchedule(78, "2026-06-30T19:00:00", "DAZN", "2º Grupo E", "2º Grupo I")
+        data[79] = MatchSchedule(79, "2026-07-01T03:00:00", "DAZN", "1º Grupo A", "3º (C/E/F/H/I)")
+        data[80] = MatchSchedule(80, "2026-07-02T02:00:00", "DAZN", "1º Grupo L", "3º (E/H/I/J/K)")
+        data[81] = MatchSchedule(81, "2026-07-01T18:00:00", "DAZN", "1º Grupo D", "3º (B/E/F/I/J)")
+        data[82] = MatchSchedule(82, "2026-07-01T22:00:00", "DAZN", "1º Grupo G", "3º (A/E/H/I/J)")
+        data[83] = MatchSchedule(83, "2026-07-02T19:00:00", "DAZN", "2º Grupo K", "2º Grupo L")
+        data[84] = MatchSchedule(84, "2026-07-02T22:30:00", "DAZN", "1º Grupo H", "2º Grupo J")
+        data[85] = MatchSchedule(85, "2026-07-03T02:30:00", "DAZN", "1º Grupo B", "3º (E/F/G/I/J)")
+        data[86] = MatchSchedule(86, "2026-07-03T18:00:00", "DAZN", "1º Grupo J", "2º Grupo H")
+        data[87] = MatchSchedule(87, "2026-07-03T23:00:00", "DAZN", "1º Grupo K", "3º (D/E/I/J/L)")
+        data[88] = MatchSchedule(88, "2026-07-03T21:30:00", "DAZN", "2º Grupo D", "2º Grupo G")
+
         return data
     }
 
     fun buildMatchEntities(): List<MatchEntity> {
         val schedule = getHardcodedSchedule()
-        return schedule.map { (id, s) ->
+        return schedule.mapNotNull { (id, s) ->
+            if (id > 72) return@mapNotNull null // Dieciseisavos created by KnockoutBracketGenerator
             val groupIndex = (id - 1) / 6
             val tv = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
             MatchEntity(
@@ -128,6 +147,9 @@ object MatchScheduleProvider {
             )
         }.sortedBy { it.id }
     }
+
+    fun getDieciseisavosSchedule(): Map<Int, MatchSchedule> =
+        getHardcodedSchedule().filterKeys { it in 73..88 }
 
     fun enrichSchedule(matches: List<MatchEntity>): List<MatchEntity> {
         val fallback = getHardcodedSchedule()

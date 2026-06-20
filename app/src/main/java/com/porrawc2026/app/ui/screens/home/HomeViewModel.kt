@@ -20,6 +20,7 @@ import com.porrawc2026.app.domain.model.KnockoutBracketGenerator
 import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
+import com.porrawc2026.app.util.GoalNotifier
 import com.porrawc2026.app.util.LiveMatchStore
 import com.porrawc2026.app.util.LogManager
 import com.porrawc2026.app.util.PdfRankingExtractor
@@ -151,6 +152,7 @@ class HomeViewModel @Inject constructor(
     private val lastWrittenScores = ConcurrentHashMap<Int, Pair<Int, Int>>()
     private val goalScorers = ConcurrentHashMap<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val liveMinutes = ConcurrentHashMap<Int, String>()
+    private val seenScorers = ConcurrentHashMap<Int, MutableSet<String>>()
     private val notifiedScorers = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val processedGoalKeys = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val relevantMatchIds = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
@@ -319,6 +321,7 @@ class HomeViewModel @Inject constructor(
             liveMinutes.clear()
             lastWrittenScores.clear()
             notifiedScorers.clear()
+            seenScorers.clear()
             processedGoalKeys.clear()
             liveMatchStore.goalScorers.clear()
             liveMatchStore.liveMinutes.clear()
@@ -469,6 +472,37 @@ class HomeViewModel @Inject constructor(
                 repository.updateMatchPoints(match.id, pts)
                 updated
             } else match
+        }
+    }
+
+    private suspend fun checkGoalNotifications() {
+        if (!_notificationsEnabled.value) return
+        val predictedNames = _players.value.mapNotNull { it.predictedName }.map { it.lowercase() }.toSet()
+        if (predictedNames.isEmpty()) return
+        var anyNotified = false
+        for ((matchId, pair) in goalScorers) {
+            val status = liveMinutes[matchId]
+            if (status == null || status == "FINAL") continue
+            val seen = seenScorers.getOrPut(matchId) { mutableSetOf() }
+            for (scorer in pair.first + pair.second) {
+                val name = scorer.playerName.lowercase().trim()
+                val key = "$name:${scorer.minute}"
+                val notificationKey = "notif:$matchId:$key"
+                if (notificationKey !in processedGoalKeys && seen.add(key)) {
+                    val matches = predictedNames.any { pred ->
+                        name.contains(pred, ignoreCase = true) || pred.contains(name, ignoreCase = true)
+                    }
+                    if (matches) {
+                        val displayName = scorer.playerName.split(" ").last()
+                        GoalNotifier.notifyGoal(context, displayName)
+                        processedGoalKeys.add(notificationKey)
+                        anyNotified = true
+                    }
+                }
+            }
+        }
+        if (anyNotified) {
+            prefsManager.setProcessedGoalKeys(processedGoalKeys.toSet())
         }
     }
 
@@ -633,6 +667,7 @@ class HomeViewModel @Inject constructor(
         notifyGoalEvents()
         recalculateAllPlayerGoals()
         refreshPoints()
+        checkGoalNotifications()
         refreshUpcomingMatches()
     }
 

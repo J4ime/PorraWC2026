@@ -49,11 +49,14 @@ class LiveScoreService @Inject constructor(
     }
 
     private fun buildDateRange(matches: List<MatchEntity>): String? {
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")
         val minDate = matches.minOfOrNull { it.dateTime.take(10).replace("-", "") }
             ?.ifBlank { null } ?: return null
         val maxDate = matches.maxOfOrNull { it.dateTime.take(10).replace("-", "") }
             ?.ifBlank { null } ?: return null
-        return "$minDate-$maxDate"
+        val minLocal = try { java.time.LocalDate.parse(minDate, fmt).minusDays(1) } catch (_: Exception) { return null }
+        val maxLocal = try { java.time.LocalDate.parse(maxDate, fmt).plusDays(1) } catch (_: Exception) { return null }
+        return "${minLocal.format(fmt)}-${maxLocal.format(fmt)}"
     }
 
     private suspend fun parseEvent(event: EspnEvent, matches: List<MatchEntity>): LiveScoreUpdate? {

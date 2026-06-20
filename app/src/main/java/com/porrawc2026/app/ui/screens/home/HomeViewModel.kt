@@ -667,6 +667,7 @@ class HomeViewModel @Inject constructor(
         val wcMatches = filterMatchesForFetch(fullFetch) ?: return
         val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(wcMatches) }.orEmpty()
         processScoreUpdates(scoreUpdates)
+        tryGenerateDieciseisavos()
         notifyGoalEvents()
         recalculateAllPlayerGoals()
         refreshPoints()
@@ -845,7 +846,7 @@ class HomeViewModel @Inject constructor(
         val todayZoned = LocalDate.now(madridZone)
         val matches = cachedMatches
 
-        val groupMatches = matches.filter { !it.isKnockout && it.id < KNOCKOUT_START_ID }
+        val groupMatches = matches.filter { it.id < KNOCKOUT_START_ID }
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = groupMatches.map { match -> toDisplay(match) }
 

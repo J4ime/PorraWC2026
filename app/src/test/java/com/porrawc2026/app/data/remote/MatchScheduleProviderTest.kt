@@ -20,14 +20,15 @@ class MatchScheduleProviderTest {
     }
 
     @Test
-    fun `buildMatchEntities creates 72 group matches`() {
+    fun `buildMatchEntities creates 88 matches including dieciseisavos`() {
         val entities = MatchScheduleProvider.buildMatchEntities()
-        assertEquals(72, entities.size)
-        assertTrue(entities.all { it.id <= 72 })
+        assertEquals(88, entities.size)
+        assertEquals(72, entities.count { it.id in 1..72 })
+        assertEquals(16, entities.count { it.id in 73..88 })
     }
 
     @Test
-    fun `buildMatchEntities assigns correct groups`() {
+    fun `buildMatchEntities assigns correct groups and dieciseisavos`() {
         val entities = MatchScheduleProvider.buildMatchEntities()
         
         val groupA = entities.filter { it.id in 1..6 }
@@ -38,6 +39,10 @@ class MatchScheduleProviderTest {
         
         val groupL = entities.filter { it.id in 67..72 }
         assertTrue(groupL.all { it.groupName == "Grupo L" })
+        
+        val dieciseisavos = entities.filter { it.id in 73..88 }
+        assertTrue(dieciseisavos.all { it.groupName == "Dieciseisavos" })
+        assertTrue(dieciseisavos.all { it.isKnockout })
     }
 
     @Test
@@ -55,9 +60,10 @@ class MatchScheduleProviderTest {
     }
 
     @Test
-    fun `buildMatchEntities sets knockout to false`() {
+    fun `buildMatchEntities sets knockout correctly`() {
         val entities = MatchScheduleProvider.buildMatchEntities()
-        assertTrue(entities.all { !it.isKnockout })
+        assertTrue(entities.filter { it.id <= 72 }.all { !it.isKnockout })
+        assertTrue(entities.filter { it.id in 73..88 }.all { it.isKnockout })
     }
 
     @Test

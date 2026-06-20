@@ -132,19 +132,33 @@ object MatchScheduleProvider {
     fun buildMatchEntities(): List<MatchEntity> {
         val schedule = getHardcodedSchedule()
         return schedule.mapNotNull { (id, s) ->
-            if (id > 72) return@mapNotNull null // Dieciseisavos created by KnockoutBracketGenerator
-            val groupIndex = (id - 1) / 6
-            val tv = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
-            MatchEntity(
-                id = id,
-                groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
-                matchday = "J${(id - 1) % 6 + 1}",
-                dateTime = s.date,
-                homeTeam = s.home,
-                awayTeam = s.away,
-                tvChannel = tv,
-                isKnockout = false
-            )
+            if (id > 88) return@mapNotNull null
+            if (id > 72) {
+                MatchEntity(
+                    id = id,
+                    groupName = "Dieciseisavos",
+                    matchday = "Dieciseisavos",
+                    dateTime = s.date,
+                    homeTeam = s.home,
+                    awayTeam = s.away,
+                    isKnockout = true,
+                    knockoutRound = "Dieciseisavos",
+                    matchNumber = id,
+                    tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN"
+                )
+            } else {
+                val groupIndex = (id - 1) / 6
+                MatchEntity(
+                    id = id,
+                    groupName = "Grupo ${groups.getOrElse(groupIndex) { "?" }}",
+                    matchday = "J${(id - 1) % 6 + 1}",
+                    dateTime = s.date,
+                    homeTeam = s.home,
+                    awayTeam = s.away,
+                    tvChannel = if (rtveMatchIds.contains(id)) "DAZN,RTVE" else "DAZN",
+                    isKnockout = false
+                )
+            }
         }.sortedBy { it.id }
     }
 

@@ -5,6 +5,7 @@ import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.*
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.util.GoalEventBus
+import com.porrawc2026.app.util.LiveMatchStore
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,6 +23,7 @@ class GoalscorersViewModelTest {
     private lateinit var repository: PorraRepository
     private lateinit var liveScoreService: LiveScoreService
     private lateinit var goalEventBus: GoalEventBus
+    private lateinit var liveMatchStore: LiveMatchStore
     private lateinit var viewModel: GoalscorersViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -31,12 +33,13 @@ class GoalscorersViewModelTest {
         repository = mockk(relaxed = true)
         liveScoreService = mockk(relaxed = true)
         goalEventBus = GoalEventBus()
+        liveMatchStore = LiveMatchStore()
 
         every { repository.getPlayerPredictions() } returns flowOf(emptyList())
         every { repository.getAllMatches() } returns flowOf(emptyList())
         coEvery { liveScoreService.fetchTopScorers(any()) } returns emptyList()
 
-        viewModel = GoalscorersViewModel(repository, liveScoreService, goalEventBus)
+        viewModel = GoalscorersViewModel(repository, liveScoreService, goalEventBus, liveMatchStore)
     }
 
     @After

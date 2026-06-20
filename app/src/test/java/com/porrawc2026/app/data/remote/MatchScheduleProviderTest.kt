@@ -6,25 +6,28 @@ import org.junit.Test
 class MatchScheduleProviderTest {
 
     @Test
-    fun `getHardcodedSchedule returns 88 matches`() {
+    fun `getHardcodedSchedule returns 104 matches`() {
         val schedule = MatchScheduleProvider.getHardcodedSchedule()
-        assertEquals(88, schedule.size)
+        assertEquals(104, schedule.size)
     }
 
     @Test
-    fun `getHardcodedSchedule contains all match IDs from 1 to 88`() {
+    fun `getHardcodedSchedule contains all match IDs from 1 to 104`() {
         val schedule = MatchScheduleProvider.getHardcodedSchedule()
-        for (id in 1..88) {
+        for (id in 1..104) {
             assertTrue("Match $id should exist", schedule.containsKey(id))
         }
     }
 
     @Test
-    fun `buildMatchEntities creates 88 matches including dieciseisavos`() {
+    fun `buildMatchEntities creates 104 matches including all knockout rounds`() {
         val entities = MatchScheduleProvider.buildMatchEntities()
-        assertEquals(88, entities.size)
+        assertEquals(104, entities.size)
         assertEquals(72, entities.count { it.id in 1..72 })
         assertEquals(16, entities.count { it.id in 73..88 })
+        assertEquals(8, entities.count { it.id in 89..96 })
+        assertEquals(4, entities.count { it.id in 97..100 })
+        assertEquals(4, entities.count { it.id in 101..104 })
     }
 
     @Test
@@ -43,6 +46,21 @@ class MatchScheduleProviderTest {
         val dieciseisavos = entities.filter { it.id in 73..88 }
         assertTrue(dieciseisavos.all { it.groupName == "Dieciseisavos" })
         assertTrue(dieciseisavos.all { it.isKnockout })
+        val octavos = entities.filter { it.id in 89..96 }
+        assertTrue(octavos.all { it.groupName == "Octavos" })
+        assertTrue(octavos.all { it.isKnockout })
+        val cuartos = entities.filter { it.id in 97..100 }
+        assertTrue(cuartos.all { it.groupName == "Cuartos" })
+        assertTrue(cuartos.all { it.isKnockout })
+        val semis = entities.filter { it.id in 101..102 }
+        assertTrue(semis.all { it.groupName == "Semifinales" })
+        assertTrue(semis.all { it.isKnockout })
+        val tercer = entities.filter { it.id == 103 }
+        assertTrue(tercer.all { it.groupName == "Tercer puesto" })
+        assertTrue(tercer.all { it.isKnockout })
+        val final = entities.filter { it.id == 104 }
+        assertTrue(final.all { it.groupName == "Final" })
+        assertTrue(final.all { it.isKnockout })
     }
 
     @Test
@@ -63,7 +81,7 @@ class MatchScheduleProviderTest {
     fun `buildMatchEntities sets knockout correctly`() {
         val entities = MatchScheduleProvider.buildMatchEntities()
         assertTrue(entities.filter { it.id <= 72 }.all { !it.isKnockout })
-        assertTrue(entities.filter { it.id in 73..88 }.all { it.isKnockout })
+        assertTrue(entities.filter { it.id >= 73 }.all { it.isKnockout })
     }
 
     @Test

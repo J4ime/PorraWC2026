@@ -7,6 +7,7 @@ import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.LiveMatchStore
 import com.porrawc2026.app.util.PrefsManager
+import com.porrawc2026.app.util.UpdateManager
 import java.util.concurrent.ConcurrentHashMap
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +58,9 @@ class HomeViewModelTest {
         mockkStatic("com.tom_roush.pdfbox.android.PDFBoxResourceLoader")
         every { com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(any()) } just Runs
         
+        mockkObject(UpdateManager)
+        coEvery { UpdateManager.checkForUpdate(any()) } returns null
+        
         viewModel = HomeViewModel(repository, liveScoreService, prefsManager, goalEventBus, liveMatchStore, context)
     }
 
@@ -64,6 +68,7 @@ class HomeViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
         unmockkStatic("com.tom_roush.pdfbox.android.PDFBoxResourceLoader")
+        unmockkObject(UpdateManager)
     }
 
     @Test

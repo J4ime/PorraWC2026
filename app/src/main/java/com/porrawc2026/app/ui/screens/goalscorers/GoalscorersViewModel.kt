@@ -2,11 +2,14 @@ package com.porrawc2026.app.ui.screens.goalscorers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.remote.LiveScoreService
+import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import com.porrawc2026.app.util.GoalEventBus
+import com.porrawc2026.app.util.LiveMatchStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -27,7 +30,8 @@ data class TopScorerDisplay(
 class GoalscorersViewModel @Inject constructor(
     private val repository: PorraRepository,
     private val liveScoreService: LiveScoreService,
-    private val goalEventBus: GoalEventBus
+    private val goalEventBus: GoalEventBus,
+    private val liveMatchStore: LiveMatchStore
 ) : ViewModel() {
 
     private val _players = MutableStateFlow<List<PlayerPredictionEntity>>(emptyList())
@@ -74,25 +78,33 @@ class GoalscorersViewModel @Inject constructor(
     private suspend fun fetchTopScorers() {
         _isLoading.value = true
         runCatching {
-            val allMatches = repository.getAllMatches().first()
+            val dbMatches = repository.getAllMatches().first()
+            val allMatches = dbMatches.map { match ->
+                val livePair = liveMatchStore.goalScorers[match.id]
+                if (livePair != null) {
+                    val homeJson = Gson().toJson(livePair.first.map { LiveScorer(it.playerName, it.minute) })
+                    val awayJson = Gson().toJson(livePair.second.map { LiveScorer(it.playerName, it.minute) })
+                    match.copy(homeScorers = homeJson, awayScorers = awayJson)
+                } else match
+            }
             val scorers = liveScoreService.fetchTopScorers(allMatches)
             val tenthGoals = scorers.getOrNull(9)?.goals ?: Int.MAX_VALUE
             val displayScorers = scorers
                 .take(10)
                 .plus(scorers.drop(10).filter { it.goals >= tenthGoals })
                 .mapIndexed { idx, s ->
-                val teamName = TeamNameNormalizer.enToEs(s.teamName)
-                TopScorerDisplay(
-                    rank = idx + 1,
-                    name = s.playerName,
-                    team = teamName,
-                    goals = s.goals,
-                    assists = null,
-                    matches = null,
-                    minutesPlayed = null,
-                    flagEmoji = com.porrawc2026.app.util.ExcelParser.getFlagEmoji(teamName)
-                )
-            }
+                    val teamName = TeamNameNormalizer.enToEs(s.teamName)
+                    TopScorerDisplay(
+                        rank = idx + 1,
+                        name = s.playerName,
+                        team = teamName,
+                        goals = s.goals,
+                        assists = null,
+                        matches = null,
+                        minutesPlayed = null,
+                        flagEmoji = com.porrawc2026.app.util.ExcelParser.getFlagEmoji(teamName)
+                    )
+                }
             _topScorers.value = displayScorers
         }.onFailure {
             _topScorers.value = emptyList()

@@ -36,6 +36,7 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
+    refreshTrigger: Int = 0,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val totalPoints by viewModel.totalPoints.collectAsState()
@@ -98,6 +99,13 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.errorMessage.collect { msg ->
             snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+        }
+    }
+
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
+            selectedDay = null
+            viewModel.refreshLiveScores()
         }
     }
 

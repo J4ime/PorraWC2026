@@ -914,7 +914,7 @@ class HomeViewModel @Inject constructor(
         val homeScr = s?.first ?: emptyList()
         val awayScr = s?.second ?: emptyList()
         val dayKey = if (zoned != null) "${dayAbbrFormatter.format(zoned).replace(".", "").uppercase(Locale.ROOT)} ${dayNumFormatter.format(zoned)}" else ""
-        val sortKey = if (zoned != null) dayNumFormatter.format(zoned) else ""
+        val sortKey = if (zoned != null) "${monthDayFormatter.format(zoned)}" else ""
 
         return MatchDisplay(
             id = match.id, dateLabel = dateLabel, time = time,
@@ -998,6 +998,7 @@ class HomeViewModel @Inject constructor(
         private val dateFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale("es", "ES"))
         private val dayAbbrFormatter = DateTimeFormatter.ofPattern("EEE", Locale("es", "ES"))
         private val dayNumFormatter = DateTimeFormatter.ofPattern("dd", Locale.US)
+        private val monthDayFormatter = DateTimeFormatter.ofPattern("MMdd", Locale.US)
         private val diacriticsRegex = Regex("\\p{M}")
         private val whitespaceRegex = Regex("\\s+")
         private val nameRegex = Regex(".*[a-zA-Z].*")

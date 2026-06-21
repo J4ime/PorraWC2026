@@ -3,6 +3,7 @@ package com.porrawc2026.app.ui.screens.groups
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,13 +20,41 @@ import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
 
+
 @Composable
-fun MatchesScreen(viewModel: GroupsViewModel = hiltViewModel()) {
+fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewModel()) {
     val allMatches by viewModel.allMatches.collectAsState()
     val koPredictions by viewModel.allKnockoutPredictions.collectAsState()
     val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
+    val listState = rememberLazyListState()
 
-    LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    LaunchedEffect(scrollTrigger) {
+        if (sorted.isEmpty()) return@LaunchedEffect
+        var lazyIdx = 1
+        var lastLabel = ""
+        var lastFinalIdx = -1
+        for (match in sorted) {
+            if (match.isKnockout) {
+                val label = match.knockoutRound ?: "Eliminatorias"
+                if (label != lastLabel) {
+                    lastLabel = label
+                    lazyIdx++
+                }
+            }
+            val status = fmtDate(match)
+            if (status == "EN JUEGO") {
+                listState.animateScrollToItem(lazyIdx)
+                return@LaunchedEffect
+            }
+            if (status == "FINAL") lastFinalIdx = lazyIdx
+            lazyIdx++
+        }
+        if (lastFinalIdx >= 0) {
+            listState.animateScrollToItem(lastFinalIdx)
+        }
+    }
+
+    LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), state = listState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Fecha", Modifier.width(72.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)

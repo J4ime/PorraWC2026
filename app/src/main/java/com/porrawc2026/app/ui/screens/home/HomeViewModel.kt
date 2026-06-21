@@ -989,7 +989,7 @@ class HomeViewModel @Inject constructor(
     companion object {
         private const val TAG = "HomeViewModel"
         private const val MATCH_WINDOW_SECONDS = 150L * 60
-        private const val KNOCKOUT_START_ID = 900
+        private const val KNOCKOUT_START_ID = 73
         private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
         private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
         private val dateFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale("es", "ES"))

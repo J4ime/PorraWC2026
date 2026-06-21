@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
 import com.porrawc2026.app.ui.navigation.PorraNavGraph
 import com.porrawc2026.app.ui.theme.WC2026Theme
 import dagger.hilt.android.AndroidEntryPoint
@@ -29,12 +27,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         requestNotificationPermission()
         enableEdgeToEdge()
-        
-        lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onResume(owner: LifecycleOwner) {}
-            override fun onPause(owner: LifecycleOwner) {}
-        })
-        
         setContent {
             WC2026Theme {
                 Surface(modifier = Modifier.fillMaxSize()) {

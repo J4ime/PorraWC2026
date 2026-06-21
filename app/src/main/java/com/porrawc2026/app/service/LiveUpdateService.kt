@@ -101,8 +101,8 @@ class LiveUpdateService : Service() {
                     Log.e("LiveUpdateService", "Error in refresh loop", e)
                     LogManager.log("LiveUpdateService", "Error in refresh loop", e)
                 }
-                val backoff = min(consecutiveErrors.toLong(), 10L) * 60_000L
-                delay(maxOf(60_000L - backoff, 10_000L))
+                val backoff = min(consecutiveErrors.toLong(), 10L) * 30_000L
+                delay(maxOf(60_000L + backoff, 10_000L))
             }
         }
     }

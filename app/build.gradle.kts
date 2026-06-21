@@ -21,12 +21,11 @@ android {
         applicationId = "com.porrawc2026.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 224
-        versionName = "1.9.59"
+        versionCode = 225
+        versionName = "1.9.60"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "FOOTBALL_DATA_API_KEY", "\"${localProperties.getProperty("FOOTBALL_DATA_API_KEY", "")}\"")
-        buildConfigField("String", "API_SPORTS_KEY", "\"${localProperties.getProperty("API_SPORTS_KEY", "")}\"")
     }
 
     signingConfigs {

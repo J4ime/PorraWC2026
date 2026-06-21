@@ -40,7 +40,7 @@ class ResultsViewModelTest {
         every { repository.getKnockoutPredictions() } returns flowOf(emptyList())
         coEvery { repository.calculateTotalPoints() } returns 0
         
-        coEvery { apiService.getWorldCupMatches(any(), any(), any(), any()) } throws RuntimeException("Network error")
+        coEvery { apiService.getWorldCupMatches(any()) } throws RuntimeException("Network error")
         
         val viewModel = ResultsViewModel(repository, apiService)
         viewModel.refreshLiveScores()

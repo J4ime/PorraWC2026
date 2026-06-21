@@ -72,7 +72,7 @@ class QuestionsViewModel @Inject constructor(
             _isEvaluating.value = true
             runCatching {
                 val allMatches = repository.getAllMatches().first()
-                val groupMatches = allMatches.filter { !it.isKnockout && it.id < 900 }
+                val groupMatches = allMatches.filter { !it.isKnockout }
                 val finished = allMatches.filter { it.homeGoals != null && it.awayGoals != null }
                 val groupFinished = groupMatches.filter { it.homeGoals != null && it.awayGoals != null }
                 val knockout = allMatches.filter { it.isKnockout }

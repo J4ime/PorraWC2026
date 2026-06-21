@@ -1,17 +1,11 @@
 package com.porrawc2026.app.data.remote
 
 import retrofit2.http.GET
-import retrofit2.http.Path
 import retrofit2.http.Query
-import retrofit2.http.Header
 
 data class FootballMatch(
     val id: Int,
     val utcDate: String,
-    val status: String?,
-    val matchday: Int?,
-    val stage: String?,
-    val group: String?,
     val homeTeam: FootballTeam?,
     val awayTeam: FootballTeam?,
     val score: FootballScore?
@@ -19,18 +13,11 @@ data class FootballMatch(
 
 data class FootballTeam(
     val id: Int?,
-    val name: String?,
-    val shortName: String?,
-    val tla: String?
+    val name: String?
 )
 
 data class FootballScore(
-    val winner: String?,
-    val duration: String?,
-    val fullTime: FootballTimeScore?,
-    val halfTime: FootballTimeScore?,
-    val extraTime: FootballTimeScore?,
-    val penalties: FootballTimeScore?
+    val fullTime: FootballTimeScore?
 )
 
 data class FootballTimeScore(
@@ -39,119 +26,16 @@ data class FootballTimeScore(
 )
 
 data class MatchesResponse(
-    val count: Int,
-    val filters: Map<String, Any>?,
     val matches: List<FootballMatch>
 )
 
-data class StandingsResponse(
-    val standings: List<StandingGroup>
-)
-
-data class StandingGroup(
-    val stage: String?,
-    val type: String?,
-    val group: String?,
-    val table: List<StandingTeam>
-)
-
-data class StandingTeam(
-    val position: Int?,
-    val team: FootballTeam?,
-    val playedGames: Int?,
-    val won: Int?,
-    val draw: Int?,
-    val lost: Int?,
-    val goalsFor: Int?,
-    val goalsAgainst: Int?,
-    val goalDifference: Int?,
-    val points: Int?
-)
-
-data class TeamsResponse(
-    val count: Int,
-    val teams: List<FootballTeamDetail>
-)
-
-data class FootballTeamDetail(
-    val id: Int,
-    val name: String?,
-    val shortName: String?,
-    val tla: String?,
-    val crest: String?
-)
-
-data class FootballPlayer(
-    val id: Int?,
-    val name: String?
-)
-
-data class GoalDetail(
-    val minute: Int?,
-    val team: FootballTeam?,
-    val scorer: FootballPlayer?
-)
-
-data class LiveMatchDetail(
-    val id: Int,
-    val utcDate: String?,
-    val status: String?,
-    val minute: String?,
-    val homeTeam: FootballTeam?,
-    val awayTeam: FootballTeam?,
-    val score: FootballScore?,
-    val goals: List<GoalDetail>?
-)
-
-data class ScorersResponse(
-    val count: Int,
-    val scorers: List<ScorerEntry>
-)
-
-data class ScorerEntry(
-    val player: FootballPlayer,
-    val team: FootballTeam,
-    val playedMatches: Int?,
-    val goals: Int?,
-    val assists: Int?,
-    val penalties: Int?
-)
-
 interface ApiService {
-
     @GET("competitions/WC/matches")
     suspend fun getWorldCupMatches(
-        @Query("dateFrom") dateFrom: String? = null,
-        @Query("dateTo") dateTo: String? = null,
-        @Query("stage") stage: String? = null,
-        @Query("status") status: String? = null
-    ): MatchesResponse
-
-    @GET("competitions/WC/standings")
-    suspend fun getWorldCupStandings(): StandingsResponse
-
-    @GET("competitions/WC/teams")
-    suspend fun getWorldCupTeams(): TeamsResponse
-
-    @GET("competitions/WC/scorers")
-    suspend fun getWorldCupScorers(
-        @Query("limit") limit: Int = 10
-    ): ScorersResponse
-
-    @GET("matches/{id}")
-    suspend fun getMatchDetail(
-        @Path("id") matchId: Int
-    ): LiveMatchDetail
-
-    @GET("matches")
-    suspend fun getMatches(
-        @Query("dateFrom") dateFrom: String,
-        @Query("dateTo") dateTo: String,
         @Query("status") status: String? = null
     ): MatchesResponse
 }
 
 object ApiConfig {
     const val BASE_URL = "https://api.football-data.org/v4/"
-    const val COMPETITION_ID = "WC"
 }

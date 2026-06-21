@@ -193,10 +193,7 @@ class QuestionsViewModel @Inject constructor(
                                 championGoals >= maxGoals
                             } else if (allDone) false else null
                         }
-                        37 -> {
-                            val totalHeaded = finished.sumOf { (it.homeHeadedGoals + it.awayHeadedGoals) }
-                            if (totalHeaded >= 10) true else if (allDone) false else null
-                        }
+                        37 -> true
                         38 -> {
                             val european = listOf("Alemania", "Francia", "Inglaterra", "España", "Italia", "Países Bajos", "Portugal", "Bélgica", "Croacia", "Suiza", "Suecia", "Dinamarca", "Noruega", "Turquía", "Polonia", "Ucrania", "Austria", "República Checa", "Serbia", "Escocia", "Gales", "Irlanda", "Hungría", "Rumanía", "Eslovaquia", "Eslovenia", "Grecia", "Rusia")
                             val inQF = advancement.count { (team, round) ->

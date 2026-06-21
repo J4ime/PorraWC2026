@@ -375,10 +375,16 @@ class HomeViewModel @Inject constructor(
 
     private fun findUserInEntries(entries: List<RankingEntry>, searchName: String): RankingEntry? {
         val searchNorm = normalizeName(searchName)
+        val searchFlat = searchNorm.replace(" ", "")
 
         for (entry in entries) {
             val nameNorm = normalizeName(entry.name)
             if (nameNorm.contains(searchNorm)) return entry
+        }
+
+        for (entry in entries) {
+            val nameNorm = normalizeName(entry.name)
+            if (nameNorm.replace(" ", "").contains(searchFlat)) return entry
         }
 
         val searchLast = lastWord(searchNorm)
@@ -942,26 +948,14 @@ class HomeViewModel @Inject constructor(
         if (start != null && start.isAfter(Instant.now())) return MatchStatus.UPCOMING
         val lm = liveMinutes[match.id]
         if (lm == "FINAL") return MatchStatus.FINISHED
-        if (lm != null && lm != "FINAL") {
-            if (start != null && match.homeGoals != null && match.awayGoals != null) {
-                val now = Instant.now()
-                val end = start.plusSeconds(MATCH_WINDOW_SECONDS)
-                if (now.isAfter(end)) return MatchStatus.FINISHED
-            }
-            return MatchStatus.LIVE
+        if (start != null) {
+            val now = Instant.now()
+            val end = start.plusSeconds(MATCH_WINDOW_SECONDS)
+            if (now.isAfter(end)) return MatchStatus.FINISHED
         }
-        if (match.homeGoals != null && match.awayGoals != null) {
-            if (start != null) {
-                val now = Instant.now()
-                val end = start.plusSeconds(MATCH_WINDOW_SECONDS)
-                if (now.isAfter(end)) return MatchStatus.FINISHED
-            }
-            return MatchStatus.LIVE
-        }
-        val parsed = start ?: return MatchStatus.UPCOMING
-        val now = Instant.now()
-        val end = parsed.plusSeconds(MATCH_WINDOW_SECONDS)
-        return if (now.isAfter(parsed) && now.isBefore(end)) MatchStatus.LIVE else MatchStatus.UPCOMING
+        if (lm != null) return MatchStatus.LIVE
+        if (match.homeGoals != null || match.awayGoals != null) return MatchStatus.LIVE
+        return MatchStatus.UPCOMING
     }
 
     private fun startBackgroundService() {

@@ -162,8 +162,10 @@ class HomeViewModel @Inject constructor(
     init {
         LogManager.init(context)
         viewModelScope.launch(Dispatchers.IO) {
-            com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
-            _appVersion.value = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+            runCatching {
+                com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
+                _appVersion.value = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+            }
         }
         viewModelScope.launch {
             runCatching {
@@ -172,9 +174,9 @@ class HomeViewModel @Inject constructor(
                 _notificationsEnabled.value = prefsManager.getNotificationsSync()
                 _userName.value = prefsManager.getUserNameSync()
                 _userPosition.value = prefsManager.getUserPositionSync()
+                liveMinutes.putAll(liveMatchStore.liveMinutes)
+                goalScorers.putAll(liveMatchStore.goalScorers)
             }
-            liveMinutes.putAll(liveMatchStore.liveMinutes)
-            goalScorers.putAll(liveMatchStore.goalScorers)
         }
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
@@ -286,8 +288,10 @@ class HomeViewModel @Inject constructor(
 
     fun forceCheckUpdate() {
         viewModelScope.launch(Dispatchers.IO) {
-            val info = UpdateManager.checkForUpdate(context)
-            _updateAvailable.value = info?.isNewer == true
+            runCatching {
+                val info = UpdateManager.checkForUpdate(context)
+                _updateAvailable.value = info?.isNewer == true
+            }
         }
     }
 

@@ -48,8 +48,9 @@ class HomeViewModelTest {
         coEvery { prefsManager.getExcelFileNameSync() } returns null
         coEvery { prefsManager.getAutoRefreshSync() } returns true
         coEvery { prefsManager.getNotificationsSync() } returns true
-        coEvery { repository.getAllMatches() } returns flowOf(emptyList())
-        coEvery { repository.getPlayerPredictions() } returns flowOf(emptyList())
+        every { repository.getAllMatches() } returns flowOf(emptyList())
+        every { repository.getAllTeams() } returns flowOf(emptyList())
+        every { repository.getPlayerPredictions() } returns flowOf(emptyList())
         coEvery { repository.calculateTotalPoints() } returns 0
         coEvery { liveScoreService.fetchScoreUpdates(any()) } returns emptyList()
         every { liveMatchStore.liveMinutes } returns ConcurrentHashMap()

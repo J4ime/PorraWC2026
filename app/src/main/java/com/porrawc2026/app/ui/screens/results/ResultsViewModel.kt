@@ -11,6 +11,7 @@ import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -26,6 +27,7 @@ class ResultsViewModel @Inject constructor(
     private val repository: PorraRepository,
     private val apiService: ApiService
 ) : ViewModel() {
+    var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
     val allMatches: StateFlow<List<MatchEntity>> = repository.getAllMatches()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -53,7 +55,7 @@ class ResultsViewModel @Inject constructor(
     }
 
     fun refreshLiveScores() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             _isRefreshing.value = true
             runCatching {
                 val response = apiService.getWorldCupMatches(status = "FINISHED")

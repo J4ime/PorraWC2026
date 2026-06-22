@@ -42,7 +42,7 @@ class ResultsViewModelTest {
         
         coEvery { apiService.getWorldCupMatches(any()) } throws RuntimeException("Network error")
         
-        val viewModel = ResultsViewModel(repository, apiService)
+        val viewModel = ResultsViewModel(repository, apiService).also { it.ioDispatcher = testDispatcher }
         viewModel.refreshLiveScores()
         
         advanceUntilIdle()

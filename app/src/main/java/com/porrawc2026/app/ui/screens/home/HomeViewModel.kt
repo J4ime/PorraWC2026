@@ -531,8 +531,10 @@ class HomeViewModel @Inject constructor(
                 val key = "$name:${scorer.minute}"
                 val notificationKey = "notif:$matchId:$key"
                 if (notificationKey !in processedGoalKeys && seen.add(key)) {
+                    val normalizedName = normalizeName(name)
                     val matches = predictedNames.any { pred ->
-                        name.contains(pred, ignoreCase = true) || pred.contains(name, ignoreCase = true)
+                        val normalizedPred = normalizeName(pred)
+                        normalizedName.contains(normalizedPred) || normalizedPred.contains(normalizedName)
                     }
                     if (matches) {
                         val displayName = scorer.playerName.split(" ").last()
@@ -682,19 +684,6 @@ class HomeViewModel @Inject constructor(
         return cachedIds
     }
 
-    private suspend fun saveFinishedScorersToCache(
-        matchId: Int,
-        homeScorers: List<LiveScorer>,
-        awayScorers: List<LiveScorer>
-    ) {
-        val homeJson = gson.toJson(homeScorers)
-        val awayJson = gson.toJson(awayScorers)
-        repository.updateMatchScorers(matchId, homeJson, awayJson)
-        cachedMatches = cachedMatches.map {
-            if (it.id == matchId) it.copy(homeScorers = homeJson, awayScorers = awayJson) else it
-        }
-    }
-
     private fun isFinishedByTime(match: MatchEntity): Boolean {
         val start = parseMadridInstant(match.dateTime) ?: return false
         return match.homeGoals != null && match.awayGoals != null &&
@@ -796,8 +785,13 @@ class HomeViewModel @Inject constructor(
         if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
             goalScorers[update.matchId] = Pair(homeScr, awayScr)
             liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)
+            val homeJson = gson.toJson(update.homeScorers)
+            val awayJson = gson.toJson(update.awayScorers)
+            cachedMatches = cachedMatches.map {
+                if (it.id == update.matchId) it.copy(homeScorers = homeJson, awayScorers = awayJson) else it
+            }
             if (update.isFinished) {
-                saveFinishedScorersToCache(update.matchId, update.homeScorers, update.awayScorers)
+                repository.updateMatchScorers(update.matchId, homeJson, awayJson)
             }
         }
     }

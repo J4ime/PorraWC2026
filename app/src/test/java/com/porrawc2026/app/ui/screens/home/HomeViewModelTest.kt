@@ -173,7 +173,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `toggleNotifications toggles the value`() = runTest {
+    fun `toggleNotifications toggles the value`() {
         val initialValue = viewModel.notificationsEnabled.value
         
         viewModel.toggleNotifications()
@@ -182,7 +182,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `toggleAutoRefresh toggles the value`() = runTest {
+    fun `toggleAutoRefresh toggles the value`() {
         val initialValue = viewModel.autoRefreshEnabled.value
         
         viewModel.toggleAutoRefresh()

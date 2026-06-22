@@ -166,7 +166,7 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `dismissValidation sets validationResult to null`() = runTest {
+    fun `dismissValidation sets validationResult to null`() {
         viewModel.dismissValidation()
         
         assertNull(viewModel.validationResult.value)

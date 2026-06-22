@@ -81,11 +81,12 @@ class LiveUpdateService : Service() {
 
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Porra WC 2026")
-            .setContentText("Actualizando...")
+            .setContentTitle("")
+            .setContentText("")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setOngoing(true)
             .setSilent(true)
+            .setLocalOnly(true)
             .build()
     }
 

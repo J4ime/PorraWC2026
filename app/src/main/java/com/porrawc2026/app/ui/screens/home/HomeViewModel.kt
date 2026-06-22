@@ -335,7 +335,8 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             runCatching {
-                val searchName = _userName.value?.takeIf { it.isNotBlank() } ?: "jaimede"
+                val searchName = _userName.value?.takeIf { it.isNotBlank() }
+                    ?: error("No hay nombre de usuario. Importa un Excel primero en Ajustes.")
                 val inputStream = context.contentResolver.openInputStream(uri)
                     ?: error("No se pudo abrir el PDF")
                 val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
@@ -351,6 +352,8 @@ class HomeViewModel @Inject constructor(
 
                 doc.close()
                 inputStream.close()
+
+                Log.d(TAG, "Buscando \"$searchName\" en ${entries.size} entradas del PDF")
 
                 val match = findUserInEntries(entries, searchName)
 

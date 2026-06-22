@@ -69,10 +69,10 @@ class LiveUpdateService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Actualización en directo",
-            NotificationManager.IMPORTANCE_LOW
+            "Actualización",
+            NotificationManager.IMPORTANCE_NONE
         ).apply {
-            description = "Notificación para mantener la app actualizada en segundo plano"
+            description = "Sincronización en segundo plano"
             setShowBadge(false)
         }
         val manager = getSystemService(NotificationManager::class.java)
@@ -82,7 +82,7 @@ class LiveUpdateService : Service() {
     private fun createNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Porra WC 2026")
-            .setContentText("Actualizando resultados en directo...")
+            .setContentText("Actualizando...")
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setOngoing(true)
             .setSilent(true)

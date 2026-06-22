@@ -151,24 +151,26 @@ fun AjustesScreen(
                         onClick = {                         viewModel.clearAndRefreshCache() }
                     )
                 }
-                item {
-                    SquareButton(
-                        icon = Icons.Filled.Assessment,
-                        label = when {
-                            pdfResult != null -> pdfResult!!
-                            userPosition != null -> {
-                                val diff = positionDiff
-                                if (diff != null && diff != 0) {
-                                    if (diff > 0) "${userPosition} (+$diff)"
-                                    else "$userPosition ($diff)"
-                                } else "${userPosition}"
-                            }
-                            else -> "Cargar result"
-                        },
-                        color = if (userPosition != null) Color(0xFF1565C0) else Color(0xFF444444),
-                        loading = isBusy,
-                        onClick = { pdfLauncher.launch(arrayOf("application/pdf")) }
-                    )
+                if (hasData) {
+                    item {
+                        SquareButton(
+                            icon = Icons.Filled.Assessment,
+                            label = when {
+                                pdfResult != null -> pdfResult!!
+                                userPosition != null -> {
+                                    val diff = positionDiff
+                                    if (diff != null && diff != 0) {
+                                        if (diff > 0) "${userPosition} (+$diff)"
+                                        else "$userPosition ($diff)"
+                                    } else "${userPosition}"
+                                }
+                                else -> "Cargar result"
+                            },
+                            color = if (userPosition != null) Color(0xFF1565C0) else Color(0xFF444444),
+                            loading = isBusy,
+                            onClick = { pdfLauncher.launch(arrayOf("application/pdf")) }
+                        )
+                    }
                 }
                 item {
                     var showLogs by remember { mutableStateOf(false) }

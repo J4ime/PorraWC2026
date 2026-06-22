@@ -338,14 +338,19 @@ class HomeViewModel @Inject constructor(
     fun loadPdfResult(uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
+            Log.i(TAG, "loadPdfResult: uri=$uri")
             runCatching {
                 val searchName = _userName.value?.takeIf { it.isNotBlank() }
                     ?: error("No hay nombre de usuario. Importa un Excel primero en Ajustes.")
+                Log.i(TAG, "searchName=\"$searchName\"")
+
                 val inputStream = context.contentResolver.openInputStream(uri)
                     ?: error("No se pudo abrir el PDF")
                 val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
+                Log.i(TAG, "PDF loaded, pages=${doc.numberOfPages}")
 
                 val entries = pdfExtractor.extract(doc)
+                Log.i(TAG, "extracted ${entries.size} entries")
 
                 runCatching {
                     val xlsmFile = File(context.cacheDir, "ClasificacionMundial_2026.xlsm")
@@ -357,14 +362,18 @@ class HomeViewModel @Inject constructor(
                 doc.close()
                 inputStream.close()
 
-                Log.d(TAG, "Buscando \"$searchName\" en ${entries.size} entradas del PDF")
-                Log.d(TAG, "searchName raw=\"$searchName\" normalized=\"${normalizeName(searchName)}\"")
-
                 val sampleSize = minOf(10, entries.size)
-                for (i in 0 until sampleSize) {
-                    val e = entries[i]
-                    Log.d(TAG, "  entrada[$i]: \"${e.name}\" -> normalized=\"${normalizeName(e.name)}\"")
+                if (entries.isEmpty()) {
+                    Log.w(TAG, "No se extrajeron entradas del PDF")
+                } else {
+                    for (i in 0 until sampleSize) {
+                        val e = entries[i]
+                        Log.i(TAG, "  entrada[$i]: \"${e.name}\" (pos=${e.position}, pts=${e.totalPoints})")
+                    }
                 }
+
+                val searchNorm = normalizeName(searchName)
+                Log.i(TAG, "Buscando \"$searchName\" (normalized=\"$searchNorm\") en ${entries.size} entradas")
 
                 val match = findUserInEntries(entries, searchName)
 
@@ -375,15 +384,16 @@ class HomeViewModel @Inject constructor(
                     prefsManager.setUserPosition(match.position)
                     prefsManager.setPreviousPosition(oldPos)
                     _pdfResult.value = "${match.position}"
-                    Log.d(TAG, "Encontrado en posición ${match.position}")
+                    Log.i(TAG, "Encontrado en posición ${match.position}")
                 } else {
                     _userPosition.value = null
                     _positionDiff.value = null
                     _pdfResult.value = "No encontrado"
-                    Log.d(TAG, "No encontrado en PDF: searchName=\"$searchName\" normalized=\"${normalizeName(searchName)}\"")
+                    Log.w(TAG, "No encontrado: searchName=\"$searchName\" normalized=\"${normalizeName(searchName)}\"")
                 }
             }.onFailure { e ->
                 _pdfResult.value = "Error: ${e.message?.take(25)}"
+                Log.e(TAG, "loadPdfResult error", e)
             }
             _isBusy.value = false
         }
@@ -396,7 +406,7 @@ class HomeViewModel @Inject constructor(
         for (entry in entries) {
             val nameNorm = normalizeName(entry.name)
             if (nameNorm.contains(searchNorm)) {
-                Log.d(TAG, "Stage1 match: entry=\"${entry.name}\" contains \"$searchNorm\"")
+                Log.i(TAG, "Stage1 match: entry=\"${entry.name}\" contains \"$searchNorm\"")
                 return entry
             }
         }
@@ -405,7 +415,7 @@ class HomeViewModel @Inject constructor(
             val nameNorm = normalizeName(entry.name)
             val flat = nameNorm.replace(" ", "")
             if (flat.contains(searchFlat)) {
-                Log.d(TAG, "Stage2 match: entry=\"${entry.name}\" flat=\"$flat\" contains \"$searchFlat\"")
+                Log.i(TAG, "Stage2 match: entry=\"${entry.name}\" flat=\"$flat\" contains \"$searchFlat\"")
                 return entry
             }
         }
@@ -416,7 +426,7 @@ class HomeViewModel @Inject constructor(
                 val nameNorm = normalizeName(entry.name)
                 val nameLast = lastWord(nameNorm)
                 if (nameLast == searchLast || nameNorm.contains(searchLast)) {
-                    Log.d(TAG, "Stage3 match: entry=\"${entry.name}\" last=\"$nameLast\" searchLast=\"$searchLast\"")
+                    Log.i(TAG, "Stage3 match: entry=\"${entry.name}\" last=\"$nameLast\" searchLast=\"$searchLast\"")
                     return entry
                 }
             }

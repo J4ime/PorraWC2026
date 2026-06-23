@@ -181,6 +181,11 @@ class HomeViewModel @Inject constructor(
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
         startBackgroundService()
+        viewModelScope.launch(Dispatchers.IO) {
+            goalEventBus.goalScored.collect {
+                tryGenerateDieciseisavos()
+            }
+        }
     }
 
     private fun preloadSchedule() {

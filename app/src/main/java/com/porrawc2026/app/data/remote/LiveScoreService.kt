@@ -29,7 +29,7 @@ data class LiveScoreUpdate(
     val hasSubGoal: Boolean = false
 )
 
-data class LiveScorer(val playerName: String, val minute: Int, val minuteLabel: String = "")
+data class LiveScorer(val playerName: String, val minute: Int, val minuteLabel: String? = null)
 
 data class TopScorerData(
     val playerName: String,

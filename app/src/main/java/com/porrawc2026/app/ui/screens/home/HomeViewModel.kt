@@ -62,7 +62,7 @@ import javax.inject.Inject
 
 enum class MatchStatus { UPCOMING, LIVE, FINISHED }
 
-data class GoalEvent(val playerName: String, val minute: Int, val minuteLabel: String = "")
+data class GoalEvent(val playerName: String, val minute: Int, val minuteLabel: String? = null)
 
 data class MatchDisplay(
     val id: Int,

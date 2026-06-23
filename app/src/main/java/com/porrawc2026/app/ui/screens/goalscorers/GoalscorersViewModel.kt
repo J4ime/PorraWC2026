@@ -82,8 +82,8 @@ class GoalscorersViewModel @Inject constructor(
             val allMatches = dbMatches.map { match ->
                 val livePair = liveMatchStore.goalScorers[match.id]
                 if (livePair != null) {
-                    val homeJson = Gson().toJson(livePair.first.map { LiveScorer(it.playerName, it.minute) })
-                    val awayJson = Gson().toJson(livePair.second.map { LiveScorer(it.playerName, it.minute) })
+                    val homeJson = Gson().toJson(livePair.first.map { LiveScorer(it.playerName, it.minute, it.minuteLabel) })
+                    val awayJson = Gson().toJson(livePair.second.map { LiveScorer(it.playerName, it.minute, it.minuteLabel) })
                     match.copy(homeScorers = homeJson, awayScorers = awayJson)
                 } else match
             }

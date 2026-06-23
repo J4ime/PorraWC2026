@@ -130,8 +130,8 @@ class LiveUpdateService : Service() {
 
             if (update.homeScorers.isNotEmpty() || update.awayScorers.isNotEmpty()) {
                 liveMatchStore.goalScorers[update.matchId] = Pair(
-                    update.homeScorers.map { GoalEvent(it.playerName, it.minute) },
-                    update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+                    update.homeScorers.map { GoalEvent(it.playerName, it.minute, it.minuteLabel) },
+                    update.awayScorers.map { GoalEvent(it.playerName, it.minute, it.minuteLabel) }
                 )
             }
 

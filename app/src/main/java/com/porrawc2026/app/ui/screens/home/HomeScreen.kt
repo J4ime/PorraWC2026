@@ -292,7 +292,8 @@ private fun MatchRow(match: MatchDisplay) {
                 sortedScorers.forEach { (goal, isHome, team) ->
                     if (isHome) runningH++ else runningA++
                     Row(Modifier.fillMaxWidth().padding(start = 50.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                        Text("${goal.minute}' [$runningH-$runningA]", fontSize = 9.sp, color = Color(0xFF888888))
+                        val minuteText = if (goal.minuteLabel.isNotEmpty()) goal.minuteLabel else "${goal.minute}"
+                        Text("${minuteText}' [$runningH-$runningA]", fontSize = 9.sp, color = Color(0xFF888888))
                         Spacer(Modifier.width(6.dp))
                         Text("\u26BD", fontSize = 10.sp); Spacer(Modifier.width(4.dp))
                         Text(goal.playerName.split(" ").last(), fontSize = 10.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)

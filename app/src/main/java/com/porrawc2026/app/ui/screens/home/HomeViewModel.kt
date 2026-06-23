@@ -62,7 +62,7 @@ import javax.inject.Inject
 
 enum class MatchStatus { UPCOMING, LIVE, FINISHED }
 
-data class GoalEvent(val playerName: String, val minute: Int)
+data class GoalEvent(val playerName: String, val minute: Int, val minuteLabel: String = "")
 
 data class MatchDisplay(
     val id: Int,
@@ -675,8 +675,8 @@ class HomeViewModel @Inject constructor(
                 try {
                     val homeList: List<LiveScorer> = gson.fromJson(homeRaw, scorerListType) ?: emptyList()
                     val awayList: List<LiveScorer> = gson.fromJson(awayRaw, scorerListType) ?: emptyList()
-                    val homeGoals = homeList.map { GoalEvent(it.playerName, it.minute) }
-                    val awayGoals = awayList.map { GoalEvent(it.playerName, it.minute) }
+                    val homeGoals = homeList.map { GoalEvent(it.playerName, it.minute, it.minuteLabel) }
+                    val awayGoals = awayList.map { GoalEvent(it.playerName, it.minute, it.minuteLabel) }
                     goalScorers[match.id] = Pair(homeGoals, awayGoals)
                     liveMatchStore.goalScorers[match.id] = Pair(homeGoals, awayGoals)
                     cachedIds.add(match.id)
@@ -785,8 +785,8 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun updateGoalScorers(update: LiveScoreUpdate) {
-        val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute) }
-        val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute) }
+        val homeScr = update.homeScorers.map { GoalEvent(it.playerName, it.minute, it.minuteLabel) }
+        val awayScr = update.awayScorers.map { GoalEvent(it.playerName, it.minute, it.minuteLabel) }
         if (homeScr.isNotEmpty() || awayScr.isNotEmpty()) {
             goalScorers[update.matchId] = Pair(homeScr, awayScr)
             liveMatchStore.goalScorers[update.matchId] = Pair(homeScr, awayScr)

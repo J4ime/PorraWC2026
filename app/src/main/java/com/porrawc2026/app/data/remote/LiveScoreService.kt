@@ -29,7 +29,7 @@ data class LiveScoreUpdate(
     val hasSubGoal: Boolean = false
 )
 
-data class LiveScorer(val playerName: String, val minute: Int)
+data class LiveScorer(val playerName: String, val minute: Int, val minuteLabel: String = "")
 
 data class TopScorerData(
     val playerName: String,
@@ -128,9 +128,14 @@ class LiveScoreService @Inject constructor(
                 val goalMinute = if (m != null) {
                     (m.groupValues[1].toIntOrNull() ?: 0) + (m.groupValues[3].toIntOrNull() ?: 0)
                 } else 0
+                val minuteLabel = m?.let {
+                    val base = it.groupValues[1]
+                    val extra = it.groupValues[3]
+                    if (extra.isNotEmpty()) "${base}+${extra}" else base
+                } ?: minuteStr
                 val isHome = detail.team?.id == homeTeamId
-                if (isHome) homeScorers.add(LiveScorer(playerName, goalMinute))
-                else awayScorers.add(LiveScorer(playerName, goalMinute))
+                if (isHome) homeScorers.add(LiveScorer(playerName, goalMinute, minuteLabel))
+                else awayScorers.add(LiveScorer(playerName, goalMinute, minuteLabel))
                 if (detail.type?.id == "137") {
                     if (isHome) hHeaded++ else aHeaded++
                 }

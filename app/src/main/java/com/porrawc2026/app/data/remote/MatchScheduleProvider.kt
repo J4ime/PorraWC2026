@@ -40,8 +40,8 @@ object MatchScheduleProvider {
         data[8] = MatchSchedule(8, "2026-06-13T21:00:00", "DAZN", "Catar", "Suiza")
         data[9] = MatchSchedule(9, "2026-06-18T21:00:00", "RTVE", "Suiza", "Bosnia y Herzegovina")
         data[10] = MatchSchedule(10, "2026-06-19T00:00:00", "DAZN", "Canadá", "Catar")
-        data[11] = MatchSchedule(11, "2026-06-25T03:00:00", "DAZN", "Suiza", "Canadá")
-        data[12] = MatchSchedule(12, "2026-06-25T03:00:00", "DAZN", "Bosnia y Herzegovina", "Catar")
+        data[11] = MatchSchedule(11, "2026-06-24T21:00:00", "DAZN", "Suiza", "Canadá")
+        data[12] = MatchSchedule(12, "2026-06-24T21:00:00", "DAZN", "Bosnia y Herzegovina", "Catar")
 
         data[13] = MatchSchedule(13, "2026-06-14T00:00:00", "RTVE", "Brasil", "Marruecos")
         data[14] = MatchSchedule(14, "2026-06-20T00:00:00", "RTVE", "Escocia", "Marruecos")

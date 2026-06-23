@@ -878,9 +878,8 @@ class HomeViewModel @Inject constructor(
         val todayZoned = LocalDate.now(madridZone)
         val matches = cachedMatches
 
-        val groupMatches = matches.filter { it.id < KNOCKOUT_START_ID }
-            .sortedBy { it.dateTime.ifBlank { "zzz" } }
-        val allDisplay = groupMatches.map { match -> toDisplay(match) }
+        val allSorted = matches.sortedBy { it.dateTime.ifBlank { "zzz" } }
+        val allDisplay = allSorted.map { match -> toDisplay(match) }
 
         val yesterdayMatches = allDisplay.filter { display ->
             val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false

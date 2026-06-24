@@ -9,8 +9,10 @@ import androidx.core.content.ContextCompat
 import com.porrawc2026.app.service.LiveUpdateService
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
+import com.porrawc2026.app.data.local.entity.TeamEntity
 import com.porrawc2026.app.data.remote.LiveScoreService
 import com.porrawc2026.app.data.remote.LiveScoreUpdate
 import com.porrawc2026.app.data.remote.MatchScheduleProvider
@@ -101,6 +103,8 @@ class HomeViewModel @Inject constructor(
 
     private val _totalPoints = MutableStateFlow(0)
     val totalPoints: StateFlow<Int> = _totalPoints.asStateFlow()
+    private val _advancementPoints = MutableStateFlow(0)
+    val advancementPoints: StateFlow<Int> = _advancementPoints.asStateFlow()
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
     private val _validationResult = MutableStateFlow<ValidationResult?>(null)
@@ -480,7 +484,10 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshPoints() {
-        viewModelScope.launch { _totalPoints.value = repository.calculateTotalPoints() }
+        viewModelScope.launch {
+            val adv = _advancementPoints.value
+            _totalPoints.value = repository.calculateTotalPoints(adv)
+        }
     }
 
     private fun downloadPlayerPhotos() {
@@ -510,16 +517,15 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun recalcAllPoints() {
-        cachedMatches = cachedMatches.map { match ->
-            val realHome = match.homeGoals
-            val realAway = match.awayGoals
-            if (realHome != null && realAway != null) {
-                val pts = PointsCalculator.calculateMatchPoints(match)
-                val updated = match.copy(pointsEarned = pts)
-                repository.updateMatchPoints(match.id, pts)
-                updated
-            } else match
-        }
+        cachedMatches = cachedMatches.map { it.copy(pointsEarned = 0) }
+
+        val teams = repository.getAllTeams().first()
+        val knockoutPredictions = repository.getKnockoutPredictions().first()
+
+        val actual = PointsCalculator.computeActualAdvancingTeams(cachedMatches, teams)
+        val predicted = PointsCalculator.computePredictedAdvancingTeams(cachedMatches, teams, knockoutPredictions)
+        val advPoints = PointsCalculator.calculateTotalAdvancementPoints(predicted, actual)
+        _advancementPoints.value = advPoints
     }
 
     private suspend fun checkGoalNotifications() {

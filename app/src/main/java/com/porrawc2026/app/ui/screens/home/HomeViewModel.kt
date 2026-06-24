@@ -517,7 +517,11 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun recalcAllPoints() {
-        cachedMatches = cachedMatches.map { it.copy(pointsEarned = 0) }
+        cachedMatches = cachedMatches.map { m ->
+            val pts = if (!m.isKnockout) PointsCalculator.calculateMatchPoints(m) else 0
+            if (pts != m.pointsEarned) repository.updateMatchPoints(m.id, pts)
+            m.copy(pointsEarned = pts)
+        }
 
         val teams = repository.getAllTeams().first()
         val knockoutPredictions = repository.getKnockoutPredictions().first()

@@ -21,8 +21,8 @@ android {
         applicationId = "com.porrawc2026.app"
         minSdk = 26
         targetSdk = 35
-versionCode = 240
-versionName = "1.9.75"
+versionCode = 241
+versionName = "1.9.76"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "FOOTBALL_DATA_API_KEY", "\"${localProperties.getProperty("FOOTBALL_DATA_API_KEY", "")}\"")

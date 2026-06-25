@@ -135,17 +135,27 @@ object KnockoutBracketGenerator {
         teams: List<com.porrawc2026.app.data.local.entity.TeamEntity>
     ): Map<String, List<GroupStanding>> {
         val groupsMap = mutableMapOf<String, MutableMap<String, GroupStanding>>()
+        val normLookup = mutableMapOf<String, MutableMap<String, String>>()
 
         for (team in teams) {
             val g = team.groupLetter.uppercase()
             val standings = groupsMap.getOrPut(g) { mutableMapOf() }
             standings[team.name] = GroupStanding(teamName = team.name, points = 0, goalDifference = 0, goalsFor = 0, position = 0)
+            val lookup = normLookup.getOrPut(g) { mutableMapOf() }
+            lookup[TeamNameNormalizer.normalize(team.name)] = team.name
+        }
+
+        fun resolveStandingKey(teamName: String, group: String): String? {
+            val groupS = groupsMap[group] ?: return null
+            if (teamName in groupS) return teamName
+            val norm = normLookup[group]?.get(TeamNameNormalizer.normalize(teamName))
+            if (norm != null) return norm
+            return null
         }
 
         val groupMatches = matches.filter { !it.isKnockout }
         for (match in groupMatches) {
             val group = match.groupName.removePrefix("Grupo ").trim().uppercase()
-            val standings = groupsMap[group] ?: continue
 
             val homeGoals = match.homeGoals
             val awayGoals = match.awayGoals
@@ -155,18 +165,22 @@ object KnockoutBracketGenerator {
                 continue
             }
 
-            val home = standings[match.homeTeam]
-            val away = standings[match.awayTeam]
+            val homeKey = resolveStandingKey(match.homeTeam, group)
+            val awayKey = resolveStandingKey(match.awayTeam, group)
+            val standings = groupsMap[group] ?: continue
+            val home = if (homeKey != null) standings[homeKey] else null
+            val away = if (awayKey != null) standings[awayKey] else null
+
             if (home == null) {
-                LogManager.log("KnockoutBracket", "SKIP #${match.id}: home='${match.homeTeam}' not found in group $group standings keys=${standings.keys}")
+                LogManager.log("KnockoutBracket", "SKIP #${match.id}: home='${match.homeTeam}' (norm='${TeamNameNormalizer.normalize(match.homeTeam)}') not found in group $group keys=${standings.keys} normKeys=${normLookup[group]?.keys}")
                 continue
             }
             if (away == null) {
-                LogManager.log("KnockoutBracket", "SKIP #${match.id}: away='${match.awayTeam}' not found in group $group standings keys=${standings.keys}")
+                LogManager.log("KnockoutBracket", "SKIP #${match.id}: away='${match.awayTeam}' (norm='${TeamNameNormalizer.normalize(match.awayTeam)}') not found in group $group keys=${standings.keys} normKeys=${normLookup[group]?.keys}")
                 continue
             }
 
-            standings[match.homeTeam] = home.copy(
+            standings[homeKey!!] = home.copy(
                 points = home.points + when {
                     homeGoals > awayGoals -> 3
                     homeGoals == awayGoals -> 1
@@ -175,7 +189,7 @@ object KnockoutBracketGenerator {
                 goalDifference = home.goalDifference + (homeGoals - awayGoals),
                 goalsFor = home.goalsFor + homeGoals
             )
-            standings[match.awayTeam] = away.copy(
+            standings[awayKey!!] = away.copy(
                 points = away.points + when {
                     awayGoals > homeGoals -> 3
                     awayGoals == homeGoals -> 1

@@ -3,6 +3,7 @@ package com.porrawc2026.app.domain.model
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
+import com.porrawc2026.app.domain.model.TeamNameNormalizer
 
 object PointsCalculator {
 
@@ -280,7 +281,7 @@ object PointsCalculator {
             val predicted = resolved[refId]
             if (predicted != null) {
                 val match = predicted.match ?: return null
-                val opp = if (match.homeTeam == predicted.teamName) match.awayTeam else match.homeTeam
+                val opp = if (TeamNameNormalizer.matches(match.homeTeam, predicted.teamName)) match.awayTeam else match.homeTeam
                 return opp
             }
             return null
@@ -294,6 +295,7 @@ object PointsCalculator {
         usePredicted: Boolean
     ): Map<String, List<GroupStanding>> {
         val groupsMap = mutableMapOf<String, MutableMap<String, GroupStanding>>()
+        val normLookup = mutableMapOf<String, MutableMap<String, String>>()
 
         for (team in allTeams) {
             val g = team.groupLetter.uppercase()
@@ -301,6 +303,14 @@ object PointsCalculator {
             standings[team.name] = GroupStanding(
                 teamName = team.name, points = 0, goalDifference = 0, goalsFor = 0, position = 0
             )
+            val lookup = normLookup.getOrPut(g) { mutableMapOf() }
+            lookup[TeamNameNormalizer.normalize(team.name)] = team.name
+        }
+
+        fun resolveKey(teamName: String, group: String): String? {
+            val gs = groupsMap[group] ?: return null
+            if (teamName in gs) return teamName
+            return normLookup[group]?.get(TeamNameNormalizer.normalize(teamName))
         }
 
         val groupMatches = allMatches.filter { !it.isKnockout }
@@ -310,10 +320,12 @@ object PointsCalculator {
             if (homeGoals == null || awayGoals == null) continue
             val group = match.groupName.removePrefix("Grupo ").trim().uppercase()
             val standings = groupsMap[group] ?: continue
-            val home = standings[match.homeTeam] ?: continue
-            val away = standings[match.awayTeam] ?: continue
+            val homeKey = resolveKey(match.homeTeam, group) ?: continue
+            val awayKey = resolveKey(match.awayTeam, group) ?: continue
+            val home = standings[homeKey] ?: continue
+            val away = standings[awayKey] ?: continue
 
-            standings[match.homeTeam] = home.copy(
+            standings[homeKey] = home.copy(
                 points = home.points + when {
                     homeGoals > awayGoals -> 3
                     homeGoals == awayGoals -> 1
@@ -322,7 +334,7 @@ object PointsCalculator {
                 goalDifference = home.goalDifference + (homeGoals - awayGoals),
                 goalsFor = home.goalsFor + homeGoals
             )
-            standings[match.awayTeam] = away.copy(
+            standings[awayKey] = away.copy(
                 points = away.points + when {
                     awayGoals > homeGoals -> 3
                     awayGoals == homeGoals -> 1

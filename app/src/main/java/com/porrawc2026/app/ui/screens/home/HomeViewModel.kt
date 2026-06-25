@@ -721,10 +721,13 @@ class HomeViewModel @Inject constructor(
     private suspend fun filterMatchesForFetch(fullFetch: Boolean): List<MatchEntity>? {
         val todayMatches = getTodayMatchesWithDates()
         val staleMatches = if (fullFetch) emptyList() else getStaleMatches()
+        val dieciseisavosToFetch = if (fullFetch) emptyList() else {
+            cachedMatches.filter { it.id in 73..88 && it.homeTeam.contains("º") }
+        }
         val matchesForWc = if (fullFetch) {
             cachedMatches
         } else {
-            (todayMatches + staleMatches).distinctBy { it.id }
+            (todayMatches + staleMatches + dieciseisavosToFetch).distinctBy { it.id }
         }
         if (matchesForWc.isEmpty()) return null
 

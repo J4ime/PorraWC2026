@@ -2,6 +2,7 @@ package com.porrawc2026.app.domain.model
 
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.remote.MatchScheduleProvider
+import com.porrawc2026.app.util.LogManager
 
 data class GroupStanding(
     val teamName: String,
@@ -143,13 +144,27 @@ object KnockoutBracketGenerator {
 
         val groupMatches = matches.filter { !it.isKnockout }
         for (match in groupMatches) {
-            val homeGoals = match.homeGoals ?: continue
-            val awayGoals = match.awayGoals ?: continue
             val group = match.groupName.removePrefix("Grupo ").trim().uppercase()
             val standings = groupsMap[group] ?: continue
 
-            val home = standings[match.homeTeam] ?: continue
-            val away = standings[match.awayTeam] ?: continue
+            val homeGoals = match.homeGoals
+            val awayGoals = match.awayGoals
+            if (homeGoals == null || awayGoals == null) {
+                if (group in listOf("A","B","C","D","E","F","G","H","I","J","K","L"))
+                    LogManager.log("KnockoutBracket", "Skipping #${match.id} ${match.homeTeam}-${match.awayTeam} (no score)")
+                continue
+            }
+
+            val home = standings[match.homeTeam]
+            val away = standings[match.awayTeam]
+            if (home == null) {
+                LogManager.log("KnockoutBracket", "SKIP #${match.id}: home='${match.homeTeam}' not found in group $group standings keys=${standings.keys}")
+                continue
+            }
+            if (away == null) {
+                LogManager.log("KnockoutBracket", "SKIP #${match.id}: away='${match.awayTeam}' not found in group $group standings keys=${standings.keys}")
+                continue
+            }
 
             standings[match.homeTeam] = home.copy(
                 points = home.points + when {
@@ -171,13 +186,19 @@ object KnockoutBracketGenerator {
             )
         }
 
-        return groupsMap.mapValues { (_, teamMap) ->
+        val result = groupsMap.mapValues { (_, teamMap) ->
             teamMap.values.sortedWith(
                 compareByDescending<GroupStanding> { it.points }
                     .thenByDescending { it.goalDifference }
                     .thenByDescending { it.goalsFor }
             ).mapIndexed { idx, entry -> entry.copy(position = idx + 1) }
         }
+
+        for ((g, entries) in result) {
+            if (g in listOf("A","B","C","D","E","F","G","H","I","J","K","L"))
+                LogManager.log("KnockoutBracket", "Group $g standings: ${entries.map { "${it.position}.${it.teamName}=${it.points}pts" }}")
+        }
+        return result
     }
 
     private fun resolveTeam(

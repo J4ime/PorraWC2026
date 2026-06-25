@@ -792,9 +792,21 @@ class HomeViewModel @Inject constructor(
         LogManager.log("HomeVM", "Fetching match IDs=$ids dates=$dates")
         val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(wcMatches) }.orEmpty()
         if (scoreUpdates.isNotEmpty()) {
-            LogManager.log("HomeVM", "API returned ${scoreUpdates.size} updates: ${scoreUpdates.map { "${it.matchId}:${it.apiHomeTeam?:""}-${it.apiAwayTeam?:""}" }}")
+            LogManager.log("HomeVM", "API returned ${scoreUpdates.size} updates: ${scoreUpdates.map { "${it.matchId}:${it.apiHomeTeam?:""} ${it.homeGoals}-${it.awayGoals} ${it.apiAwayTeam?:""}" }}")
+            val canadaMatches = scoreUpdates.filter { it.matchId in 7..12 }
+            if (canadaMatches.isNotEmpty()) {
+                LogManager.log("HomeVM", "Group B from API:")
+                canadaMatches.forEach { m ->
+                    LogManager.log("HomeVM", "  #${m.matchId}: ${m.apiHomeTeam} ${m.homeGoals}-${m.awayGoals} ${m.apiAwayTeam} finished=${m.isFinished}")
+                }
+            }
         } else {
             LogManager.log("HomeVM", "API returned 0 updates for date range ${dates.firstOrNull()}..${dates.lastOrNull()}")
+        }
+        val canadaCached = cachedMatches.filter { it.id in 7..12 }
+        LogManager.log("HomeVM", "Group B cached scores:")
+        canadaCached.forEach { m ->
+            LogManager.log("HomeVM", "  #${m.id}: ${m.homeTeam} ${m.homeGoals}-${m.awayGoals} ${m.awayTeam}")
         }
         processScoreUpdates(scoreUpdates)
         tryGenerateDieciseisavos()

@@ -35,7 +35,7 @@ object KnockoutBracketGenerator {
         data class ThirdParty(val winnerGroup: String, val eligibleGroups: List<String>) : SlotTeam()
     }
 
-    private val dieciseisavoSlots = listOf(
+    val dieciseisavoSlots = listOf(
         DieciseisavoSlot(73, SlotTeam.GroupPosition(2, "A"), SlotTeam.GroupPosition(2, "B")),
         DieciseisavoSlot(74, SlotTeam.GroupPosition(1, "E"), SlotTeam.ThirdParty("E", listOf("A","B","C","D","F"))),
         DieciseisavoSlot(75, SlotTeam.GroupPosition(1, "F"), SlotTeam.GroupPosition(2, "C")),

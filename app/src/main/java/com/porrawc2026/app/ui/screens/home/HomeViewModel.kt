@@ -627,20 +627,76 @@ class HomeViewModel @Inject constructor(
         tryGenerateDieciseisavos()
     }
 
+    private val apiConfirmedMatchIds = mutableSetOf<Int>()
+
     private suspend fun tryGenerateDieciseisavos() {
         val existingDieciseisavos = cachedMatches.filter { it.id in 73..88 }
+        val completeGroups = getCompleteGroups()
+        val allGroupsComplete = completeGroups.size == 12
+        LogManager.log("HomeVM", "tryGenerateDieciseisavos: ${completeGroups.size}/12 groups complete ($completeGroups)")
+        existingDieciseisavos.forEach { d ->
+            LogManager.log("HomeVM", "  1/16 #${d.id}: ${d.homeTeam} vs ${d.awayTeam}")
+        }
+        val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
+
+        val placeholders = existingDieciseisavos.map { existing ->
+            val sched = schedule[existing.id] ?: return@map existing
+            val slot = KnockoutBracketGenerator.dieciseisavoSlots.firstOrNull { it.matchId == existing.id }
+            val homeComplete = slot == null || isSlotTeamComplete(slot.homeType, completeGroups, allGroupsComplete)
+            val awayComplete = slot == null || isSlotTeamComplete(slot.awayType, completeGroups, allGroupsComplete)
+            val hasApi = existing.id in apiConfirmedMatchIds
+
+            val newHome = when {
+                hasApi -> existing.homeTeam
+                homeComplete -> existing.homeTeam
+                existing.homeTeam.contains("º") -> existing.homeTeam
+                existing.homeTeam != sched.home -> sched.home
+                else -> existing.homeTeam
+            }
+            val newAway = when {
+                hasApi -> existing.awayTeam
+                awayComplete -> existing.awayTeam
+                existing.awayTeam.contains("º") -> existing.awayTeam
+                existing.awayTeam != sched.away -> sched.away
+                else -> existing.awayTeam
+            }
+            if (newHome != existing.homeTeam || newAway != existing.awayTeam)
+                existing.copy(homeTeam = newHome, awayTeam = newAway)
+            else existing
+        }
+
+        val placeholderChanged = placeholders != existingDieciseisavos.sortedBy { it.id }
+        if (placeholderChanged) {
+            LogManager.log("HomeVM", "Reverting to schedule placeholders (incomplete groups)")
+            placeholders.forEach { p ->
+                val orig = existingDieciseisavos.firstOrNull { it.id == p.id }
+                if (orig != null && (orig.homeTeam != p.homeTeam || orig.awayTeam != p.awayTeam))
+                    LogManager.log("HomeVM", "  #${p.id}: ${orig.homeTeam} vs ${orig.awayTeam} → ${p.homeTeam} vs ${p.awayTeam}")
+            }
+            repository.insertMatches(placeholders)
+            cachedMatches = (cachedMatches.filter { it.id !in 73..88 } + placeholders).sortedBy { it.id }
+        }
+
+        if (!allGroupsComplete && !placeholderChanged) return
+        if (!allGroupsComplete) {
+            refreshUpcomingMatches()
+            return
+        }
+
         val teams = repository.getAllTeams().first()
         val dieciseisavos = KnockoutBracketGenerator.generateDieciseisavos(cachedMatches, teams)
         if (dieciseisavos.isEmpty()) return
 
+        LogManager.log("HomeVM", "All groups complete, generating bracket")
         val preserved = dieciseisavos.map { gen ->
-            val existing = existingDieciseisavos.firstOrNull { it.id == gen.id }
+            val existing = placeholders.firstOrNull { it.id == gen.id }
             if (existing != null) {
+                val hasApi = gen.id in apiConfirmedMatchIds
                 val homeIsPlaceholder = existing.homeTeam.contains("º")
                 val awayIsPlaceholder = existing.awayTeam.contains("º")
                 gen.copy(
-                    homeTeam = if (homeIsPlaceholder) gen.homeTeam else existing.homeTeam,
-                    awayTeam = if (awayIsPlaceholder) gen.awayTeam else existing.awayTeam,
+                    homeTeam = if (hasApi) existing.homeTeam else if (homeIsPlaceholder) gen.homeTeam else existing.homeTeam,
+                    awayTeam = if (hasApi) existing.awayTeam else if (awayIsPlaceholder) gen.awayTeam else existing.awayTeam,
                     homeGoals = existing.homeGoals, awayGoals = existing.awayGoals,
                     predictedHomeGoals = existing.predictedHomeGoals,
                     predictedAwayGoals = existing.predictedAwayGoals,
@@ -660,9 +716,32 @@ class HomeViewModel @Inject constructor(
         val changed = preserved != existingDieciseisavos.sortedBy { it.id }
         if (!changed) return
 
+        LogManager.log("HomeVM", "Updating bracket with generated teams")
+        preserved.forEach { p ->
+            val orig = existingDieciseisavos.firstOrNull { it.id == p.id }
+            if (orig != null && (orig.homeTeam != p.homeTeam || orig.awayTeam != p.awayTeam))
+                LogManager.log("HomeVM", "  #${p.id}: ${orig.homeTeam} vs ${orig.awayTeam} → ${p.homeTeam} vs ${p.awayTeam}")
+        }
+
         repository.insertMatches(preserved)
         cachedMatches = (cachedMatches.filter { it.id !in 73..88 } + preserved).sortedBy { it.id }
         refreshUpcomingMatches()
+    }
+
+    private fun getCompleteGroups(): Set<String> {
+        val groupMatches = cachedMatches.filter { !it.isKnockout }.groupBy {
+            it.groupName.removePrefix("Grupo ").trim().uppercase()
+        }
+        return groupMatches.filterValues { groupList ->
+            groupList.all { it.homeGoals != null && it.awayGoals != null }
+        }.keys
+    }
+
+    private fun isSlotTeamComplete(slotTeam: KnockoutBracketGenerator.SlotTeam, completeGroups: Set<String>, allGroupsComplete: Boolean): Boolean {
+        return when (slotTeam) {
+            is KnockoutBracketGenerator.SlotTeam.GroupPosition -> slotTeam.group in completeGroups
+            is KnockoutBracketGenerator.SlotTeam.ThirdParty -> allGroupsComplete
+        }
     }
 
     private suspend fun <T> fetchWithRetry(maxAttempts: Int = 10, block: suspend () -> T?): T? {
@@ -708,7 +787,15 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun fetchLiveResults(fullFetch: Boolean = false) {
         val wcMatches = filterMatchesForFetch(fullFetch) ?: return
+        val ids = wcMatches.map { it.id }.sorted()
+        val dates = wcMatches.mapNotNull { it.dateTime.take(10) }.distinct().sorted()
+        LogManager.log("HomeVM", "Fetching match IDs=$ids dates=$dates")
         val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(wcMatches) }.orEmpty()
+        if (scoreUpdates.isNotEmpty()) {
+            LogManager.log("HomeVM", "API returned ${scoreUpdates.size} updates: ${scoreUpdates.map { "${it.matchId}:${it.apiHomeTeam?:""}-${it.apiAwayTeam?:""}" }}")
+        } else {
+            LogManager.log("HomeVM", "API returned 0 updates for date range ${dates.firstOrNull()}..${dates.lastOrNull()}")
+        }
         processScoreUpdates(scoreUpdates)
         tryGenerateDieciseisavos()
         notifyGoalEvents()
@@ -782,6 +869,7 @@ class HomeViewModel @Inject constructor(
                 }
             }
             if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+                apiConfirmedMatchIds.add(update.matchId)
                 val cur = cachedMatches.firstOrNull { it.id == update.matchId }
                 if (cur != null && (cur.homeTeam != update.apiHomeTeam || cur.awayTeam != update.apiAwayTeam)) {
                     cachedMatches = cachedMatches.map {

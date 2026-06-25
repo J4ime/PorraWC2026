@@ -89,6 +89,10 @@ object PointsCalculator {
             .filter { it.isKnockout && it.winnerTeam != null }
             .associate { it.id to it.winnerTeam!! }
 
+        val tercero = mutableSetOf<String>()
+        val resolvedTercero = resolveThirdPlaceParticipants(allMatches, winnerByMatch)
+        if (resolvedTercero != null) tercero.addAll(resolvedTercero)
+
         return AdvancingTeams(
             dieciseisavos = dieciseisavos,
             octavos = resolveAdvancing(73..88, winnerByMatch),
@@ -96,7 +100,7 @@ object PointsCalculator {
             semifinales = resolveAdvancing(97..100, winnerByMatch),
             final = resolveAdvancing(101..102, winnerByMatch),
             campeon = resolveAdvancing(104..104, winnerByMatch),
-            tercero = resolveAdvancing(103..103, winnerByMatch)
+            tercero = tercero
         )
     }
 
@@ -138,6 +142,78 @@ object PointsCalculator {
         home > away -> "h"
         home < away -> "a"
         else -> "d"
+    }
+
+    fun computeKnockoutMatchAdvancementPoints(
+        match: MatchEntity,
+        allMatches: List<MatchEntity>,
+        actual: AdvancingTeams
+    ): Int {
+        val round = match.knockoutRound ?: return 0
+        val roundPts = getRoundAdvancementPoints(round)
+        if (roundPts == 0) return 0
+
+        val advancingSet = when (round) {
+            "Dieciseisavos" -> actual.dieciseisavos
+            "Octavos" -> actual.octavos
+            "Cuartos" -> actual.cuartos
+            "Semifinales" -> actual.semifinales
+            "3er puesto" -> actual.tercero
+            "Final" -> actual.final
+            else -> return 0
+        }
+
+        val homeResolved = resolveMatchTeam(match.homeTeam, allMatches)
+        val awayResolved = resolveMatchTeam(match.awayTeam, allMatches)
+
+        var pts = 0
+        if (homeResolved in advancingSet) pts += roundPts
+        if (awayResolved in advancingSet) pts += roundPts
+        return pts
+    }
+
+    fun resolveMatchTeam(teamName: String, allMatches: List<MatchEntity>): String {
+        val ganador = Regex("^Ganador\\s+(\\d+)$").find(teamName)
+        if (ganador != null) {
+            val id = ganador.groupValues[1].toIntOrNull()
+            if (id != null) {
+                return allMatches.firstOrNull { it.id == id }?.winnerTeam ?: teamName
+            }
+        }
+        val perdedor = Regex("^Perdedor\\s+(\\d+)$").find(teamName)
+        if (perdedor != null) {
+            val id = perdedor.groupValues[1].toIntOrNull()
+            if (id != null) {
+                val m = allMatches.firstOrNull { it.id == id }
+                if (m != null && m.winnerTeam != null) {
+                    return if (m.homeTeam == m.winnerTeam) m.awayTeam else m.homeTeam
+                }
+            }
+        }
+        return teamName
+    }
+
+    private fun resolveThirdPlaceParticipants(allMatches: List<MatchEntity>, winnerByMatch: Map<Int, String>): Set<String>? {
+        val hMatch = matchRefId(allMatches.firstOrNull { it.id == 103 }?.homeTeam ?: return null)
+        val aMatch = matchRefId(allMatches.firstOrNull { it.id == 103 }?.awayTeam ?: return null)
+        val hLoser = findLoser(hMatch, allMatches, winnerByMatch)
+        val aLoser = findLoser(aMatch, allMatches, winnerByMatch)
+        val result = mutableSetOf<String>()
+        if (hLoser != null) result.add(hLoser)
+        if (aLoser != null) result.add(aLoser)
+        return result.ifEmpty { null }
+    }
+
+    private fun matchRefId(teamName: String): Int? {
+        val r = Regex("^Ganador\\s+(\\d+)$|^Perdedor\\s+(\\d+)$").find(teamName)
+        return if (r != null) (r.groupValues[1].ifBlank { r.groupValues[2] }).toIntOrNull() else null
+    }
+
+    private fun findLoser(matchId: Int?, allMatches: List<MatchEntity>, winnerByMatch: Map<Int, String>): String? {
+        if (matchId == null) return null
+        val m = allMatches.firstOrNull { it.id == matchId } ?: return null
+        val w = winnerByMatch[matchId] ?: return null
+        return if (m.homeTeam == w) m.awayTeam else m.homeTeam
     }
 
     private fun resolveAdvancing(matchIds: IntRange, winnerByMatch: Map<Int, String>): Set<String> {

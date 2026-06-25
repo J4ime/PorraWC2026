@@ -635,11 +635,12 @@ class HomeViewModel @Inject constructor(
 
         val preserved = dieciseisavos.map { gen ->
             val existing = existingDieciseisavos.firstOrNull { it.id == gen.id }
-            if (existing != null && existing.homeTeam == gen.homeTeam && existing.awayTeam == gen.awayTeam) {
-                return@map existing
-            }
             if (existing != null) {
+                val homeIsPlaceholder = existing.homeTeam.contains("º")
+                val awayIsPlaceholder = existing.awayTeam.contains("º")
                 gen.copy(
+                    homeTeam = if (homeIsPlaceholder) gen.homeTeam else existing.homeTeam,
+                    awayTeam = if (awayIsPlaceholder) gen.awayTeam else existing.awayTeam,
                     homeGoals = existing.homeGoals, awayGoals = existing.awayGoals,
                     predictedHomeGoals = existing.predictedHomeGoals,
                     predictedAwayGoals = existing.predictedAwayGoals,
@@ -775,6 +776,15 @@ class HomeViewModel @Inject constructor(
                 repository.updateMatchSubGoal(update.matchId, update.hasSubGoal)
                 if (update.winnerTeam != null) {
                     repository.updateMatchWinner(update.matchId, update.winnerTeam)
+                }
+            }
+            if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+                val cur = cachedMatches.firstOrNull { it.id == update.matchId }
+                if (cur != null && (cur.homeTeam != update.apiHomeTeam || cur.awayTeam != update.apiAwayTeam)) {
+                    cachedMatches = cachedMatches.map {
+                        if (it.id == update.matchId) it.copy(homeTeam = update.apiHomeTeam, awayTeam = update.apiAwayTeam) else it
+                    }
+                    repository.updateMatchTeams(update.matchId, update.apiHomeTeam, update.apiAwayTeam)
                 }
             }
         }

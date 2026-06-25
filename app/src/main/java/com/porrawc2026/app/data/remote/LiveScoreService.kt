@@ -26,7 +26,9 @@ data class LiveScoreUpdate(
     val winnerTeam: String? = null,
     val homeHeadedGoals: Int = 0,
     val awayHeadedGoals: Int = 0,
-    val hasSubGoal: Boolean = false
+    val hasSubGoal: Boolean = false,
+    val apiHomeTeam: String? = null,
+    val apiAwayTeam: String? = null
 )
 
 data class LiveScorer(val playerName: String, val minute: Int, val minuteLabel: String? = null)
@@ -70,10 +72,13 @@ class LiveScoreService @Inject constructor(
         val homeName = homeTeam.team?.displayName ?: homeTeam.team?.name ?: return null
         val awayName = awayTeam.team?.displayName ?: awayTeam.team?.name ?: return null
 
-        val entity = findMatchingMatch(matches, homeName, awayName)
+        var entity = findMatchingMatch(matches, homeName, awayName)
         if (entity == null) {
-            LogManager.log("LiveScoreService", "No match found for $homeName vs $awayName")
-            return null
+            entity = findMatchByDate(competition.date ?: event.date, matches)
+            if (entity == null) {
+                LogManager.log("LiveScoreService", "No match found for $homeName vs $awayName")
+                return null
+            }
         }
 
         val hScore = homeTeam.score?.toIntOrNull() ?: 0
@@ -99,7 +104,9 @@ class LiveScoreService @Inject constructor(
             homeMissedPenalties = hMissedPens, awayMissedPenalties = aMissedPens,
             winnerTeam = winnerName,
             homeHeadedGoals = hHeaded, awayHeadedGoals = aHeaded,
-            hasSubGoal = hasSubGoal
+            hasSubGoal = hasSubGoal,
+            apiHomeTeam = homeName,
+            apiAwayTeam = awayName
         )
     }
 
@@ -221,6 +228,31 @@ class LiveScoreService @Inject constructor(
                 TopScorerData(player, team, goals)
             }
         }.sortedByDescending { it.goals }
+    }
+
+    private fun findMatchByDate(eventDate: String?, matches: List<MatchEntity>): MatchEntity? {
+        if (eventDate == null) return null
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+        val zid = java.time.ZoneId.of("Europe/Madrid")
+
+        val eventInstant = try {
+            if (eventDate.endsWith("Z")) {
+                java.time.Instant.parse(eventDate)
+            } else {
+                java.time.LocalDateTime.parse(eventDate.take(19), fmt).toInstant(java.time.ZoneOffset.UTC)
+            }
+        } catch (e: Exception) { return null }
+
+        for (match in matches) {
+            if (match.id !in 73..88) continue
+            val matchInstant = try {
+                java.time.LocalDateTime.parse(match.dateTime.take(19), fmt).atZone(zid).toInstant()
+            } catch (e: Exception) { continue }
+
+            val diff = Math.abs(matchInstant.toEpochMilli() - eventInstant.toEpochMilli())
+            if (diff < 45 * 60 * 1000L) return match
+        }
+        return null
     }
 
     private fun findMatchingMatch(matches: List<MatchEntity>, homeName: String, awayName: String): MatchEntity? {

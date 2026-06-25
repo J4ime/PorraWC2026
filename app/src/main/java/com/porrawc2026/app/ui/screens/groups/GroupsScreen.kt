@@ -16,31 +16,40 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
+import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.ui.theme.*
 
 
 @Composable
 fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewModel()) {
     val allMatches by viewModel.allMatches.collectAsState()
-    val koPredictions by viewModel.allKnockoutPredictions.collectAsState()
+    val allTeams by viewModel.allTeams.collectAsState()
     val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
     val listState = rememberLazyListState()
+
+    val actualAdvancing = remember(allMatches, allTeams) {
+        if (allMatches.isEmpty() || allTeams.isEmpty()) emptySet()
+        else PointsCalculator.computeActualAdvancingTeams(allMatches, allTeams).dieciseisavos
+    }
+    val predictedAdvancing = remember(allMatches, allTeams) {
+        if (allMatches.isEmpty() || allTeams.isEmpty()) emptySet()
+        else PointsCalculator.computePredictedAdvancingTeams(allMatches, allTeams, emptyList()).dieciseisavos
+    }
+    val correct = remember(actualAdvancing, predictedAdvancing) {
+        predictedAdvancing.intersect(actualAdvancing)
+    }
+    val missing = remember(actualAdvancing, predictedAdvancing) {
+        predictedAdvancing - actualAdvancing
+    }
+    val advPoints = remember(correct) { correct.size * 20 }
 
     LaunchedEffect(scrollTrigger) {
         if (sorted.isEmpty()) return@LaunchedEffect
         var lazyIdx = 1
-        var lastLabel = ""
         var lastFinalIdx = -1
         for (match in sorted) {
-            if (match.isKnockout) {
-                val label = match.knockoutRound ?: "Eliminatorias"
-                if (label != lastLabel) {
-                    lastLabel = label
-                    lazyIdx++
-                }
-            }
+            if (match.isKnockout) continue
             val status = fmtDate(match)
             if (status == "EN JUEGO") {
                 listState.animateScrollToItem(lazyIdx)
@@ -63,19 +72,42 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
             }
         }
 
-        var lastLabel = ""
         for (match in sorted) {
-            if (match.isKnockout) {
-                val label = match.knockoutRound ?: "Eliminatorias"
-                if (label != lastLabel) {
-                    lastLabel = label
-                    item { Text(label.uppercase(), style = MaterialTheme.typography.titleSmall, color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) }
-                }
-                item { KnockoutMatchRow(match, koPredictions) }
-            } else {
+            if (!match.isKnockout) {
                 item { GroupMatchRow(match) }
             }
         }
+
+        if (advPoints > 0 || correct.isNotEmpty()) {
+            item {
+                Text("CLASIFICACI\u00D3N A 1/16 (20pts por acierto)", style = MaterialTheme.typography.titleSmall, color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+            }
+            for (team in correct.sorted()) {
+                item {
+                    Row(Modifier.fillMaxWidth().background(AccentGreen.copy(alpha = 0.1f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("\u2713", fontSize = 13.sp, color = AccentGreen, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp))
+                        Text(team, Modifier.weight(1f), fontSize = 12.sp, color = TextPrimary)
+                        Text("+20", fontSize = 12.sp, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+                    }
+                }
+            }
+            for (team in missing.sorted()) {
+                item {
+                    Row(Modifier.fillMaxWidth().background(AccentRed.copy(alpha = 0.08f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("\u2717", fontSize = 13.sp, color = AccentRed, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp))
+                        Text(team, Modifier.weight(1f), fontSize = 12.sp, color = TextSecondary)
+                        Text("0", fontSize = 12.sp, color = TextMuted, textAlign = TextAlign.End)
+                    }
+                }
+            }
+            item {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Text("Total 1/16:", Modifier.weight(1f), fontSize = 12.sp, color = WCGold, fontWeight = FontWeight.Bold)
+                    Text("${advPoints}pts", fontSize = 12.sp, color = AccentGreen, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
         item { Spacer(Modifier.height(16.dp)) }
     }
 }
@@ -134,40 +166,4 @@ private fun GroupMatchRow(match: MatchEntity) {
     }
 }
 
-@Composable
-private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPredictionEntity>) {
-    val hasResult = match.homeGoals != null && match.awayGoals != null
-    val koPred = koPredictions.firstOrNull { it.homeTeamRef == match.homeTeam && it.awayTeamRef == match.awayTeam }
-    val homeWins = koPred?.winner == 1
-    val awayWins = koPred?.winner == 2
-    val correct = hasResult && match.pointsEarned > 0
 
-    val bgColor = when {
-        correct -> AccentGreen.copy(alpha = 0.1f)
-        hasResult -> AccentRed.copy(alpha = 0.1f)
-        else -> SurfaceMedium.copy(alpha = 0.3f)
-    }
-
-    val hColor = when {
-        correct && homeWins -> AccentGreen
-        hasResult && homeWins -> AccentRed
-        else -> TextPrimary
-    }
-    val aColor = when {
-        correct && awayWins -> AccentGreen
-        hasResult && awayWins -> AccentRed
-        else -> TextPrimary
-    }
-
-    Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(fmtDate(match), Modifier.width(72.dp), fontSize = 9.sp, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-
-        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Text(match.homeTeam, fontSize = 11.sp, color = hColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = TextAlign.End, fontWeight = if (homeWins) FontWeight.Bold else FontWeight.Normal)
-            Text(" vs ", fontSize = 11.sp, color = TextMuted, maxLines = 1)
-            Text(match.awayTeam, fontSize = 11.sp, color = aColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), fontWeight = if (awayWins) FontWeight.Bold else FontWeight.Normal)
-        }
-
-        Text(if (correct) "+${match.pointsEarned}" else "", Modifier.width(24.dp), fontSize = 11.sp, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-    }
-}

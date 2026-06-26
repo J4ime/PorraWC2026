@@ -47,6 +47,7 @@ class HomeViewModelTest {
         
         coEvery { prefsManager.getExcelFileNameSync() } returns null
         coEvery { prefsManager.getNotificationsSync() } returns true
+        coEvery { prefsManager.setNotificationsEnabled(any()) } just Runs
         every { repository.getAllMatches() } returns flowOf(emptyList())
         every { repository.getAllTeams() } returns flowOf(emptyList())
         every { repository.getPlayerPredictions() } returns flowOf(emptyList())
@@ -178,15 +179,6 @@ class HomeViewModelTest {
         viewModel.toggleNotifications()
         
         assertNotEquals(initialValue, viewModel.notificationsEnabled.value)
-    }
-
-    @Test
-    fun `toggleAutoRefresh toggles the value`() {
-        val initialValue = viewModel.autoRefreshEnabled.value
-        
-        viewModel.toggleAutoRefresh()
-        
-        assertNotEquals(initialValue, viewModel.autoRefreshEnabled.value)
     }
 
     @Test

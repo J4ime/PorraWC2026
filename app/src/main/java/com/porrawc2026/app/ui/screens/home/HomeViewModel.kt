@@ -231,8 +231,7 @@ class HomeViewModel @Inject constructor(
         }
         // Slow operations (API calls, photos) en segundo plano, sin bloquear la UI
         viewModelScope.launch(Dispatchers.IO) {
-            fetchLiveResults()
-            fetchMissingGroupScores()
+            fetchLiveResults(fullFetch = true)
             tryGenerateDieciseisavos()
             downloadPlayerPhotos()
             precachePhotosInBackground()
@@ -594,11 +593,9 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun refreshAll() {
-        fetchLiveResults()
+        fetchLiveResults(fullFetch = true)
         tryGenerateDieciseisavos()
     }
-
-    private val apiConfirmedMatchIds = mutableSetOf<Int>()
 
     private suspend fun tryGenerateDieciseisavos() {
         val existingDieciseisavos = cachedMatches.filter { it.id in 73..88 }
@@ -758,20 +755,6 @@ class HomeViewModel @Inject constructor(
         refreshPoints()
         checkGoalNotifications()
         refreshUpcomingMatches()
-    }
-
-    private suspend fun fetchMissingGroupScores() {
-        val missingIds = cachedMatches
-            .filter { !it.isKnockout && (it.homeGoals == null || it.awayGoals == null) && it.dateTime.isNotBlank() }
-            .map { it.id }
-        if (missingIds.isEmpty()) return
-        val missingMatches = cachedMatches.filter { it.id in missingIds }
-        LogManager.log("HomeVM", "Fetching missing scores for ${missingMatches.size} group matches: $missingIds")
-        val updates = fetchWithRetry { liveScoreService.fetchScoreUpdates(missingMatches) }.orEmpty()
-        if (updates.isNotEmpty()) {
-            processScoreUpdates(updates)
-            tryGenerateDieciseisavos()
-        }
     }
 
     private suspend fun filterMatchesForFetch(fullFetch: Boolean): List<MatchEntity>? {

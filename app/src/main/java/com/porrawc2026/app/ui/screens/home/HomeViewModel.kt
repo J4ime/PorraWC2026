@@ -217,7 +217,7 @@ class HomeViewModel @Inject constructor(
                 refreshPoints()
                 loadPlayers()
                 processedGoalKeys.addAll(prefsManager.getProcessedGoalKeys())
-                tryGenerateDieciseisavos()
+                // Don't generate dieciseisavo names yet — wait for API data
                 lastWrittenScores.clear()
                 refreshUpcomingMatches()
                 _hasData.value = true
@@ -231,7 +231,7 @@ class HomeViewModel @Inject constructor(
         }
         // Slow operations (API calls, photos) en segundo plano, sin bloquear la UI
         viewModelScope.launch(Dispatchers.IO) {
-            fetchLiveResults(fullFetch = true)
+            fetchLiveResults()
             tryGenerateDieciseisavos()
             downloadPlayerPhotos()
             precachePhotosInBackground()
@@ -593,7 +593,7 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun refreshAll() {
-        fetchLiveResults(fullFetch = true)
+        fetchLiveResults()
         tryGenerateDieciseisavos()
     }
 
@@ -836,6 +836,17 @@ class HomeViewModel @Inject constructor(
             recalcAllPoints(); refreshPoints()
             if (update.isFinished) {
                 repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
+            }
+        }
+        // For dieciseisavo matches with placeholder names, use API team names as fallback
+        if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+            val match = cachedMatches.firstOrNull { it.id == update.matchId }
+            if (match != null && match.homeTeam.contains("º")) {
+                LogManager.log("HomeVM", "Setting 1/16 #${update.matchId} names from API: ${match.homeTeam} → ${update.apiHomeTeam}, ${match.awayTeam} → ${update.apiAwayTeam}")
+                repository.updateMatchTeams(update.matchId, update.apiHomeTeam, update.apiAwayTeam)
+                cachedMatches = cachedMatches.map {
+                    if (it.id == update.matchId) it.copy(homeTeam = update.apiHomeTeam, awayTeam = update.apiAwayTeam) else it
+                }
             }
         }
     }

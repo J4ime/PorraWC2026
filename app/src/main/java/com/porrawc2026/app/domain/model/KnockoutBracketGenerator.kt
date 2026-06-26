@@ -108,12 +108,14 @@ object KnockoutBracketGenerator {
 
         val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
 
+        val rtveMatchIds = MatchScheduleProvider.getRtveMatchIds()
+
         return dieciseisavoSlots.map { slot ->
             val homeTeam = resolveTeam(slot.homeType, topTwo, assignedThird)
             val awayTeam = resolveTeam(slot.awayType, topTwo, assignedThird)
             val sched = schedule[slot.matchId]
             val dateStr = sched?.date ?: ""
-            val tv = sched?.tv ?: "DAZN"
+            val tv = if (rtveMatchIds.contains(slot.matchId)) "DAZN,RTVE" else "DAZN"
 
             MatchEntity(
                 id = slot.matchId,

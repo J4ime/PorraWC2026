@@ -213,6 +213,15 @@ class HomeViewModel @Inject constructor(
                     repository.insertMatches(staticSchedule)
                     prefsManager.setCacheTimestamp(System.currentTimeMillis())
                 }
+                // Reset dieciseisavo names to schedule defaults before attempting generation
+                val dieciseisavoSched = MatchScheduleProvider.getDieciseisavosSchedule()
+                cachedMatches = cachedMatches.map { m ->
+                    if (m.id in 73..88) {
+                        val s = dieciseisavoSched[m.id]
+                        if (s != null) m.copy(homeTeam = s.home, awayTeam = s.away) else m
+                    } else m
+                }
+                repository.insertMatches(cachedMatches.filter { it.id in 73..88 })
                 enrichSchedule()
                 recalcAllPoints()
                 refreshPoints()
@@ -340,7 +349,15 @@ class HomeViewModel @Inject constructor(
             processedGoalKeys.clear()
             liveMatchStore.goalScorers.clear()
             liveMatchStore.liveMinutes.clear()
-            cachedMatches = cachedMatches.map { it.copy(homeGoals = null, awayGoals = null, homeScorers = null, awayScorers = null, homeRedCards = null, awayRedCards = null, homeYellowCards = null, awayYellowCards = null) }
+            // Reset dieciseisavo names to schedule defaults before re-fetching
+            val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
+            cachedMatches = cachedMatches.map { m ->
+                if (m.id in 73..88) {
+                    val sched = schedule[m.id]
+                    if (sched != null) m.copy(homeTeam = sched.home, awayTeam = sched.away) else m
+                } else m.copy(homeGoals = null, awayGoals = null, homeScorers = null, awayScorers = null, homeRedCards = null, awayRedCards = null, homeYellowCards = null, awayYellowCards = null)
+            }
+            repository.insertMatches(cachedMatches.filter { it.id in 73..88 })
             fetchLiveResults(fullFetch = true)
             _isBusy.value = false
         }

@@ -12,7 +12,7 @@ object MatchScheduleProvider {
 
     private val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
 
-    private val rtveMatchIds = setOf(1, 7, 13, 25, 43, 49, 67, 9, 21, 33, 45, 57, 69, 17, 30, 48, 65)
+    private val rtveMatchIds = setOf(1, 7, 13, 25, 43, 49, 67, 9, 21, 33, 45, 57, 69, 17, 30, 48, 65, 84, 86)
 
     data class MatchSchedule(
         val id: Int,
@@ -246,6 +246,8 @@ object MatchScheduleProvider {
 
     fun getDieciseisavosSchedule(): Map<Int, MatchSchedule> =
         getHardcodedSchedule().filterKeys { it in 73..88 }
+
+    fun getRtveMatchIds(): Set<Int> = rtveMatchIds
 
     fun getMaxVisibleRoundId(): Int {
         val schedule = getHardcodedSchedule()

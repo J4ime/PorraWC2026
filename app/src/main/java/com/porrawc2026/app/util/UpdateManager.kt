@@ -43,7 +43,7 @@ object UpdateManager {
                     conn.disconnect()
                 }
             }
-        }.getOrNull()
+        }.onFailure { android.util.Log.e("UpdateManager", "checkForUpdate failed", it) }.getOrNull()
     }
 
     suspend fun downloadAndInstall(context: Context, url: String): Boolean = withContext(Dispatchers.IO) {
@@ -71,7 +71,7 @@ object UpdateManager {
                     conn.disconnect()
                 }
             }
-        }.getOrDefault(false)
+        }.onFailure { android.util.Log.e("UpdateManager", "downloadAndInstall failed for $url", it) }.getOrDefault(false)
     }
 
     private fun compareVersions(v1: String, v2: String): Int {

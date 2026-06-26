@@ -21,7 +21,7 @@ object LogManager {
             if (base != null && base.isDirectory) {
                 File(base, "logs").also { it.mkdirs() }
             } else null
-        } catch (_: Exception) { null }
+        } catch (e: Exception) { Log.e("LogManager", "init: failed to create log dir", e); null }
         logDir = dir ?: run {
             val fallback = File(System.getProperty("java.io.tmpdir") ?: ".", "logs_app")
             fallback.mkdirs()
@@ -46,7 +46,7 @@ object LogManager {
         val dir = logDir ?: return ""
         val file = File(dir, "app_log.txt")
         return if (file.exists()) {
-            try { file.readText() } catch (_: Exception) { "" }
+            try { file.readText() } catch (e: Exception) { Log.e("LogManager", "getLogs: failed to read log file", e); "" }
         } else ""
     }
 

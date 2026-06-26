@@ -259,7 +259,7 @@ object MatchScheduleProvider {
             if (dateStr.isBlank()) return null
             return try {
                 LocalDateTime.parse(dateStr, fmt).atZone(madridZone).toInstant()
-            } catch (_: Exception) { null }
+            } catch (e: Exception) { android.util.Log.e("MatchSchedule", "parseInstant failed for dateStr=$dateStr", e); null }
         }
 
         val firstSemi = parseInstant(schedule[101]?.date ?: "")

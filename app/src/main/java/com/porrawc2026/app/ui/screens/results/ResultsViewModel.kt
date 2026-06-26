@@ -102,7 +102,7 @@ class ResultsViewModel @Inject constructor(
                 val local = LocalDateTime.parse(dateTime, dateTimeFormatter)
                 local.atZone(madridZone).toInstant()
             }
-        } catch (_: Exception) { null }
+        } catch (e: Exception) { android.util.Log.e("ResultsVM", "parseMadridInstant failed for dateTime=$dateTime", e); null }
     }
 
     companion object {

@@ -143,7 +143,7 @@ object ExcelParser {
         var questionsEmpty = 0
         for (rowIdx in 158..207) {
             val row = sheet.getRow(rowIdx) ?: continue
-            val cellValue = runCatching { formatter.formatCellValue(row.getCell(31)).trim() }.getOrDefault("")
+            val cellValue = runCatching { formatter.formatCellValue(row.getCell(31)).trim() }.onFailure { android.util.Log.e("ExcelParser", "Failed to read cell row=$rowIdx col=31", it) }.getOrDefault("")
             total++
             if (cellValue.isBlank()) {
                 questionsEmpty++
@@ -231,7 +231,7 @@ object ExcelParser {
                         if (isAgCellValid(cell, dv)) green++
                         else {
                             red++
-                            val cellValue = runCatching { formatter.formatCellValue(cell).trim() }.getOrDefault("")
+                            val cellValue = runCatching { formatter.formatCellValue(cell).trim() }.onFailure { android.util.Log.e("ExcelParser", "Failed to read cell row=$rowIdx col=$colIdx", it) }.getOrDefault("")
                             errors.add("Fila $rowIdx, col $colIdx — '$cellValue'")
                         }
                     }
@@ -250,7 +250,7 @@ object ExcelParser {
     }
 
     private fun isAgCellValid(cell: Cell, dv: DataValidation): Boolean {
-        val cellValue = runCatching { formatter.formatCellValue(cell).trim() }.getOrDefault("")
+        val cellValue = runCatching { formatter.formatCellValue(cell).trim() }.onFailure { android.util.Log.e("ExcelParser", "isAgCellValid: failed to read cell", it) }.getOrDefault("")
         val isEmpty = cellValue.isEmpty() || cellValue == "0" || cellValue == "0.0"
 
         if (isEmpty) return dv.emptyCellAllowed
@@ -412,7 +412,7 @@ object ExcelParser {
             val cell = row.getCell(col) ?: continue
             val value = formatter.formatCellValue(cell).trim()
             if (value.isBlank()) continue
-            val n = runCatching { cell.numericCellValue }.getOrNull()
+            val n = runCatching { cell.numericCellValue }.onFailure { android.util.Log.e("ExcelParser", "readDateCell: failed to get numericCellValue", it) }.getOrNull()
             if (n != null && DateUtil.isCellDateFormatted(cell)) {
                 return DateUtil.getJavaDate(n, madridTz).toInstant().atZone(madridZone).format(dateTimeFmt)
             }
@@ -567,7 +567,7 @@ object ExcelParser {
                 CellType.BLANK -> null
                 else -> null
             }
-        }.getOrNull()
+        }.onFailure { android.util.Log.e("ExcelParser", "cellText: failed to read cell", it) }.getOrNull()
         if (result != null) return result.trim().takeIf { it.isNotEmpty() }
         val fb = formatter.formatCellValue(cell).trim()
         return fb.takeIf { it.isNotEmpty() }
@@ -589,8 +589,8 @@ object ExcelParser {
             CellType.STRING -> cell.stringCellValue
             CellType.BOOLEAN -> cell.booleanCellValue
             CellType.FORMULA -> {
-                runCatching { cell.numericCellValue }.getOrElse {
-                    runCatching { cell.stringCellValue }.getOrNull()
+                runCatching { cell.numericCellValue }.onFailure { android.util.Log.e("ExcelParser", "getCellValue: failed to get numericCellValue for formula cell", it) }.getOrElse {
+                    runCatching { cell.stringCellValue }.onFailure { android.util.Log.e("ExcelParser", "getCellValue: failed to get stringCellValue for formula cell", it) }.getOrNull()
                 }
             }
             CellType.BLANK -> null

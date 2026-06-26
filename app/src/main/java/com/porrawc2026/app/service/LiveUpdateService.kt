@@ -179,7 +179,7 @@ class LiveUpdateService : Service() {
                 val local = java.time.LocalDateTime.parse(dateTime, dateTimeFormatter)
                 local.atZone(ZoneId.of("Europe/Madrid")).toInstant()
             }
-        } catch (_: Exception) { null }
+        } catch (e: Exception) { Log.e("LiveUpdateService", "parseMadridInstant failed for dateTime=$dateTime", e); null }
     }
 
     companion object {

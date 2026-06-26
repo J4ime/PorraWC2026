@@ -104,7 +104,7 @@ object PlayerPhotoDownloader {
                     }
                 }
                 destFile.absolutePath
-            }.getOrNull()
+            }.onFailure { LogManager.log("PlayerPhotoDownloader", "Failed to download photo for $playerName", it) }.getOrNull()
         }
     }
 

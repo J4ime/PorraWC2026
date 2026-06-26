@@ -170,7 +170,7 @@ class HomeViewModel @Inject constructor(
             runCatching {
                 com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context)
                 _appVersion.value = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
-            }
+            }.onFailure { Log.e(TAG, "Failed to init PDFBox or get app version", it) }
         }
         viewModelScope.launch {
             runCatching {
@@ -181,7 +181,7 @@ class HomeViewModel @Inject constructor(
                 _userPosition.value = prefsManager.getUserPositionSync()
                 liveMinutes.putAll(liveMatchStore.liveMinutes)
                 goalScorers.putAll(liveMatchStore.goalScorers)
-            }
+            }.onFailure { Log.e(TAG, "Failed to load prefs on init", it) }
         }
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
@@ -311,7 +311,7 @@ class HomeViewModel @Inject constructor(
             runCatching {
                 val info = UpdateManager.checkForUpdate(context)
                 _updateAvailable.value = info?.isNewer == true
-            }
+            }.onFailure { Log.e(TAG, "Failed to check for update", it) }
         }
     }
 
@@ -629,7 +629,7 @@ class HomeViewModel @Inject constructor(
                 val local = LocalDateTime.parse(dateTime, dateTimeFormatter)
                 local.atZone(madridZone).toInstant()
             }
-        } catch (_: Exception) { null }
+        } catch (e: Exception) { Log.e(TAG, "parseMadridInstant failed for dateTime=$dateTime", e); null }
     }
 
     private fun getTodayMatchesWithDates(): List<MatchEntity> {
@@ -731,14 +731,19 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun <T> fetchWithRetry(maxAttempts: Int = 10, block: suspend () -> T?): T? {
+        var lastError: Throwable? = null
         repeat(maxAttempts) { attempt ->
             val result = runCatching { block() }
             if (result.isSuccess) {
                 val data = result.getOrNull()
                 if (data != null) return data
+                lastError = null
+            } else {
+                lastError = result.exceptionOrNull()
             }
             if (attempt < maxAttempts - 1) delay(2000L shl attempt.coerceAtMost(4))
         }
+        if (lastError != null) Log.e(TAG, "fetchWithRetry exhausted after $maxAttempts attempts", lastError!!)
         return null
     }
 
@@ -866,16 +871,9 @@ class HomeViewModel @Inject constructor(
                     repository.updateMatchWinner(update.matchId, update.winnerTeam)
                 }
             }
-            if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
-                apiConfirmedMatchIds.add(update.matchId)
-                val cur = cachedMatches.firstOrNull { it.id == update.matchId }
-                if (cur != null && (!TeamNameNormalizer.matches(cur.homeTeam, update.apiHomeTeam) || !TeamNameNormalizer.matches(cur.awayTeam, update.apiAwayTeam))) {
-                    cachedMatches = cachedMatches.map {
-                        if (it.id == update.matchId) it.copy(homeTeam = update.apiHomeTeam, awayTeam = update.apiAwayTeam) else it
-                    }
-                    repository.updateMatchTeams(update.matchId, update.apiHomeTeam, update.apiAwayTeam)
-                }
-            }
+            // Dieciseisavo team names come from group standings via tryGenerateDieciseisavos() only.
+            // The ESPN API may return placeholder/default names for slots not yet finalized,
+            // so we never overwrite from the API.
         }
     }
 

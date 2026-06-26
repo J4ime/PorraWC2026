@@ -64,7 +64,7 @@ class QuestionsViewModel @Inject constructor(
 
     private fun parseScorers(json: String?): List<LiveScorer> {
         if (json == null) return emptyList()
-        return try { gson.fromJson(json, scorerListType) ?: emptyList() } catch (_: Exception) { emptyList() }
+        return try { gson.fromJson(json, scorerListType) ?: emptyList() } catch (e: Exception) { android.util.Log.e("QuestionsVM", "parseScorers failed", e); emptyList() }
     }
 
     fun evaluateQuestions() {

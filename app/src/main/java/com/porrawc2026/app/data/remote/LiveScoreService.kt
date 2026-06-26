@@ -48,7 +48,7 @@ class LiveScoreService @Inject constructor(
         val dateGroups = groupMatchesByDate(matches)
         val dateFmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")
         for ((dateStr, dayMatches) in dateGroups) {
-            val dateObj = try { java.time.LocalDate.parse(dateStr, dateFmt) } catch (_: Exception) { continue }
+            val dateObj = try { java.time.LocalDate.parse(dateStr, dateFmt) } catch (e: Exception) { LogManager.log("LiveScoreService", "Failed to parse date group $dateStr", e); continue }
             val rangeStart = dateObj.minusDays(1).format(dateFmt)
             val rangeEnd = dateObj.plusDays(1).format(dateFmt)
             val scoreboard = espnService.getScoreboard(dates = "$rangeStart-$rangeEnd")
@@ -62,7 +62,7 @@ class LiveScoreService @Inject constructor(
 
     private fun groupMatchesByDate(matches: List<MatchEntity>): Map<String, List<MatchEntity>> {
         return matches.groupBy { m ->
-            try { m.dateTime.take(10).replace("-", "") } catch (_: Exception) { "" }
+            try { m.dateTime.take(10).replace("-", "") } catch (e: Exception) { LogManager.log("LiveScoreService", "Failed to parse dateTime for match ${m.id}", e); "" }
         }.filterKeys { it.isNotBlank() }.mapValues { (_, list) -> list.sortedBy { it.id } }
     }
 
@@ -72,8 +72,8 @@ class LiveScoreService @Inject constructor(
             ?.ifBlank { null } ?: return null
         val maxDate = matches.maxOfOrNull { it.dateTime.take(10).replace("-", "") }
             ?.ifBlank { null } ?: return null
-        val minLocal = try { java.time.LocalDate.parse(minDate, fmt).minusDays(1) } catch (_: Exception) { return null }
-        val maxLocal = try { java.time.LocalDate.parse(maxDate, fmt).plusDays(1) } catch (_: Exception) { return null }
+        val minLocal = try { java.time.LocalDate.parse(minDate, fmt).minusDays(1) } catch (e: Exception) { LogManager.log("LiveScoreService", "buildDateRange: failed to parse minDate=$minDate", e); return null }
+        val maxLocal = try { java.time.LocalDate.parse(maxDate, fmt).plusDays(1) } catch (e: Exception) { LogManager.log("LiveScoreService", "buildDateRange: failed to parse maxDate=$maxDate", e); return null }
         return "${minLocal.format(fmt)}-${maxLocal.format(fmt)}"
     }
 
@@ -257,14 +257,14 @@ class LiveScoreService @Inject constructor(
             } else {
                 java.time.LocalDateTime.parse(eventDate.take(19), fmt).toInstant(java.time.ZoneOffset.UTC)
             }
-        } catch (e: Exception) { return null }
+        } catch (e: Exception) { LogManager.log("LiveScoreService", "findMatchByDate: failed to parse eventDate=$eventDate", e); return null }
 
         val eventGroup = eventName?.let { extractGroup(it) }
 
         for (match in matches) {
             val matchInstant = try {
                 java.time.LocalDateTime.parse(match.dateTime.take(19), fmt).atZone(zid).toInstant()
-            } catch (e: Exception) { continue }
+            } catch (e: Exception) { LogManager.log("LiveScoreService", "findMatchByDate: failed to parse match dateTime=${match.dateTime} for match ${match.id}", e); continue }
 
             val diff = Math.abs(matchInstant.toEpochMilli() - eventInstant.toEpochMilli())
             if (diff >= 45 * 60 * 1000L) continue

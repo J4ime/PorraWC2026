@@ -42,6 +42,6 @@ object GoalNotifier {
 
         runCatching {
             NotificationManagerCompat.from(context).notify(nextId++, notification)
-        }
+        }.onFailure { android.util.Log.e("GoalNotifier", "Failed to show goal notification for $playerName", it) }
     }
 }

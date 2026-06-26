@@ -251,11 +251,16 @@ class LiveScoreService @Inject constructor(
         val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
         val zid = java.time.ZoneId.of("Europe/Madrid")
 
+        val normalizedDate = if (eventDate.endsWith("Z")) {
+            if (eventDate.length == 16) eventDate.take(16) + ":00Z" else eventDate
+        } else {
+            if (eventDate.length == 16) eventDate + ":00" else eventDate
+        }
         val eventInstant = try {
-            if (eventDate.endsWith("Z")) {
-                java.time.Instant.parse(eventDate)
+            if (normalizedDate.endsWith("Z")) {
+                java.time.Instant.parse(normalizedDate)
             } else {
-                java.time.LocalDateTime.parse(eventDate.take(19), fmt).toInstant(java.time.ZoneOffset.UTC)
+                java.time.LocalDateTime.parse(normalizedDate.take(19), fmt).toInstant(java.time.ZoneOffset.UTC)
             }
         } catch (e: Exception) { LogManager.log("LiveScoreService", "findMatchByDate: failed to parse eventDate=$eventDate", e); return null }
 

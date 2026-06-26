@@ -248,29 +248,11 @@ class LiveScoreService @Inject constructor(
 
     private fun findMatchByDate(eventDate: String?, eventName: String?, matches: List<MatchEntity>): MatchEntity? {
         if (eventDate == null) return null
-        val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-        val zid = java.time.ZoneId.of("Europe/Madrid")
-
-        val normalizedDate = if (eventDate.endsWith("Z")) {
-            if (eventDate.length == 16) eventDate.take(16) + ":00Z" else eventDate
-        } else {
-            if (eventDate.length == 16) eventDate + ":00" else eventDate
-        }
-        val eventInstant = try {
-            if (normalizedDate.endsWith("Z")) {
-                java.time.Instant.parse(normalizedDate)
-            } else {
-                java.time.LocalDateTime.parse(normalizedDate.take(19), fmt).toInstant(java.time.ZoneOffset.UTC)
-            }
-        } catch (e: Exception) { LogManager.log("LiveScoreService", "findMatchByDate: failed to parse eventDate=$eventDate", e); return null }
-
+        val eventInstant = parseEspnDate(eventDate) ?: return null
         val eventGroup = eventName?.let { extractGroup(it) }
 
         for (match in matches) {
-            val matchInstant = try {
-                java.time.LocalDateTime.parse(match.dateTime.take(19), fmt).atZone(zid).toInstant()
-            } catch (e: Exception) { LogManager.log("LiveScoreService", "findMatchByDate: failed to parse match dateTime=${match.dateTime} for match ${match.id}", e); continue }
-
+            val matchInstant = parseMadridDate(match.dateTime) ?: continue
             val diff = Math.abs(matchInstant.toEpochMilli() - eventInstant.toEpochMilli())
             if (diff >= 45 * 60 * 1000L) continue
             if (eventGroup != null && !match.groupName.contains(eventGroup, ignoreCase = true)) continue
@@ -282,6 +264,29 @@ class LiveScoreService @Inject constructor(
     private fun extractGroup(eventName: String): String? {
         val g = Regex("""[Gg]roup\s+([A-Z])""").find(eventName)?.groupValues?.getOrNull(1) ?: return null
         return g
+    }
+
+    private val espnDateRegex = Regex("""(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(Z?)""")
+
+    private fun parseEspnDate(date: String): java.time.Instant? {
+        val m = espnDateRegex.matchEntire(date) ?: return null
+        val datePart = m.groupValues[1]
+        val hh = m.groupValues[2]
+        val mm = m.groupValues[3]
+        val ss = m.groupValues[4].ifEmpty { "00" }
+        val z = m.groupValues[5]
+        val full = "${datePart}T${hh}:${mm}:${ss}${z}"
+        return if (z == "Z") java.time.Instant.parse(full)
+        else java.time.LocalDateTime.parse(full, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US))
+            .toInstant(java.time.ZoneOffset.UTC)
+    }
+
+    private fun parseMadridDate(date: String): java.time.Instant? {
+        val m = espnDateRegex.matchEntire(date) ?: return null
+        val full = m.groupValues[1] + "T" + m.groupValues[2] + ":" + m.groupValues[3] + ":" +
+            m.groupValues[4].ifEmpty { "00" }
+        return java.time.LocalDateTime.parse(full, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US))
+            .atZone(java.time.ZoneId.of("Europe/Madrid")).toInstant()
     }
 
     private fun findMatchingMatch(matches: List<MatchEntity>, homeName: String, awayName: String): MatchEntity? {

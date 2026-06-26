@@ -44,10 +44,26 @@ class LiveScoreService @Inject constructor(
     private val espnService: EspnService
 ) {
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): List<LiveScoreUpdate> {
-        val dateRange = buildDateRange(matches)
-        val scoreboard = espnService.getScoreboard(dates = dateRange)
-        val events = scoreboard.events ?: return emptyList()
-        return coroutineScope { events.mapNotNull { parseEvent(it, matches) } }
+        val allUpdates = mutableListOf<LiveScoreUpdate>()
+        val dateGroups = groupMatchesByDate(matches)
+        val dateFmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")
+        for ((dateStr, dayMatches) in dateGroups) {
+            val dateObj = try { java.time.LocalDate.parse(dateStr, dateFmt) } catch (_: Exception) { continue }
+            val rangeStart = dateObj.minusDays(1).format(dateFmt)
+            val rangeEnd = dateObj.plusDays(1).format(dateFmt)
+            val scoreboard = espnService.getScoreboard(dates = "$rangeStart-$rangeEnd")
+            val events = scoreboard.events ?: continue
+            // Use the FULL matches list (not just dayMatches) for lookup, so timezone-shifted events match
+            val parsed = coroutineScope { events.mapNotNull { parseEvent(it, matches) } }
+            allUpdates.addAll(parsed)
+        }
+        return allUpdates
+    }
+
+    private fun groupMatchesByDate(matches: List<MatchEntity>): Map<String, List<MatchEntity>> {
+        return matches.groupBy { m ->
+            try { m.dateTime.take(10).replace("-", "") } catch (_: Exception) { "" }
+        }.filterKeys { it.isNotBlank() }.mapValues { (_, list) -> list.sortedBy { it.id } }
     }
 
     private fun buildDateRange(matches: List<MatchEntity>): String? {

@@ -290,8 +290,8 @@ class QuestionsViewModel @Inject constructor(
     }
 
     private fun findMatch(finished: List<MatchEntity>, home: String, away: String) = finished.firstOrNull { matchName(it.homeTeam, home) && matchName(it.awayTeam, away) }
-    private fun pts(s: Map<String, TeamStanding>, t: String) = s[t]?.points ?: 0
-    private fun pos(s: Map<String, TeamStanding>, t: String) = s[t]?.position ?: 0
+    private fun pts(s: Map<String, TeamStanding>, t: String) = s.entries.firstOrNull { matchName(it.key, t) }?.value?.points ?: 0
+    private fun pos(s: Map<String, TeamStanding>, t: String) = s.entries.firstOrNull { matchName(it.key, t) }?.value?.position ?: 0
     private fun qualified(s: Map<String, TeamStanding>, t: String) = pos(s, t) in 1..3
 
     data class TeamStanding(val points: Int, val position: Int, val wins: Int)
@@ -369,6 +369,11 @@ class QuestionsViewModel @Inject constructor(
     private fun computeAdvancement(finished: List<MatchEntity>, standings: Map<String, TeamStanding>): Map<String, String> {
         val result = mutableMapOf<String, String>()
 
+        // Build norm lookup so winnerTeam (English) resolves to standings key (Spanish)
+        fun normKey(name: String): String {
+            return standings.keys.firstOrNull { matchName(it, name) } ?: normalize(name)
+        }
+
         // Groups: top 3 per group reach Dieciseisavos
         for ((team, st) in standings) {
             if (st.position in 1..3) result[team] = "Dieciseisavos"
@@ -383,10 +388,10 @@ class QuestionsViewModel @Inject constructor(
                 val nr = nextRound[round] ?: continue
                 val winner = match.winnerTeam
                 if (winner != null) {
-                    result[winner] = nr
+                    result[normKey(winner)] = nr
                 } else if (match.homeGoals != null && match.awayGoals != null && match.homeGoals != match.awayGoals) {
                     val w = if (match.homeGoals!! > match.awayGoals!!) match.homeTeam else match.awayTeam
-                    result[w] = nr
+                    result[normKey(w)] = nr
                 }
             }
         }

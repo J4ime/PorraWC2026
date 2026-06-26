@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
+import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.ui.theme.*
 
@@ -144,8 +145,8 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
     val hasResult = match.homeGoals != null && match.awayGoals != null
     val actualWinner = if (hasResult && match.winnerTeam != null) {
         when {
-            match.homeTeam == match.winnerTeam -> 1
-            match.awayTeam == match.winnerTeam -> 2
+            TeamNameNormalizer.matches(match.homeTeam, match.winnerTeam) -> 1
+            TeamNameNormalizer.matches(match.awayTeam, match.winnerTeam) -> 2
             else -> null
         }
     } else null

@@ -17,13 +17,14 @@ data class StandingEntry(
 object StandingsCalculator {
 
     fun calculateGroupStandings(matches: List<MatchEntity>, groupTeams: List<String>): List<StandingEntry> {
+        val teamMap = groupTeams.associateBy { TeamNameNormalizer.normalize(it) }
         val standings = groupTeams.associateWith { StandingEntry(it) }.toMutableMap()
 
         for (match in matches) {
             val homeGoals = match.homeGoals ?: continue
             val awayGoals = match.awayGoals ?: continue
-            val home = match.homeTeam
-            val away = match.awayTeam
+            val home = teamMap[TeamNameNormalizer.normalize(match.homeTeam)] ?: continue
+            val away = teamMap[TeamNameNormalizer.normalize(match.awayTeam)] ?: continue
 
             val homeEntry = standings[home] ?: continue
             val awayEntry = standings[away] ?: continue

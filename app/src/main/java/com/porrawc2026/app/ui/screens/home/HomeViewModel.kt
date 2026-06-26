@@ -19,6 +19,7 @@ import com.porrawc2026.app.data.remote.MatchScheduleProvider
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.domain.model.KnockoutBracketGenerator
+import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
@@ -217,6 +218,7 @@ class HomeViewModel @Inject constructor(
                 refreshPoints()
                 loadPlayers()
                 processedGoalKeys.addAll(prefsManager.getProcessedGoalKeys())
+                tryGenerateDieciseisavos()
                 startAutoRefresh()
                 lastWrittenScores.clear()
                 refreshUpcomingMatches()
@@ -637,94 +639,61 @@ class HomeViewModel @Inject constructor(
         existingDieciseisavos.forEach { d ->
             LogManager.log("HomeVM", "  1/16 #${d.id}: ${d.homeTeam} vs ${d.awayTeam}")
         }
+
+        if (completeGroups.isEmpty()) return
+
         val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
-
-        val placeholders = existingDieciseisavos.map { existing ->
-            val sched = schedule[existing.id] ?: return@map existing
-            val slot = KnockoutBracketGenerator.dieciseisavoSlots.firstOrNull { it.matchId == existing.id }
-            val homeComplete = slot == null || isSlotTeamComplete(slot.homeType, completeGroups, allGroupsComplete)
-            val awayComplete = slot == null || isSlotTeamComplete(slot.awayType, completeGroups, allGroupsComplete)
-            val hasApi = existing.id in apiConfirmedMatchIds
-
-            val newHome = when {
-                hasApi -> existing.homeTeam
-                homeComplete -> existing.homeTeam
-                existing.homeTeam.contains("º") -> existing.homeTeam
-                existing.homeTeam != sched.home -> sched.home
-                else -> existing.homeTeam
-            }
-            val newAway = when {
-                hasApi -> existing.awayTeam
-                awayComplete -> existing.awayTeam
-                existing.awayTeam.contains("º") -> existing.awayTeam
-                existing.awayTeam != sched.away -> sched.away
-                else -> existing.awayTeam
-            }
-            if (newHome != existing.homeTeam || newAway != existing.awayTeam)
-                existing.copy(homeTeam = newHome, awayTeam = newAway)
-            else existing
-        }
-
-        val placeholderChanged = placeholders != existingDieciseisavos.sortedBy { it.id }
-        if (placeholderChanged) {
-            LogManager.log("HomeVM", "Reverting to schedule placeholders (incomplete groups)")
-            placeholders.forEach { p ->
-                val orig = existingDieciseisavos.firstOrNull { it.id == p.id }
-                if (orig != null && (orig.homeTeam != p.homeTeam || orig.awayTeam != p.awayTeam))
-                    LogManager.log("HomeVM", "  #${p.id}: ${orig.homeTeam} vs ${orig.awayTeam} → ${p.homeTeam} vs ${p.awayTeam}")
-            }
-            repository.insertMatches(placeholders)
-            cachedMatches = (cachedMatches.filter { it.id !in 73..88 } + placeholders).sortedBy { it.id }
-        }
-
-        if (!allGroupsComplete && !placeholderChanged) return
-        if (!allGroupsComplete) {
-            refreshUpcomingMatches()
-            return
-        }
-
         val teams = repository.getAllTeams().first()
         val dieciseisavos = KnockoutBracketGenerator.generateDieciseisavos(cachedMatches, teams)
         if (dieciseisavos.isEmpty()) return
 
-        LogManager.log("HomeVM", "All groups complete, generating bracket")
-        val preserved = dieciseisavos.map { gen ->
-            val existing = placeholders.firstOrNull { it.id == gen.id }
-            if (existing != null) {
-                val hasApi = gen.id in apiConfirmedMatchIds
-                val homeIsPlaceholder = existing.homeTeam.contains("º")
-                val awayIsPlaceholder = existing.awayTeam.contains("º")
-                gen.copy(
-                    homeTeam = if (hasApi) existing.homeTeam else if (homeIsPlaceholder) gen.homeTeam else existing.homeTeam,
-                    awayTeam = if (hasApi) existing.awayTeam else if (awayIsPlaceholder) gen.awayTeam else existing.awayTeam,
-                    homeGoals = existing.homeGoals, awayGoals = existing.awayGoals,
-                    predictedHomeGoals = existing.predictedHomeGoals,
-                    predictedAwayGoals = existing.predictedAwayGoals,
-                    pointsEarned = existing.pointsEarned,
-                    homeRedCards = existing.homeRedCards, awayRedCards = existing.awayRedCards,
-                    homeYellowCards = existing.homeYellowCards, awayYellowCards = existing.awayYellowCards,
-                    homeScorers = existing.homeScorers, awayScorers = existing.awayScorers,
-                    homeMissedPenalties = existing.homeMissedPenalties,
-                    awayMissedPenalties = existing.awayMissedPenalties,
-                    winnerTeam = existing.winnerTeam,
-                    homeHeadedGoals = existing.homeHeadedGoals, awayHeadedGoals = existing.awayHeadedGoals,
-                    hasSubGoal = existing.hasSubGoal
-                )
-            } else gen
+        LogManager.log("HomeVM", "Generating bracket ($allGroupsComplete)")
+        val updated = dieciseisavos.map { gen ->
+            val existing = existingDieciseisavos.firstOrNull { it.id == gen.id }
+            if (existing == null) return@map gen
+
+            val slot = KnockoutBracketGenerator.dieciseisavoSlots.firstOrNull { it.matchId == gen.id }
+            val sched = schedule[gen.id]
+
+            val homeKnown = slot != null && when (slot.homeType) {
+                is KnockoutBracketGenerator.SlotTeam.GroupPosition -> slot.homeType.group in completeGroups
+                is KnockoutBracketGenerator.SlotTeam.ThirdParty -> allGroupsComplete
+            }
+            val awayKnown = slot != null && when (slot.awayType) {
+                is KnockoutBracketGenerator.SlotTeam.GroupPosition -> slot.awayType.group in completeGroups
+                is KnockoutBracketGenerator.SlotTeam.ThirdParty -> allGroupsComplete
+            }
+
+            gen.copy(
+                homeTeam = if (homeKnown) gen.homeTeam else (sched?.home ?: gen.homeTeam),
+                awayTeam = if (awayKnown) gen.awayTeam else (sched?.away ?: gen.awayTeam),
+                homeGoals = existing.homeGoals, awayGoals = existing.awayGoals,
+                predictedHomeGoals = existing.predictedHomeGoals,
+                predictedAwayGoals = existing.predictedAwayGoals,
+                pointsEarned = existing.pointsEarned,
+                homeRedCards = existing.homeRedCards, awayRedCards = existing.awayRedCards,
+                homeYellowCards = existing.homeYellowCards, awayYellowCards = existing.awayYellowCards,
+                homeScorers = existing.homeScorers, awayScorers = existing.awayScorers,
+                homeMissedPenalties = existing.homeMissedPenalties,
+                awayMissedPenalties = existing.awayMissedPenalties,
+                winnerTeam = existing.winnerTeam,
+                homeHeadedGoals = existing.homeHeadedGoals, awayHeadedGoals = existing.awayHeadedGoals,
+                hasSubGoal = existing.hasSubGoal
+            )
         }
 
-        val changed = preserved != existingDieciseisavos.sortedBy { it.id }
+        val changed = updated != existingDieciseisavos.sortedBy { it.id }
         if (!changed) return
 
         LogManager.log("HomeVM", "Updating bracket with generated teams")
-        preserved.forEach { p ->
+        updated.forEach { p ->
             val orig = existingDieciseisavos.firstOrNull { it.id == p.id }
             if (orig != null && (orig.homeTeam != p.homeTeam || orig.awayTeam != p.awayTeam))
                 LogManager.log("HomeVM", "  #${p.id}: ${orig.homeTeam} vs ${orig.awayTeam} → ${p.homeTeam} vs ${p.awayTeam}")
         }
 
-        repository.insertMatches(preserved)
-        cachedMatches = (cachedMatches.filter { it.id !in 73..88 } + preserved).sortedBy { it.id }
+        repository.insertMatches(updated)
+        cachedMatches = (cachedMatches.filter { it.id !in 73..88 } + updated).sortedBy { it.id }
         refreshUpcomingMatches()
     }
 
@@ -883,7 +852,7 @@ class HomeViewModel @Inject constructor(
             if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
                 apiConfirmedMatchIds.add(update.matchId)
                 val cur = cachedMatches.firstOrNull { it.id == update.matchId }
-                if (cur != null && (cur.homeTeam != update.apiHomeTeam || cur.awayTeam != update.apiAwayTeam)) {
+                if (cur != null && (!TeamNameNormalizer.matches(cur.homeTeam, update.apiHomeTeam) || !TeamNameNormalizer.matches(cur.awayTeam, update.apiAwayTeam))) {
                     cachedMatches = cachedMatches.map {
                         if (it.id == update.matchId) it.copy(homeTeam = update.apiHomeTeam, awayTeam = update.apiAwayTeam) else it
                     }

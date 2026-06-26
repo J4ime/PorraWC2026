@@ -36,8 +36,10 @@ object TeamNameNormalizer {
         "bosnia-herzegovina" to "bosniayherzegovina", "bosniaherzegovina" to "bosniayherzegovina",
         "unitedstates" to "estadosunidos", "usa" to "estadosunidos",
         "netherlands" to "paisesbajos", "ivorycoast" to "costademarfil",
+        "cotedivoire" to "costademarfil",
         "saudiarabia" to "arabiasaudita", "newzealand" to "nuevazelanda",
         "capeverde" to "caboverde", "congodr" to "rdcongo",
+        "drcongo" to "rdcongo",
         "turkey" to "turquia", "turkiye" to "turquia", "japan" to "japon", "sweden" to "suecia",
         "belgium" to "belgica", "egypt" to "egipto", "spain" to "espana",
         "france" to "francia", "england" to "inglaterra", "croatia" to "croacia",
@@ -59,6 +61,7 @@ object TeamNameNormalizer {
             .replace(diacriticsRegex, "")
             .replace(" ", "")
             .replace("-", "")
+            .replace("'", "")
             .lowercase()
         return normalizeMap[clean] ?: clean
     }

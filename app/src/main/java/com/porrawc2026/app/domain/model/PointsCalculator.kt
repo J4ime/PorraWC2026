@@ -187,7 +187,7 @@ object PointsCalculator {
             if (id != null) {
                 val m = allMatches.firstOrNull { it.id == id }
                 if (m != null && m.winnerTeam != null) {
-                    return if (m.homeTeam == m.winnerTeam) m.awayTeam else m.homeTeam
+                    return if (TeamNameNormalizer.matches(m.homeTeam, m.winnerTeam)) m.awayTeam else m.homeTeam
                 }
             }
         }
@@ -214,7 +214,7 @@ object PointsCalculator {
         if (matchId == null) return null
         val m = allMatches.firstOrNull { it.id == matchId } ?: return null
         val w = winnerByMatch[matchId] ?: return null
-        return if (m.homeTeam == w) m.awayTeam else m.homeTeam
+        return if (TeamNameNormalizer.matches(m.homeTeam, w)) m.awayTeam else m.homeTeam
     }
 
     private fun resolveAdvancing(matchIds: IntRange, winnerByMatch: Map<Int, String>): Set<String> {

@@ -74,9 +74,9 @@ class LiveScoreService @Inject constructor(
 
         var entity = findMatchingMatch(matches, homeName, awayName)
         if (entity == null) {
-            entity = findMatchByDate(competition.date ?: event.date, matches)
+            entity = findMatchByDate(competition.date ?: event.date, event.name, matches)
             if (entity == null) {
-                LogManager.log("LiveScoreService", "No match found for $homeName vs $awayName")
+                LogManager.log("LiveScoreService", "No match found for $homeName vs $awayName (event=${event.name})")
                 return null
             }
         }
@@ -230,7 +230,7 @@ class LiveScoreService @Inject constructor(
         }.sortedByDescending { it.goals }
     }
 
-    private fun findMatchByDate(eventDate: String?, matches: List<MatchEntity>): MatchEntity? {
+    private fun findMatchByDate(eventDate: String?, eventName: String?, matches: List<MatchEntity>): MatchEntity? {
         if (eventDate == null) return null
         val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
         val zid = java.time.ZoneId.of("Europe/Madrid")
@@ -243,16 +243,24 @@ class LiveScoreService @Inject constructor(
             }
         } catch (e: Exception) { return null }
 
+        val eventGroup = eventName?.let { extractGroup(it) }
+
         for (match in matches) {
-            if (match.id !in 73..88) continue
             val matchInstant = try {
                 java.time.LocalDateTime.parse(match.dateTime.take(19), fmt).atZone(zid).toInstant()
             } catch (e: Exception) { continue }
 
             val diff = Math.abs(matchInstant.toEpochMilli() - eventInstant.toEpochMilli())
-            if (diff < 45 * 60 * 1000L) return match
+            if (diff >= 45 * 60 * 1000L) continue
+            if (eventGroup != null && !match.groupName.contains(eventGroup, ignoreCase = true)) continue
+            return match
         }
         return null
+    }
+
+    private fun extractGroup(eventName: String): String? {
+        val g = Regex("""[Gg]roup\s+([A-Z])""").find(eventName)?.groupValues?.getOrNull(1) ?: return null
+        return g
     }
 
     private fun findMatchingMatch(matches: List<MatchEntity>, homeName: String, awayName: String): MatchEntity? {
@@ -260,7 +268,13 @@ class LiveScoreService @Inject constructor(
             TeamNameNormalizer.matches(it.homeTeam, homeName) &&
             TeamNameNormalizer.matches(it.awayTeam, awayName)
         }
-        return if (candidates.size == 1) candidates.first() else null
+        if (candidates.size == 1) return candidates.first()
+        val swapped = matches.filter {
+            TeamNameNormalizer.matches(it.homeTeam, awayName) &&
+            TeamNameNormalizer.matches(it.awayTeam, homeName)
+        }
+        if (swapped.size == 1) return swapped.first()
+        return null
     }
 
     companion object {

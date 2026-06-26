@@ -46,7 +46,6 @@ class HomeViewModelTest {
         context = mockk(relaxed = true)
         
         coEvery { prefsManager.getExcelFileNameSync() } returns null
-        coEvery { prefsManager.getAutoRefreshSync() } returns true
         coEvery { prefsManager.getNotificationsSync() } returns true
         every { repository.getAllMatches() } returns flowOf(emptyList())
         every { repository.getAllTeams() } returns flowOf(emptyList())

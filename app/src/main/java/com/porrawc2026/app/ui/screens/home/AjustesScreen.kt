@@ -51,7 +51,6 @@ fun AjustesScreen(
     val isUpdating by viewModel.isUpdating.collectAsState()
     val appVersion by viewModel.appVersion.collectAsState()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
-    val autoRefreshEnabled by viewModel.autoRefreshEnabled.collectAsState()
     val pdfResult by viewModel.pdfResult.collectAsState()
     val userName by viewModel.userName.collectAsState()
     val userPosition by viewModel.userPosition.collectAsState()
@@ -131,15 +130,6 @@ fun AjustesScreen(
                         color = if (notificationsEnabled) Color(0xFFE65100) else Color(0xFF444444),
                         loading = false,
                         onClick = { viewModel.toggleNotifications() }
-                    )
-                }
-                item {
-                    SquareButton(
-                        icon = if (autoRefreshEnabled) Icons.Filled.Sync else Icons.Filled.SyncDisabled,
-                        label = if (autoRefreshEnabled) "Live ON" else "Live OFF",
-                        color = if (autoRefreshEnabled) Color(0xFF4CAF50) else Color(0xFF444444),
-                        loading = false,
-                        onClick = { viewModel.toggleAutoRefresh() }
                     )
                 }
                 item {

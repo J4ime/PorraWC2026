@@ -1,12 +1,9 @@
 package com.porrawc2026.app.ui.screens.home
 
 import android.content.Context
-import android.content.Intent
-import android.util.Log
 import android.net.Uri
 import android.provider.OpenableColumns
-import androidx.core.content.ContextCompat
-import com.porrawc2026.app.service.LiveUpdateService
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
@@ -39,7 +36,6 @@ import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -50,7 +46,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.Normalizer
 import java.time.Instant
@@ -140,8 +135,6 @@ class HomeViewModel @Inject constructor(
     val allMatches: StateFlow<List<MatchDisplay>> = _allMatches.asStateFlow()
     private val _dayKeys = MutableStateFlow<List<String>>(emptyList())
     val dayKeys: StateFlow<List<String>> = _dayKeys.asStateFlow()
-    private val _autoRefreshEnabled = MutableStateFlow(true)
-    val autoRefreshEnabled: StateFlow<Boolean> = _autoRefreshEnabled.asStateFlow()
     private val _pdfResult = MutableStateFlow<String?>(null)
     val pdfResult: StateFlow<String?> = _pdfResult.asStateFlow()
     private val _userName = MutableStateFlow<String?>(null)
@@ -153,7 +146,6 @@ class HomeViewModel @Inject constructor(
 
     @Volatile
     private var cachedMatches: List<MatchEntity> = emptyList()
-    private var refreshJob: Job? = null
     private val lastWrittenScores = ConcurrentHashMap<Int, Pair<Int, Int>>()
     private val goalScorers = ConcurrentHashMap<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val liveMinutes = ConcurrentHashMap<Int, String>()
@@ -175,7 +167,6 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             runCatching {
                 _excelFileName.value = prefsManager.getExcelFileNameSync()
-                _autoRefreshEnabled.value = prefsManager.getAutoRefreshSync()
                 _notificationsEnabled.value = prefsManager.getNotificationsSync()
                 _userName.value = prefsManager.getUserNameSync()
                 _userPosition.value = prefsManager.getUserPositionSync()
@@ -185,7 +176,6 @@ class HomeViewModel @Inject constructor(
         }
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
-        startBackgroundService()
         viewModelScope.launch(Dispatchers.IO) {
             goalEventBus.goalScored.collect {
                 tryGenerateDieciseisavos()
@@ -228,7 +218,6 @@ class HomeViewModel @Inject constructor(
                 loadPlayers()
                 processedGoalKeys.addAll(prefsManager.getProcessedGoalKeys())
                 tryGenerateDieciseisavos()
-                startAutoRefresh()
                 lastWrittenScores.clear()
                 refreshUpcomingMatches()
                 _hasData.value = true
@@ -243,6 +232,7 @@ class HomeViewModel @Inject constructor(
         // Slow operations (API calls, photos) en segundo plano, sin bloquear la UI
         viewModelScope.launch(Dispatchers.IO) {
             fetchLiveResults()
+            fetchMissingGroupScores()
             tryGenerateDieciseisavos()
             downloadPlayerPhotos()
             precachePhotosInBackground()
@@ -294,7 +284,6 @@ class HomeViewModel @Inject constructor(
                     _hasData.value = true
                     loadPlayers()
                     downloadPlayerPhotos()
-                    startAutoRefresh()
                 }
             }.onFailure { e ->
                 viewModelScope.launch { _errorMessage.emit("Error al cargar el Excel: ${e.message}") }
@@ -318,11 +307,6 @@ class HomeViewModel @Inject constructor(
     fun toggleNotifications() {
         _notificationsEnabled.value = !_notificationsEnabled.value
         viewModelScope.launch { prefsManager.setNotificationsEnabled(_notificationsEnabled.value) }
-    }
-
-    fun toggleAutoRefresh() {
-        _autoRefreshEnabled.value = !_autoRefreshEnabled.value
-        viewModelScope.launch { prefsManager.setAutoRefresh(_autoRefreshEnabled.value) }
     }
 
     fun refreshLiveScores() {
@@ -588,38 +572,6 @@ class HomeViewModel @Inject constructor(
         cachedMatches = MatchScheduleProvider.enrichSchedule(cachedMatches)
     }
 
-    private fun startAutoRefresh() {
-        refreshJob?.cancel()
-        refreshJob = viewModelScope.launch(Dispatchers.IO) {
-            var lastDay = LocalDate.now(madridZone)
-            while (isActive) {
-                try {
-                    val currentDay = LocalDate.now(madridZone)
-                    if (currentDay != lastDay) {
-                        lastDay = currentDay
-                        refreshUpcomingMatches()
-                    }
-                    checkLiveWindow()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error in auto-refresh loop", e)
-                    LogManager.log(TAG, "Error in auto-refresh loop", e)
-                }
-                delay(60_000)
-            }
-        }
-    }
-
-    private suspend fun checkLiveWindow() {
-        if (!_autoRefreshEnabled.value) return
-        val todayMatches = getTodayMatchesWithDates()
-        val staleMatches = getStaleMatches()
-        val anyNeedsUpdate = (todayMatches + staleMatches).any { match ->
-            liveMinutes[match.id] != "FINAL" && !isFinishedByTime(match)
-        }
-        if (!anyNeedsUpdate) return
-        fetchLiveResults()
-    }
-
     fun parseMadridInstant(dateTime: String): Instant? {
         if (dateTime.isBlank()) return null
         return try {
@@ -806,6 +758,20 @@ class HomeViewModel @Inject constructor(
         refreshPoints()
         checkGoalNotifications()
         refreshUpcomingMatches()
+    }
+
+    private suspend fun fetchMissingGroupScores() {
+        val missingIds = cachedMatches
+            .filter { !it.isKnockout && (it.homeGoals == null || it.awayGoals == null) && it.dateTime.isNotBlank() }
+            .map { it.id }
+        if (missingIds.isEmpty()) return
+        val missingMatches = cachedMatches.filter { it.id in missingIds }
+        LogManager.log("HomeVM", "Fetching missing scores for ${missingMatches.size} group matches: $missingIds")
+        val updates = fetchWithRetry { liveScoreService.fetchScoreUpdates(missingMatches) }.orEmpty()
+        if (updates.isNotEmpty()) {
+            processScoreUpdates(updates)
+            tryGenerateDieciseisavos()
+        }
     }
 
     private suspend fun filterMatchesForFetch(fullFetch: Boolean): List<MatchEntity>? {
@@ -1099,13 +1065,7 @@ class HomeViewModel @Inject constructor(
         return MatchStatus.UPCOMING
     }
 
-    private fun startBackgroundService() {
-        val intent = Intent(context, LiveUpdateService::class.java)
-        ContextCompat.startForegroundService(context, intent)
-    }
-
     override fun onCleared() {
-        refreshJob?.cancel()
         super.onCleared()
     }
 

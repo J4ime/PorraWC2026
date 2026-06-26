@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.delay
 
 @Composable
@@ -107,6 +110,17 @@ fun HomeScreen(
             selectedDay = null
             viewModel.refreshLiveScores()
         }
+    }
+
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshLiveScores()
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {

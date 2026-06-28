@@ -203,6 +203,9 @@ class HomeViewModel @Inject constructor(
                     repository.insertMatches(staticSchedule)
                     prefsManager.setCacheTimestamp(System.currentTimeMillis())
                 }
+                // Migration: reset dieciseisavo placeholder names ("2º Grupo A") to empty,
+                // and force correct dates from schedule so findMatchByDate matches API times
+                fixDieciseisavoDatesAndNames()
                 enrichSchedule()
                 recalcAllPoints()
                 refreshPoints()
@@ -562,6 +565,27 @@ class HomeViewModel @Inject constructor(
         cachedMatches = MatchScheduleProvider.enrichSchedule(cachedMatches)
     }
 
+    private suspend fun fixDieciseisavoDatesAndNames() {
+        val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
+        var changed = false
+        cachedMatches = cachedMatches.map { m ->
+            if (m.id in 73..88) {
+                val sched = schedule[m.id]
+                if (sched != null) {
+                    val home = if (m.homeTeam.contains("º")) "" else m.homeTeam
+                    val away = if (m.awayTeam.contains("º")) "" else m.awayTeam
+                    if (home != m.homeTeam || away != m.awayTeam || sched.date != m.dateTime) {
+                        changed = true
+                        m.copy(homeTeam = home, awayTeam = away, dateTime = sched.date)
+                    } else m
+                } else m
+            } else m
+        }
+        if (changed) {
+            repository.insertMatches(cachedMatches.filter { it.id in 73..88 })
+        }
+    }
+
     fun parseMadridInstant(dateTime: String): Instant? {
         if (dateTime.isBlank()) return null
         return try {
@@ -752,7 +776,7 @@ class HomeViewModel @Inject constructor(
         val todayMatches = getTodayMatchesWithDates()
         val staleMatches = if (fullFetch) emptyList() else getStaleMatches()
         val dieciseisavosToFetch = if (fullFetch) emptyList() else {
-            cachedMatches.filter { it.id in 73..88 && it.homeTeam.isBlank() }
+            cachedMatches.filter { it.id in 73..88 }
         }
         val matchesForWc = if (fullFetch) {
             cachedMatches

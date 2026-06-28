@@ -497,8 +497,10 @@ object ExcelParser {
                 val rowIdx = startRow + offset
                 val row = sheet.getRow(rowIdx) ?: continue
                 val matchNumber = cellInt(row, COL_KNOCKOUT_MATCH_NUM) ?: continue
-                val homeRef = cellText(row, COL_KNOCKOUT_HOME_REF) ?: continue
-                val awayRef = cellText(row, COL_KNOCKOUT_AWAY_REF) ?: continue
+                val homeTeamName = cellText(row, COL_MATCH_HOME)
+                val homeRef = homeTeamName ?: (cellText(row, COL_KNOCKOUT_HOME_REF) ?: continue)
+                val awayTeamName = cellText(row, COL_MATCH_AWAY)
+                val awayRef = awayTeamName ?: (cellText(row, COL_KNOCKOUT_AWAY_REF) ?: continue)
 
                 val whRaw = cellText(row, COL_KNOCKOUT_WINNER_HOME)
                 val waRaw = cellText(row, COL_KNOCKOUT_WINNER_AWAY)
@@ -529,7 +531,11 @@ object ExcelParser {
         if (thirdRow != null) {
             val wh = cellText(thirdRow, COL_KNOCKOUT_WINNER_HOME)
             val wa = cellText(thirdRow, COL_KNOCKOUT_WINNER_AWAY)
-            predictions.add(KnockoutPredictionEntity(103, "3er puesto", "L101", "L102",
+            val homeTeamName = cellText(thirdRow, COL_MATCH_HOME)
+            val homeRef = homeTeamName ?: (cellText(thirdRow, COL_KNOCKOUT_HOME_REF) ?: "L101")
+            val awayTeamName = cellText(thirdRow, COL_MATCH_AWAY)
+            val awayRef = awayTeamName ?: (cellText(thirdRow, COL_KNOCKOUT_AWAY_REF) ?: "L102")
+            predictions.add(KnockoutPredictionEntity(103, "3er puesto", homeRef, awayRef,
                 when { wh == "1" || wh == "1.0" -> 1; wa == "1" || wa == "1.0" -> 2; else -> null }))
         }
 
@@ -537,7 +543,11 @@ object ExcelParser {
         if (finalRow != null) {
             val wh = cellText(finalRow, COL_KNOCKOUT_WINNER_HOME)
             val wa = cellText(finalRow, COL_KNOCKOUT_WINNER_AWAY)
-            predictions.add(KnockoutPredictionEntity(104, "Final", "W101", "W102",
+            val homeTeamName = cellText(finalRow, COL_MATCH_HOME)
+            val homeRef = homeTeamName ?: (cellText(finalRow, COL_KNOCKOUT_HOME_REF) ?: "W101")
+            val awayTeamName = cellText(finalRow, COL_MATCH_AWAY)
+            val awayRef = awayTeamName ?: (cellText(finalRow, COL_KNOCKOUT_AWAY_REF) ?: "W102")
+            predictions.add(KnockoutPredictionEntity(104, "Final", homeRef, awayRef,
                 when { wh == "1" || wh == "1.0" -> 1; wa == "1" || wa == "1.0" -> 2; else -> null }))
         }
 

@@ -15,7 +15,6 @@ import com.porrawc2026.app.data.remote.LiveScoreUpdate
 import com.porrawc2026.app.data.remote.MatchScheduleProvider
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.PointsCalculator
-import com.porrawc2026.app.domain.model.KnockoutBracketGenerator
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.util.ExcelParser
@@ -82,7 +81,9 @@ data class MatchDisplay(
     val homeScorers: List<GoalEvent> = emptyList(),
     val awayScorers: List<GoalEvent> = emptyList(),
     val dayKey: String = "",
-    val sortKey: String = ""
+    val sortKey: String = "",
+    val isKnockout: Boolean = false,
+    val hasKnockoutPred: Boolean = false
 )
 
 @HiltViewModel
@@ -149,6 +150,7 @@ class HomeViewModel @Inject constructor(
     private val lastWrittenScores = ConcurrentHashMap<Int, Pair<Int, Int>>()
     private val goalScorers = ConcurrentHashMap<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val liveMinutes = ConcurrentHashMap<Int, String>()
+    private var knockoutPredictionMap = mapOf<Int, Boolean>()
     private val seenScorers = ConcurrentHashMap<Int, MutableSet<String>>()
     private val notifiedScorers = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val processedGoalKeys = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
@@ -177,9 +179,7 @@ class HomeViewModel @Inject constructor(
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
         viewModelScope.launch(Dispatchers.IO) {
-            goalEventBus.goalScored.collect {
-                tryGenerateDieciseisavos()
-            }
+            goalEventBus.goalScored.collect { }
         }
     }
 
@@ -226,7 +226,6 @@ class HomeViewModel @Inject constructor(
         // Slow operations (API calls, photos) en segundo plano, sin bloquear la UI
         viewModelScope.launch(Dispatchers.IO) {
             fetchLiveResults()
-            tryGenerateDieciseisavos()
             downloadPlayerPhotos()
             precachePhotosInBackground()
         }
@@ -326,15 +325,7 @@ class HomeViewModel @Inject constructor(
             processedGoalKeys.clear()
             liveMatchStore.goalScorers.clear()
             liveMatchStore.liveMinutes.clear()
-            // Reset dieciseisavo names to schedule defaults before re-fetching
-            val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
-            cachedMatches = cachedMatches.map { m ->
-                if (m.id in 73..88) {
-                    val sched = schedule[m.id]
-                    if (sched != null) m.copy(homeTeam = sched.home, awayTeam = sched.away) else m
-                } else m.copy(homeGoals = null, awayGoals = null, homeScorers = null, awayScorers = null, homeRedCards = null, awayRedCards = null, homeYellowCards = null, awayYellowCards = null)
-            }
-            repository.insertMatches(cachedMatches.filter { it.id in 73..88 })
+            fixDieciseisavoDatesAndNames()
             fetchLiveResults(fullFetch = true)
             _isBusy.value = false
         }
@@ -513,17 +504,23 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun recalcAllPoints() {
+        val teams = repository.getAllTeams().first()
+        val knockoutPredictions = repository.getKnockoutPredictions().first()
+        knockoutPredictionMap = knockoutPredictions.associate { it.matchNumber to (it.winner != null) }
+
+        val actual = PointsCalculator.computeActualAdvancingTeams(cachedMatches, teams)
+        val predicted = PointsCalculator.computePredictedAdvancingTeams(cachedMatches, teams, knockoutPredictions)
+
         cachedMatches = cachedMatches.map { m ->
-            val pts = if (!m.isKnockout) PointsCalculator.calculateMatchPoints(m) else 0
+            val pts = if (!m.isKnockout) {
+                PointsCalculator.calculateMatchPoints(m)
+            } else {
+                PointsCalculator.computeKnockoutAdvancementPoints(m, predicted)
+            }
             if (pts != m.pointsEarned) repository.updateMatchPoints(m.id, pts)
             m.copy(pointsEarned = pts)
         }
 
-        val teams = repository.getAllTeams().first()
-        val knockoutPredictions = repository.getKnockoutPredictions().first()
-
-        val actual = PointsCalculator.computeActualAdvancingTeams(cachedMatches, teams)
-        val predicted = PointsCalculator.computePredictedAdvancingTeams(cachedMatches, teams, knockoutPredictions)
         val advPoints = PointsCalculator.calculateTotalAdvancementPoints(predicted, actual)
         _advancementPoints.value = advPoints
     }
@@ -566,24 +563,42 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fixDieciseisavoDatesAndNames() {
+        repository.clearKnockoutMatchData(*(73..96).toList().toIntArray())
         val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
-        var changed = false
+        val now = Instant.now()
         cachedMatches = cachedMatches.map { m ->
             if (m.id in 73..88) {
                 val sched = schedule[m.id]
-                if (sched != null) {
-                    val home = if (m.homeTeam.contains("º")) "" else m.homeTeam
-                    val away = if (m.awayTeam.contains("º")) "" else m.awayTeam
-                    if (home != m.homeTeam || away != m.awayTeam || sched.date != m.dateTime) {
-                        changed = true
-                        m.copy(homeTeam = home, awayTeam = away, dateTime = sched.date)
-                    } else m
-                } else m
+                if (sched != null) m.copy(
+                    homeTeam = "",
+                    awayTeam = "",
+                    dateTime = sched.date,
+                    homeGoals = null, awayGoals = null,
+                    homeScorers = null, awayScorers = null,
+                    homeRedCards = null, awayRedCards = null,
+                    homeYellowCards = null, awayYellowCards = null,
+                    homeMissedPenalties = 0, awayMissedPenalties = 0,
+                    winnerTeam = null,
+                    homeHeadedGoals = 0, awayHeadedGoals = 0,
+                    hasSubGoal = false,
+                    pointsEarned = 0
+                ) else m
+            } else if (m.id in 89..96) {
+                m.copy(
+                    homeTeam = "", awayTeam = "",
+                    homeGoals = null, awayGoals = null,
+                    homeScorers = null, awayScorers = null,
+                    homeRedCards = null, awayRedCards = null,
+                    homeYellowCards = null, awayYellowCards = null,
+                    homeMissedPenalties = 0, awayMissedPenalties = 0,
+                    winnerTeam = null,
+                    homeHeadedGoals = 0, awayHeadedGoals = 0,
+                    hasSubGoal = false,
+                    pointsEarned = 0
+                )
             } else m
         }
-        if (changed) {
-            repository.insertMatches(cachedMatches.filter { it.id in 73..88 })
-        }
+        repository.insertMatches(cachedMatches.filter { it.id in 73..96 })
     }
 
     fun parseMadridInstant(dateTime: String): Instant? {
@@ -609,89 +624,6 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun refreshAll() {
         fetchLiveResults()
-        tryGenerateDieciseisavos()
-    }
-
-    private suspend fun tryGenerateDieciseisavos() {
-        val existingDieciseisavos = cachedMatches.filter { it.id in 73..88 }
-        val completeGroups = getCompleteGroups()
-        val allGroupsComplete = completeGroups.size == 12
-        LogManager.log("HomeVM", "tryGenerateDieciseisavos: ${completeGroups.size}/12 groups complete ($completeGroups)")
-        existingDieciseisavos.forEach { d ->
-            LogManager.log("HomeVM", "  1/16 #${d.id}: ${d.homeTeam} vs ${d.awayTeam}")
-        }
-
-        if (completeGroups.isEmpty()) return
-
-        val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
-        val teams = repository.getAllTeams().first()
-        val dieciseisavos = KnockoutBracketGenerator.generateDieciseisavos(cachedMatches, teams)
-        if (dieciseisavos.isEmpty()) return
-
-        LogManager.log("HomeVM", "Generating bracket ($allGroupsComplete)")
-        val updated = dieciseisavos.map { gen ->
-            val existing = existingDieciseisavos.firstOrNull { it.id == gen.id }
-            if (existing == null) return@map gen
-
-            val slot = KnockoutBracketGenerator.dieciseisavoSlots.firstOrNull { it.matchId == gen.id }
-            val sched = schedule[gen.id]
-
-            val homeKnown = slot != null && when (slot.homeType) {
-                is KnockoutBracketGenerator.SlotTeam.GroupPosition -> slot.homeType.group in completeGroups
-                is KnockoutBracketGenerator.SlotTeam.ThirdParty -> allGroupsComplete
-            }
-            val awayKnown = slot != null && when (slot.awayType) {
-                is KnockoutBracketGenerator.SlotTeam.GroupPosition -> slot.awayType.group in completeGroups
-                is KnockoutBracketGenerator.SlotTeam.ThirdParty -> allGroupsComplete
-            }
-
-            gen.copy(
-                homeTeam = existing.homeTeam,
-                awayTeam = existing.awayTeam,
-                homeGoals = existing.homeGoals, awayGoals = existing.awayGoals,
-                predictedHomeGoals = existing.predictedHomeGoals,
-                predictedAwayGoals = existing.predictedAwayGoals,
-                pointsEarned = existing.pointsEarned,
-                homeRedCards = existing.homeRedCards, awayRedCards = existing.awayRedCards,
-                homeYellowCards = existing.homeYellowCards, awayYellowCards = existing.awayYellowCards,
-                homeScorers = existing.homeScorers, awayScorers = existing.awayScorers,
-                homeMissedPenalties = existing.homeMissedPenalties,
-                awayMissedPenalties = existing.awayMissedPenalties,
-                winnerTeam = existing.winnerTeam,
-                homeHeadedGoals = existing.homeHeadedGoals, awayHeadedGoals = existing.awayHeadedGoals,
-                hasSubGoal = existing.hasSubGoal
-            )
-        }
-
-        val changed = updated != existingDieciseisavos.sortedBy { it.id }
-        if (!changed) return
-
-        LogManager.log("HomeVM", "Updating bracket with generated teams")
-        updated.forEach { p ->
-            val orig = existingDieciseisavos.firstOrNull { it.id == p.id }
-            if (orig != null && (orig.homeTeam != p.homeTeam || orig.awayTeam != p.awayTeam))
-                LogManager.log("HomeVM", "  #${p.id}: ${orig.homeTeam} vs ${orig.awayTeam} → ${p.homeTeam} vs ${p.awayTeam}")
-        }
-
-        repository.insertMatches(updated)
-        cachedMatches = (cachedMatches.filter { it.id !in 73..88 } + updated).sortedBy { it.id }
-        refreshUpcomingMatches()
-    }
-
-    private fun getCompleteGroups(): Set<String> {
-        val groupMatches = cachedMatches.filter { !it.isKnockout }.groupBy {
-            it.groupName.removePrefix("Grupo ").trim().uppercase()
-        }
-        return groupMatches.filterValues { groupList ->
-            groupList.all { it.homeGoals != null && it.awayGoals != null }
-        }.keys
-    }
-
-    private fun isSlotTeamComplete(slotTeam: KnockoutBracketGenerator.SlotTeam, completeGroups: Set<String>, allGroupsComplete: Boolean): Boolean {
-        return when (slotTeam) {
-            is KnockoutBracketGenerator.SlotTeam.GroupPosition -> slotTeam.group in completeGroups
-            is KnockoutBracketGenerator.SlotTeam.ThirdParty -> allGroupsComplete
-        }
     }
 
     private suspend fun <T> fetchWithRetry(maxAttempts: Int = 10, block: suspend () -> T?): T? {
@@ -764,7 +696,6 @@ class HomeViewModel @Inject constructor(
             LogManager.log("HomeVM", "  #${m.id}: ${m.homeTeam} ${m.homeGoals}-${m.awayGoals} ${m.awayTeam}")
         }
         processScoreUpdates(scoreUpdates)
-        tryGenerateDieciseisavos()
         notifyGoalEvents()
         recalculateAllPlayerGoals()
         refreshPoints()
@@ -822,7 +753,21 @@ class HomeViewModel @Inject constructor(
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
             if (match != null) {
                 val start = parseMadridInstant(match.dateTime)
-                if (start != null && start.isAfter(Instant.now())) return@forEach
+                if (start != null && start.isAfter(Instant.now())) {
+                    // Future match: update team names only (scores can't exist yet)
+                    if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+                        val esHome = TeamNameNormalizer.enToEs(update.apiHomeTeam)
+                        val esAway = TeamNameNormalizer.enToEs(update.apiAwayTeam)
+                        if (match.homeTeam != esHome || match.awayTeam != esAway) {
+                            LogManager.log("HomeVM", "Setting 1/16 #${update.matchId} from API (future): ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
+                            repository.updateMatchTeams(update.matchId, esHome, esAway)
+                            cachedMatches = cachedMatches.map {
+                                if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
+                            }
+                        }
+                    }
+                    return@forEach
+                }
             }
             updateMatchScores(update)
             updateGoalScorers(update)
@@ -966,7 +911,9 @@ class HomeViewModel @Inject constructor(
         val todayZoned = LocalDate.now(madridZone)
         val matches = cachedMatches
 
-        val allSorted = matches.sortedBy { it.dateTime.ifBlank { "zzz" } }
+        val allSorted = matches
+            .filter { it.homeTeam.isNotBlank() && it.awayTeam.isNotBlank() }
+            .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = allSorted.map { match -> toDisplay(match) }
 
         val yesterdayMatches = allDisplay.filter { display ->
@@ -1056,7 +1003,9 @@ class HomeViewModel @Inject constructor(
             homeScorers = homeScr,
             awayScorers = awayScr,
             dayKey = dayKey,
-            sortKey = sortKey
+            sortKey = sortKey,
+            isKnockout = match.isKnockout,
+            hasKnockoutPred = knockoutPredictionMap[match.id] == true
         )
     }
 

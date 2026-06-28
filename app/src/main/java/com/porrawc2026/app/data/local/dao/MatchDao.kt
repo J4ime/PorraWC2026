@@ -59,4 +59,7 @@ interface MatchDao {
 
     @Query("UPDATE matches SET homeTeam = :homeTeam, awayTeam = :awayTeam WHERE id = :matchId")
     suspend fun updateMatchTeams(matchId: Int, homeTeam: String, awayTeam: String)
+
+    @Query("UPDATE matches SET homeTeam='', awayTeam='', homeGoals=NULL, awayGoals=NULL, homeScorers=NULL, awayScorers=NULL, homeRedCards=NULL, awayRedCards=NULL, homeYellowCards=NULL, awayYellowCards=NULL, homeMissedPenalties=0, awayMissedPenalties=0, winnerTeam=NULL, homeHeadedGoals=0, awayHeadedGoals=0, hasSubGoal=0, pointsEarned=0 WHERE id IN (:ids)")
+    suspend fun clearKnockoutMatchData(vararg ids: Int)
 }

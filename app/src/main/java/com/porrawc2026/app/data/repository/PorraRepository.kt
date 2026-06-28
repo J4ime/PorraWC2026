@@ -119,6 +119,10 @@ class PorraRepository @Inject constructor(
         matchDao.clearAllMatchScores()
     }
 
+    suspend fun clearKnockoutMatchData(vararg ids: Int) {
+        matchDao.clearKnockoutMatchData(*ids)
+    }
+
     suspend fun resetAllPlayerGoals() {
         playerPredictionDao.resetAllPlayerGoals()
     }

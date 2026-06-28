@@ -5,6 +5,23 @@ import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
 
+private data class GroupStanding(
+    val teamName: String,
+    val points: Int,
+    val goalDifference: Int,
+    val goalsFor: Int,
+    val position: Int
+)
+
+private data class ThirdPlaceTeam(
+    val teamName: String,
+    val group: String,
+    val points: Int,
+    val goalDifference: Int,
+    val goalsFor: Int,
+    val rank: Int
+)
+
 object PointsCalculator {
 
     fun calculateMatchPoints(match: MatchEntity): Int {
@@ -171,6 +188,30 @@ object PointsCalculator {
         if (homeResolved in advancingSet) pts += roundPts
         if (awayResolved in advancingSet) pts += roundPts
         return pts
+    }
+
+    fun computeKnockoutAdvancementPoints(
+        match: MatchEntity,
+        predicted: AdvancingTeams
+    ): Int {
+        val round = match.knockoutRound ?: return 0
+        val winner = match.winnerTeam
+        if (winner.isNullOrBlank()) return 0
+
+        val (nextRound, predictedSet) = when (round) {
+            "Dieciseisavos" -> "Octavos" to predicted.octavos as Set<String>
+            "Octavos" -> "Cuartos" to predicted.cuartos as Set<String>
+            "Cuartos" -> "Semifinales" to predicted.semifinales as Set<String>
+            "Semifinales" -> "Final" to predicted.final as Set<String>
+            "Final" -> "Campeon" to predicted.campeon as Set<String>
+            else -> return 0
+        }
+
+        val roundPts = getRoundAdvancementPoints(nextRound)
+        if (roundPts == 0) return 0
+
+        val normWinner = TeamNameNormalizer.normalize(winner)
+        return if (predictedSet.any { TeamNameNormalizer.normalize(it) == normWinner }) roundPts else 0
     }
 
     fun resolveMatchTeam(teamName: String, allMatches: List<MatchEntity>): String {

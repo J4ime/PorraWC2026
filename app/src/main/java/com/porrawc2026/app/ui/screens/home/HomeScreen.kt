@@ -265,7 +265,8 @@ private fun MatchRow(match: MatchDisplay) {
 
             // Points + TV + round column
             Column(modifier = Modifier.width(38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (hasPred && (isLive || showScore)) {
+                val showKnockoutPoints = match.isKnockout && match.hasKnockoutPred && (isLive || showScore)
+            if ((hasPred && (isLive || showScore)) || showKnockoutPoints) {
                     val pts = if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0"
                     val pc = when { match.pointsEarned > 0 -> Color(0xFF4CAF50); else -> Color(0xFF666666) }
                     Text(pts, fontSize = 12.sp, color = pc, fontWeight = FontWeight.Bold)
@@ -277,19 +278,7 @@ private fun MatchRow(match: MatchDisplay) {
                         Text(ch.trim().take(4), fontSize = 7.sp, color = Color.White, modifier = Modifier.background(bg, RoundedCornerShape(3.dp)).padding(horizontal = 2.dp, vertical = 1.dp))
                     }
                 }
-                val roundAbbr = when (match.groupLabel) {
-                    "Dieciseisavos" -> "1/16"
-                    "Octavos" -> "1/8"
-                    "Cuartos" -> "1/4"
-                    "Semifinales" -> "SEMI"
-                    "Final" -> "FIN"
-                    "Tercer puesto" -> "3º"
-                    else -> null
-                }
-                if (roundAbbr != null) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(roundAbbr, fontSize = 7.sp, color = Color(0xFFE65100), fontWeight = FontWeight.Bold, maxLines = 1)
-                }
+
             }
         }
 

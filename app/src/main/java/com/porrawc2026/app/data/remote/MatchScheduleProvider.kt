@@ -12,7 +12,7 @@ object MatchScheduleProvider {
 
     private val groups = listOf("A","B","C","D","E","F","G","H","I","J","K","L")
 
-    private val rtveMatchIds = setOf(1, 7, 13, 25, 43, 49, 67, 9, 21, 33, 45, 57, 69, 17, 30, 48, 65, 73, 74, 77, 84, 86)
+    private val rtveMatchIds = setOf(1, 7, 13, 25, 43, 49, 67, 9, 21, 33, 45, 57, 69, 17, 30, 48, 65, 73, 74, 78, 84)
 
     data class MatchSchedule(
         val id: Int,
@@ -113,23 +113,23 @@ object MatchScheduleProvider {
         data[71] = MatchSchedule(71, "2026-06-27T23:00:00", "RTVE", "Panamá", "Inglaterra")
         data[72] = MatchSchedule(72, "2026-06-27T23:00:00", "DAZN", "Croacia", "Ghana")
 
-        // Dieciseisavos (Round of 32) — IDs 73-88. Team names come from ESPN API only.
-        data[73] = MatchSchedule(73, "2026-06-28T21:00:00", "RTVE", "", "")
-        data[74] = MatchSchedule(74, "2026-06-29T19:00:00", "RTVE", "", "")
-        data[75] = MatchSchedule(75, "2026-06-30T03:00:00", "DAZN", "", "")
-        data[76] = MatchSchedule(76, "2026-06-30T06:00:00", "DAZN", "", "")
-        data[77] = MatchSchedule(77, "2026-06-30T23:00:00", "RTVE", "", "")
-        data[78] = MatchSchedule(78, "2026-07-01T06:00:00", "DAZN", "", "")
-        data[79] = MatchSchedule(79, "2026-07-01T03:00:00", "DAZN", "", "")
-        data[80] = MatchSchedule(80, "2026-07-01T16:00:00", "RTVE", "", "")
-        data[81] = MatchSchedule(81, "2026-07-02T03:00:00", "RTVE", "", "")
-        data[82] = MatchSchedule(82, "2026-07-01T23:00:00", "RTVE", "", "")
-        data[83] = MatchSchedule(83, "2026-07-02T23:00:00", "RTVE", "", "")
-        data[84] = MatchSchedule(84, "2026-07-02T21:00:00", "RTVE", "", "")
-        data[85] = MatchSchedule(85, "2026-07-03T06:00:00", "DAZN", "", "")
-        data[86] = MatchSchedule(86, "2026-07-03T22:00:00", "DAZN", "", "")
-        data[87] = MatchSchedule(87, "2026-07-04T02:30:00", "DAZN", "", "")
-        data[88] = MatchSchedule(88, "2026-07-03T19:00:00", "RTVE", "", "")
+        // Dieciseisavos (Round of 32) — IDs 73-88. Times must match ESPN API events exactly for findMatchByDate().
+        data[73] = MatchSchedule(73, "2026-06-28T21:00:00", "RTVE", "", "")  // ESPN 760486: South Africa vs Canada 19:00Z
+        data[74] = MatchSchedule(74, "2026-06-29T19:00:00", "RTVE", "", "")  // ESPN 760487: Brazil vs Japan 17:00Z
+        data[75] = MatchSchedule(75, "2026-06-29T22:30:00", "DAZN", "", "")  // ESPN 760489: Germany vs Paraguay 20:30Z
+        data[76] = MatchSchedule(76, "2026-06-30T03:00:00", "DAZN", "", "")  // ESPN 760488: Netherlands vs Morocco 01:00Z
+        data[77] = MatchSchedule(77, "2026-06-30T19:00:00", "DAZN", "", "")  // ESPN 760490: Ivory Coast vs Norway 17:00Z
+        data[78] = MatchSchedule(78, "2026-06-30T23:00:00", "RTVE", "", "")  // ESPN 760492: France vs Sweden 21:00Z
+        data[79] = MatchSchedule(79, "2026-07-01T03:00:00", "DAZN", "", "")  // ESPN 760491: Mexico vs Ecuador 01:00Z
+        data[80] = MatchSchedule(80, "2026-07-01T18:00:00", "DAZN", "", "")  // ESPN 760495: England vs Congo DR 16:00Z
+        data[81] = MatchSchedule(81, "2026-07-01T22:00:00", "DAZN", "", "")  // ESPN 760493: Belgium vs Senegal 20:00Z
+        data[82] = MatchSchedule(82, "2026-07-02T02:00:00", "DAZN", "", "")  // ESPN 760494: United States vs Bosnia-Herzegovina 00:00Z
+        data[83] = MatchSchedule(83, "2026-07-03T01:00:00", "DAZN", "", "")  // ESPN 760496: Portugal vs Croatia 23:00Z (Jul 2)
+        data[84] = MatchSchedule(84, "2026-07-02T21:00:00", "RTVE", "", "")  // ESPN 760497: Spain vs Austria 19:00Z
+        data[85] = MatchSchedule(85, "2026-07-03T05:00:00", "DAZN", "", "")  // ESPN 760498: Switzerland vs Algeria 03:00Z
+        data[86] = MatchSchedule(86, "2026-07-03T20:00:00", "DAZN", "", "")  // ESPN 760499: Australia vs Egypt 18:00Z
+        data[87] = MatchSchedule(87, "2026-07-04T00:00:00", "DAZN", "", "")  // ESPN 760500: Argentina vs Cape Verde 22:00Z (Jul 3)
+        data[88] = MatchSchedule(88, "2026-07-04T03:30:00", "DAZN", "", "")  // ESPN 760501: Colombia vs Ghana 01:30Z
 
         // Octavos (Round of 16) — IDs 89-96
         data[89] = MatchSchedule(89, "2026-07-04T23:00:00", "DAZN", "Ganador 74", "Ganador 77")

@@ -828,14 +828,16 @@ class HomeViewModel @Inject constructor(
                 repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
             }
         }
-        // For dieciseisavo matches, always use API team names (authoritative source)
+        // For dieciseisavo matches, always use API team names (authoritative source), converted to Spanish
         if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+            val esHome = TeamNameNormalizer.enToEs(update.apiHomeTeam)
+            val esAway = TeamNameNormalizer.enToEs(update.apiAwayTeam)
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
-            if (match != null && (match.homeTeam != update.apiHomeTeam || match.awayTeam != update.apiAwayTeam)) {
-                LogManager.log("HomeVM", "Setting 1/16 #${update.matchId} from API: ${match.homeTeam} vs ${match.awayTeam} → ${update.apiHomeTeam} vs ${update.apiAwayTeam}")
-                repository.updateMatchTeams(update.matchId, update.apiHomeTeam, update.apiAwayTeam)
+            if (match != null && (match.homeTeam != esHome || match.awayTeam != esAway)) {
+                LogManager.log("HomeVM", "Setting 1/16 #${update.matchId} from API: ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
+                repository.updateMatchTeams(update.matchId, esHome, esAway)
                 cachedMatches = cachedMatches.map {
-                    if (it.id == update.matchId) it.copy(homeTeam = update.apiHomeTeam, awayTeam = update.apiAwayTeam) else it
+                    if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
                 }
             }
         }

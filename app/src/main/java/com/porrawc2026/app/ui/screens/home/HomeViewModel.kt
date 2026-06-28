@@ -203,15 +203,6 @@ class HomeViewModel @Inject constructor(
                     repository.insertMatches(staticSchedule)
                     prefsManager.setCacheTimestamp(System.currentTimeMillis())
                 }
-                // Reset dieciseisavo names to schedule defaults before attempting generation
-                val dieciseisavoSched = MatchScheduleProvider.getDieciseisavosSchedule()
-                cachedMatches = cachedMatches.map { m ->
-                    if (m.id in 73..88) {
-                        val s = dieciseisavoSched[m.id]
-                        if (s != null) m.copy(homeTeam = s.home, awayTeam = s.away) else m
-                    } else m
-                }
-                repository.insertMatches(cachedMatches.filter { it.id in 73..88 })
                 enrichSchedule()
                 recalcAllPoints()
                 refreshPoints()
@@ -631,8 +622,8 @@ class HomeViewModel @Inject constructor(
             }
 
             gen.copy(
-                homeTeam = if (homeKnown) gen.homeTeam else (sched?.home ?: gen.homeTeam),
-                awayTeam = if (awayKnown) gen.awayTeam else (sched?.away ?: gen.awayTeam),
+                homeTeam = existing.homeTeam,
+                awayTeam = existing.awayTeam,
                 homeGoals = existing.homeGoals, awayGoals = existing.awayGoals,
                 predictedHomeGoals = existing.predictedHomeGoals,
                 predictedAwayGoals = existing.predictedAwayGoals,
@@ -761,7 +752,7 @@ class HomeViewModel @Inject constructor(
         val todayMatches = getTodayMatchesWithDates()
         val staleMatches = if (fullFetch) emptyList() else getStaleMatches()
         val dieciseisavosToFetch = if (fullFetch) emptyList() else {
-            cachedMatches.filter { it.id in 73..88 && it.homeTeam.contains("º") }
+            cachedMatches.filter { it.id in 73..88 && it.homeTeam.isBlank() }
         }
         val matchesForWc = if (fullFetch) {
             cachedMatches
@@ -820,9 +811,8 @@ class HomeViewModel @Inject constructor(
                     repository.updateMatchWinner(update.matchId, update.winnerTeam)
                 }
             }
-            // Dieciseisavo team names come from group standings via tryGenerateDieciseisavos() only.
-            // The ESPN API may return placeholder/default names for slots not yet finalized,
-            // so we never overwrite from the API.
+            // Dieciseisavo team names come from ESPN API in updateMatchScores()
+            // tryGenerateDieciseisavos() preserves the API-set names.
         }
     }
 
@@ -838,11 +828,11 @@ class HomeViewModel @Inject constructor(
                 repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
             }
         }
-        // For dieciseisavo matches with placeholder names, use API team names as fallback
+        // For dieciseisavo matches, always use API team names (authoritative source)
         if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
-            if (match != null && match.homeTeam.contains("º")) {
-                LogManager.log("HomeVM", "Setting 1/16 #${update.matchId} names from API: ${match.homeTeam} → ${update.apiHomeTeam}, ${match.awayTeam} → ${update.apiAwayTeam}")
+            if (match != null && (match.homeTeam != update.apiHomeTeam || match.awayTeam != update.apiAwayTeam)) {
+                LogManager.log("HomeVM", "Setting 1/16 #${update.matchId} from API: ${match.homeTeam} vs ${match.awayTeam} → ${update.apiHomeTeam} vs ${update.apiAwayTeam}")
                 repository.updateMatchTeams(update.matchId, update.apiHomeTeam, update.apiAwayTeam)
                 cachedMatches = cachedMatches.map {
                     if (it.id == update.matchId) it.copy(homeTeam = update.apiHomeTeam, awayTeam = update.apiAwayTeam) else it

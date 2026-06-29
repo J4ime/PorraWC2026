@@ -93,7 +93,13 @@ object PointsCalculator {
         val semifinales: Set<String> = emptySet(),
         val final: Set<String> = emptySet(),
         val campeon: Set<String> = emptySet(),
-        val tercero: Set<String> = emptySet()
+        val tercero: Set<String> = emptySet(),
+        // Predicted participants per round (resolved from refs)
+        val octavosParticipants: Set<String> = emptySet(),
+        val cuartosParticipants: Set<String> = emptySet(),
+        val semifinalesParticipants: Set<String> = emptySet(),
+        val finalParticipants: Set<String> = emptySet(),
+        val campeonParticipants: Set<String> = emptySet()
     )
 
     fun computeActualAdvancingTeams(
@@ -133,6 +139,19 @@ object PointsCalculator {
         val predictedWinners = resolvePredictedKnockoutWinners(knockoutPredictions, allMatches)
         val flat = predictedWinners.mapValues { (_, v) -> v.teamName }
 
+        // Resolve participant teams per round
+        fun resolveParticipants(matchIds: IntRange): Set<String> {
+            val participants = mutableSetOf<String>()
+            for (id in matchIds) {
+                val pred = knockoutPredictions.firstOrNull { it.matchNumber == id } ?: continue
+                val homeResolved = resolvePredictionTeamName(pred.homeTeamRef, knockoutPredictions)
+                val awayResolved = resolvePredictionTeamName(pred.awayTeamRef, knockoutPredictions)
+                if (homeResolved.isNotBlank()) participants.add(homeResolved)
+                if (awayResolved.isNotBlank()) participants.add(awayResolved)
+            }
+            return participants
+        }
+
         return AdvancingTeams(
             dieciseisavos = dieciseisavos,
             octavos = resolveAdvancing(73..88, flat),
@@ -140,7 +159,12 @@ object PointsCalculator {
             semifinales = resolveAdvancing(97..100, flat),
             final = resolveAdvancing(101..102, flat),
             campeon = resolveAdvancing(104..104, flat),
-            tercero = resolveAdvancing(103..103, flat)
+            tercero = resolveAdvancing(103..103, flat),
+            octavosParticipants = resolveParticipants(89..96),
+            cuartosParticipants = resolveParticipants(97..100),
+            semifinalesParticipants = resolveParticipants(101..102),
+            finalParticipants = resolveParticipants(103..103),
+            campeonParticipants = resolveParticipants(104..104)
         )
     }
 
@@ -204,12 +228,13 @@ object PointsCalculator {
         }
         if (advancingTeam.isBlank()) return 0
 
+        // Check if the winning team is a PARTICIPANT in the next-round predictions
         val (nextRound, predictedSet) = when (round) {
-            "Dieciseisavos" -> "Octavos" to predicted.octavos as Set<String>
-            "Octavos" -> "Cuartos" to predicted.cuartos as Set<String>
-            "Cuartos" -> "Semifinales" to predicted.semifinales as Set<String>
-            "Semifinales" -> "Final" to predicted.final as Set<String>
-            "Final" -> "Campeon" to predicted.campeon as Set<String>
+            "Dieciseisavos" -> "Octavos" to predicted.octavosParticipants as Set<String>
+            "Octavos" -> "Cuartos" to predicted.cuartosParticipants as Set<String>
+            "Cuartos" -> "Semifinales" to predicted.semifinalesParticipants as Set<String>
+            "Semifinales" -> "Final" to predicted.finalParticipants as Set<String>
+            "Final" -> "Campeon" to predicted.campeonParticipants as Set<String>
             else -> return 0
         }
 

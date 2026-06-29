@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
+import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.ui.components.TournamentBracket
 import com.porrawc2026.app.ui.theme.*
 
@@ -80,6 +81,8 @@ fun KnockoutScreen(
 
 @Composable
 private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) {
+    val resolvedHome = remember(predictions) { predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions) } }
+    val resolvedAway = remember(predictions) { predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions) } }
     val rounds = listOf(
         "Dieciseisavos" to 20,
         "Octavos" to 40,
@@ -109,7 +112,11 @@ private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) 
                 }
 
                 items(roundPredictions) { prediction ->
-                    KnockoutPredictionCard(prediction = prediction)
+                    KnockoutPredictionCard(
+                        prediction = prediction,
+                        homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef,
+                        awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
+                    )
                 }
             }
         }
@@ -119,7 +126,7 @@ private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) 
 }
 
 @Composable
-private fun KnockoutPredictionCard(prediction: KnockoutPredictionEntity) {
+private fun KnockoutPredictionCard(prediction: KnockoutPredictionEntity, homeTeam: String = prediction.homeTeamRef, awayTeam: String = prediction.awayTeamRef) {
     val isSelectedHome = prediction.winner == 1
     val isSelectedAway = prediction.winner == 2
 
@@ -175,7 +182,7 @@ private fun KnockoutPredictionCard(prediction: KnockoutPredictionEntity) {
                             )
                         }
                         Text(
-                            prediction.homeTeamRef,
+                            homeTeam,
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (isSelectedHome) AccentGreen else TextPrimary,
                             fontWeight = if (isSelectedHome) FontWeight.Bold else FontWeight.Normal,
@@ -212,7 +219,7 @@ private fun KnockoutPredictionCard(prediction: KnockoutPredictionEntity) {
                             )
                         }
                         Text(
-                            prediction.awayTeamRef,
+                            awayTeam,
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (isSelectedAway) AccentGreen else TextPrimary,
                             fontWeight = if (isSelectedAway) FontWeight.Bold else FontWeight.Normal,

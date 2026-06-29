@@ -10,6 +10,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,6 +27,8 @@ fun TournamentBracket(
     predictions: List<KnockoutPredictionEntity>,
     modifier: Modifier = Modifier
 ) {
+    val resolvedHome = remember(predictions) { predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions) } }
+    val resolvedAway = remember(predictions) { predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions) } }
     val rounds = listOf(
         "Dieciseisavos" to 16,
         "Octavos" to 8,
@@ -72,7 +75,9 @@ fun TournamentBracket(
                         BracketMatchRow(
                             prediction = prediction,
                             roundColor = color,
-                            roundPoints = pts
+                            roundPoints = pts,
+                            homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef,
+                            awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
                         )
                     }
                 }
@@ -94,7 +99,9 @@ fun TournamentBracket(
             BracketMatchRow(
                 prediction = thirdPlace,
                 roundColor = AccentOrange,
-                roundPoints = pts
+                roundPoints = pts,
+                homeTeam = resolvedHome[thirdPlace.matchNumber] ?: thirdPlace.homeTeamRef,
+                awayTeam = resolvedAway[thirdPlace.matchNumber] ?: thirdPlace.awayTeamRef
             )
         }
     }
@@ -104,7 +111,9 @@ fun TournamentBracket(
 private fun BracketMatchRow(
     prediction: KnockoutPredictionEntity,
     roundColor: Color,
-    roundPoints: Int
+    roundPoints: Int,
+    homeTeam: String = prediction.homeTeamRef,
+    awayTeam: String = prediction.awayTeamRef
 ) {
     val isHomeWinner = prediction.winner == 1
     val isAwayWinner = prediction.winner == 2
@@ -130,7 +139,7 @@ private fun BracketMatchRow(
 
             // Home team
             Text(
-                text = prediction.homeTeamRef,
+                text = homeTeam,
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isHomeWinner) AccentGreen else TextPrimary,
                 fontWeight = if (isHomeWinner) FontWeight.Bold else FontWeight.Normal,
@@ -149,7 +158,7 @@ private fun BracketMatchRow(
 
             // Away team
             Text(
-                text = prediction.awayTeamRef,
+                text = awayTeam,
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isAwayWinner) AccentGreen else TextPrimary,
                 fontWeight = if (isAwayWinner) FontWeight.Bold else FontWeight.Normal,

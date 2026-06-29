@@ -214,6 +214,28 @@ object PointsCalculator {
         return if (predictedSet.any { TeamNameNormalizer.normalize(it) == normWinner }) roundPts else 0
     }
 
+    fun resolvePredictionTeamName(ref: String, predictions: List<KnockoutPredictionEntity>): String {
+        if (ref.startsWith("W")) {
+            val matchId = ref.substring(1).toIntOrNull() ?: return ref
+            val pred = predictions.firstOrNull { it.matchNumber == matchId }
+            if (pred != null && pred.winner != null) {
+                val teamRef = if (pred.winner == 1) pred.homeTeamRef else pred.awayTeamRef
+                return resolvePredictionTeamName(teamRef, predictions)
+            }
+            return ref
+        }
+        if (ref.startsWith("L")) {
+            val matchId = ref.substring(1).toIntOrNull() ?: return ref
+            val pred = predictions.firstOrNull { it.matchNumber == matchId }
+            if (pred != null && pred.winner != null) {
+                val loserRef = if (pred.winner == 1) pred.awayTeamRef else pred.homeTeamRef
+                return resolvePredictionTeamName(loserRef, predictions)
+            }
+            return ref
+        }
+        return ref
+    }
+
     fun resolveMatchTeam(teamName: String, allMatches: List<MatchEntity>): String {
         val ganador = Regex("^Ganador\\s+(\\d+)$").find(teamName)
         if (ganador != null) {

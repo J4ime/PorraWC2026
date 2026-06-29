@@ -506,7 +506,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun recalcAllPoints() {
         val teams = repository.getAllTeams().first()
         val knockoutPredictions = repository.getKnockoutPredictions().first()
-        knockoutPredictionMap = knockoutPredictions.associate { it.matchNumber to (it.winner != null) }
+        knockoutPredictionMap = knockoutPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.winner != null } }
 
         val actual = PointsCalculator.computeActualAdvancingTeams(cachedMatches, teams)
         val predicted = PointsCalculator.computePredictedAdvancingTeams(cachedMatches, teams, knockoutPredictions)

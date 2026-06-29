@@ -265,8 +265,8 @@ private fun MatchRow(match: MatchDisplay) {
 
             // Points + TV + round column
             Column(modifier = Modifier.width(38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val showLiveKoPoints = match.isKnockout
-            if ((hasPred && (isLive || showScore)) || showLiveKoPoints) {
+                val showKoPoints = match.isKnockout && (isLive || showScore)
+            if ((hasPred && (isLive || showScore)) || showKoPoints) {
                     val pts = if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0"
                     val pc = when { match.pointsEarned > 0 -> Color(0xFF4CAF50); else -> Color(0xFF666666) }
                     Text(pts, fontSize = 12.sp, color = pc, fontWeight = FontWeight.Bold)

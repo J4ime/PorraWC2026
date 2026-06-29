@@ -551,7 +551,48 @@ object ExcelParser {
                 when { wh == "1" || wh == "1.0" -> 1; wa == "1" || wa == "1.0" -> 2; else -> null }))
         }
 
-        return predictions
+        // Post-process: resolve Wxxx/Lxxx references recursively using parsed predictions
+        return resolvePredictionReferences(predictions)
+    }
+
+    private fun resolvePredictionReferences(predictions: MutableList<KnockoutPredictionEntity>): MutableList<KnockoutPredictionEntity> {
+        val cur = predictions.toMutableList()
+        val n = cur.size
+        for (iteration in 0 until n) {
+            var changed = false
+            for (i in cur.indices) {
+                val p = cur[i]
+                val newHome = resolveRef(p.homeTeamRef, cur)
+                val newAway = resolveRef(p.awayTeamRef, cur)
+                if (newHome != p.homeTeamRef || newAway != p.awayTeamRef) {
+                    cur[i] = p.copy(homeTeamRef = newHome, awayTeamRef = newAway)
+                    changed = true
+                }
+            }
+            if (!changed) break
+        }
+        return cur
+    }
+
+    private fun resolveRef(ref: String, predictions: List<KnockoutPredictionEntity>): String {
+        val matchId = when {
+            ref.startsWith("W") -> ref.substring(1).toIntOrNull()
+            ref.startsWith("L") -> ref.substring(1).toIntOrNull()
+            ref.startsWith("Ganador ") -> ref.removePrefix("Ganador ").trim().toIntOrNull()
+            ref.startsWith("Perdedor ") -> ref.removePrefix("Perdedor ").trim().toIntOrNull()
+            else -> return ref
+        } ?: return ref
+
+        val pred = predictions.firstOrNull { it.matchNumber == matchId } ?: return ref
+        val isWinner = ref.startsWith("W") || ref.startsWith("Ganador ")
+
+        if (pred.winner == null) return ref
+
+        return if (isWinner) {
+            if (pred.winner == 1) pred.homeTeamRef else pred.awayTeamRef
+        } else {
+            if (pred.winner == 1) pred.awayTeamRef else pred.homeTeamRef
+        }
     }
 
     private fun parseStandings(teams: List<TeamEntity>): List<GroupStandingEntity> {

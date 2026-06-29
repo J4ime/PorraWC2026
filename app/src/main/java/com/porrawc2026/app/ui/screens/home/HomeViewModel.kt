@@ -1020,12 +1020,12 @@ class HomeViewModel @Inject constructor(
         if (start != null && start.isAfter(Instant.now())) return MatchStatus.UPCOMING
         val lm = liveMinutes[match.id]
         if (lm == "FINAL") return MatchStatus.FINISHED
+        if (lm != null) return MatchStatus.LIVE
         if (start != null) {
             val now = Instant.now()
             val end = start.plusSeconds(MATCH_WINDOW_SECONDS)
             if (now.isAfter(end)) return MatchStatus.FINISHED
         }
-        if (lm != null) return MatchStatus.LIVE
         if (match.homeGoals != null || match.awayGoals != null) return MatchStatus.LIVE
         return MatchStatus.UPCOMING
     }

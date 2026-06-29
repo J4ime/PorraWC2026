@@ -195,8 +195,14 @@ object PointsCalculator {
         predicted: AdvancingTeams
     ): Int {
         val round = match.knockoutRound ?: return 0
-        val winner = match.winnerTeam
-        if (winner.isNullOrBlank()) return 0
+
+        val advancingTeam = when {
+            !match.winnerTeam.isNullOrBlank() -> match.winnerTeam
+            match.homeGoals != null && match.awayGoals != null && match.homeGoals != match.awayGoals ->
+                if (match.homeGoals!! > match.awayGoals!!) match.homeTeam else match.awayTeam
+            else -> return 0
+        }
+        if (advancingTeam.isBlank()) return 0
 
         val (nextRound, predictedSet) = when (round) {
             "Dieciseisavos" -> "Octavos" to predicted.octavos as Set<String>
@@ -210,8 +216,8 @@ object PointsCalculator {
         val roundPts = getRoundAdvancementPoints(nextRound)
         if (roundPts == 0) return 0
 
-        val normWinner = TeamNameNormalizer.normalize(winner)
-        return if (predictedSet.any { TeamNameNormalizer.normalize(it) == normWinner }) roundPts else 0
+        val normAdvancing = TeamNameNormalizer.normalize(advancingTeam)
+        return if (predictedSet.any { TeamNameNormalizer.normalize(it) == normAdvancing }) roundPts else 0
     }
 
     fun resolvePredictionTeamName(ref: String, predictions: List<KnockoutPredictionEntity>): String {

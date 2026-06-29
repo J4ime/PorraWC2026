@@ -769,6 +769,12 @@ class HomeViewModel @Inject constructor(
                     return@forEach
                 }
             }
+            // Update winnerTeam in cachedMatches BEFORE recalcAllPoints (called inside updateMatchScores)
+            if (update.winnerTeam != null) {
+                cachedMatches = cachedMatches.map {
+                    if (it.id == update.matchId) it.copy(winnerTeam = update.winnerTeam) else it
+                }
+            }
             updateMatchScores(update)
             updateGoalScorers(update)
             if (update.isFinished) {

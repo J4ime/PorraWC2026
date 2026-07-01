@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.util.PlayerPhotoDownloader
@@ -28,9 +29,9 @@ import java.io.File
 fun GoalscorersScreen(
     viewModel: GoalscorersViewModel = hiltViewModel()
 ) {
-    val players by viewModel.players.collectAsState()
-    val topScorers by viewModel.topScorers.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val players by viewModel.players.collectAsStateWithLifecycle()
+    val topScorers by viewModel.topScorers.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E)),

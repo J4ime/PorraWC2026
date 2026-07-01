@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.util.LogManager
 import com.porrawc2026.app.util.ValidationResult
 
@@ -44,17 +45,17 @@ import com.porrawc2026.app.util.ValidationResult
 fun AjustesScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val isLoading by viewModel.isLoading.collectAsState()
-    val validationResult by viewModel.validationResult.collectAsState()
-    val hasData by viewModel.hasData.collectAsState()
-    val isBusy by viewModel.isBusy.collectAsState()
-    val isUpdating by viewModel.isUpdating.collectAsState()
-    val appVersion by viewModel.appVersion.collectAsState()
-    val notificationsEnabled by viewModel.notificationsEnabled.collectAsState()
-    val pdfResult by viewModel.pdfResult.collectAsState()
-    val userName by viewModel.userName.collectAsState()
-    val userPosition by viewModel.userPosition.collectAsState()
-    val positionDiff by viewModel.positionDiff.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val validationResult by viewModel.validationResult.collectAsStateWithLifecycle()
+    val hasData by viewModel.hasData.collectAsStateWithLifecycle()
+    val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
+    val isUpdating by viewModel.isUpdating.collectAsStateWithLifecycle()
+    val appVersion by viewModel.appVersion.collectAsStateWithLifecycle()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
+    val pdfResult by viewModel.pdfResult.collectAsStateWithLifecycle()
+    val userName by viewModel.userName.collectAsStateWithLifecycle()
+    val userPosition by viewModel.userPosition.collectAsStateWithLifecycle()
+    val positionDiff by viewModel.positionDiff.collectAsStateWithLifecycle()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()

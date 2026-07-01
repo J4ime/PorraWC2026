@@ -6,8 +6,7 @@ import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.QuestionEntity
 import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.data.repository.PorraRepository
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.porrawc2026.app.util.GsonHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -31,8 +30,8 @@ class QuestionsViewModel @Inject constructor(
     private val _pendingManualAnswer = MutableStateFlow<Pair<QuestionEntity, Boolean>?>(null)
     val pendingManualAnswer: StateFlow<Pair<QuestionEntity, Boolean>?> = _pendingManualAnswer.asStateFlow()
 
-    private val gson = Gson()
-    private val scorerListType = object : TypeToken<List<LiveScorer>>() {}.type
+    private val gson get() = GsonHolder.gson
+    private val scorerListType get() = GsonHolder.scorerListType
 
     fun clearMessage() { _evalMessage.value = null }
 

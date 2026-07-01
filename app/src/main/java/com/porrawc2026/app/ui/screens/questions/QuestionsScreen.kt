@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.data.local.entity.QuestionEntity
 import com.porrawc2026.app.ui.theme.*
 
@@ -27,10 +28,10 @@ import com.porrawc2026.app.ui.theme.*
 fun QuestionsScreen(
     viewModel: QuestionsViewModel = hiltViewModel()
 ) {
-    val questions by viewModel.questions.collectAsState()
-    val isEvaluating by viewModel.isEvaluating.collectAsState()
-    val evalMessage by viewModel.evalMessage.collectAsState()
-    val pendingManual by viewModel.pendingManualAnswer.collectAsState()
+    val questions by viewModel.questions.collectAsStateWithLifecycle()
+    val isEvaluating by viewModel.isEvaluating.collectAsStateWithLifecycle()
+    val evalMessage by viewModel.evalMessage.collectAsStateWithLifecycle()
+    val pendingManual by viewModel.pendingManualAnswer.collectAsStateWithLifecycle()
 
     var showSelectionFor by remember { mutableStateOf<QuestionEntity?>(null) }
 

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.ui.theme.*
 
@@ -25,7 +26,7 @@ fun PlayersScreen(
     onBackClick: () -> Unit,
     viewModel: PlayersViewModel = hiltViewModel()
 ) {
-    val predictions by viewModel.predictions.collectAsState()
+    val predictions by viewModel.predictions.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -63,7 +64,7 @@ fun PlayersScreen(
                 )
             }
 
-            items(predictions.sortedBy { it.rank }) { prediction ->
+            items(predictions.sortedBy { it.rank }, key = { prediction -> prediction.rank }) { prediction ->
                 PlayerCard(prediction = prediction)
             }
 

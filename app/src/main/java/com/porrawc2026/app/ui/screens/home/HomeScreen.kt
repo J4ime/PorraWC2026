@@ -37,6 +37,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 
 @Composable
@@ -44,12 +45,12 @@ fun HomeScreen(
     refreshTrigger: Int = 0,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val totalPoints by viewModel.totalPoints.collectAsState()
-    val hasData by viewModel.hasData.collectAsState()
-    val upcomingMatches by viewModel.upcomingMatches.collectAsState()
-    val allMatches by viewModel.allMatches.collectAsState()
-    val dayKeys by viewModel.dayKeys.collectAsState()
-    val isBusy by viewModel.isBusy.collectAsState()
+    val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
+    val hasData by viewModel.hasData.collectAsStateWithLifecycle()
+    val upcomingMatches by viewModel.upcomingMatches.collectAsStateWithLifecycle()
+    val allMatches by viewModel.allMatches.collectAsStateWithLifecycle()
+    val dayKeys by viewModel.dayKeys.collectAsStateWithLifecycle()
+    val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
 
     val pullRefreshState = rememberPullToRefreshState()
     var selectedDay by remember { mutableStateOf<String?>(null) }
@@ -134,7 +135,7 @@ fun HomeScreen(
                 state = listState
             ) {
                 item { Spacer(Modifier.width(8.dp)) }
-                items(allDaysSorted) { day ->
+                items(allDaysSorted, key = { it }) { day ->
                     val isSelected = if (day == todayDayKey) selectedDay == null else selectedDay == day
                     DayChip(dayLabel(day), isSelected) {
                         selectedDay = if (day == todayDayKey) null else day
@@ -174,9 +175,12 @@ fun HomeScreen(
                 }
             }, contentPadding = PaddingValues(bottom = 8.dp)) {
                 if (visibleMatches.isNotEmpty()) {
-                    items(visibleMatches.take(40), key = { it.id }) { match ->
+                    val displayMatches = visibleMatches.take(40)
+                    val lastMatch = displayMatches.last()
+                    item { Spacer(Modifier.height(1.dp)) }
+                    items(displayMatches, key = { it.id }) { match ->
                         MatchRow(match)
-                        if (match != visibleMatches.take(40).last()) Spacer(Modifier.height(6.dp))
+                        if (match !== lastMatch) Spacer(Modifier.height(6.dp))
                     }
                 } else if (hasData && !isBusy) {
                     item { Text("Sin partidos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }

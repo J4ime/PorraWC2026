@@ -8,8 +8,10 @@ import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.local.entity.QuestionEntity
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
+import com.porrawc2026.app.domain.model.KnockoutCalculator
 import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
+import com.porrawc2026.app.util.DateTimeUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -91,56 +93,7 @@ class ResultsViewModel @Inject constructor(
         }
     }
 
-    // Map each team to the furthest round they actually reached
-    private fun buildAdvancement(matches: List<MatchEntity>): Map<String, String> {
-        val result = mutableMapOf<String, String>()
-        val koRounds = listOf("Dieciseisavos", "Octavos", "Cuartos", "Semifinales", "Final")
-
-        for (match in matches.filter { it.homeTeam.isNotBlank() }) {
-            if (!match.isKnockout || match.knockoutRound == null) continue
-            val round = match.knockoutRound
-            if (round !in koRounds) continue
-
-            for (team in listOf(match.homeTeam, match.awayTeam)) {
-                val prev = result[team]
-                if (prev == null || roundLevel(round) > roundLevel(prev)) {
-                    result[team] = round
-                }
-            }
-            // Winner advances to the next round
-            val winner = match.winnerTeam?.let { w ->
-                val es = TeamNameNormalizer.enToEs(w)
-                // Only use winner name if it matches one of the teams in this match
-                if (TeamNameNormalizer.matches(es, match.homeTeam) || TeamNameNormalizer.matches(es, match.awayTeam)) es else null
-            } ?: if (match.homeGoals != null && match.awayGoals != null && match.homeGoals != match.awayGoals) {
-                if (match.homeGoals!! > match.awayGoals!!) match.homeTeam else match.awayTeam
-            } else null
-            if (winner != null) {
-                val nextIdx = koRounds.indexOf(round) + 1
-                if (nextIdx < koRounds.size) {
-                    val nextRound = koRounds[nextIdx]
-                    val prev = result[winner]
-                    if (prev == null || roundLevel(nextRound) > roundLevel(prev)) {
-                        result[winner] = nextRound
-                    }
-                }
-            }
-        }
-        return result
-    }
-
-    private fun roundLevel(round: String): Int = when (round) {
-        "Dieciseisavos" -> 1
-        "Octavos" -> 2
-        "Cuartos" -> 3
-        "Semifinales" -> 4
-        "3er puesto" -> 5
-        "Final" -> 6
-        "Campeón" -> 7
-        else -> 0
-    }
-
-    private fun computeKnockoutResults(
+private fun computeKnockoutResults(
         matches: List<MatchEntity>,
         predictions: List<KnockoutPredictionEntity>
     ): List<KnockoutResultDisplay> {
@@ -150,7 +103,7 @@ class ResultsViewModel @Inject constructor(
         val resolvedAway = predictions.associate {
             it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions)
         }
-        val advancement = buildAdvancement(matches)
+        val advancement = KnockoutCalculator.buildAdvancement(matches)
 
         // Per-match actual winner for strikethrough display (the team that won the match)
         val matchByNumber = matches.filter { it.matchNumber != null }.associateBy { it.matchNumber!! }
@@ -180,11 +133,11 @@ class ResultsViewModel @Inject constructor(
                 }?.value
             }
             val isCorrect = if (prediction.round == "3er puesto") {
-                actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
+                actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) == KnockoutCalculator.roundLevel(prediction.round)
             } else if (prediction.round == "Dieciseisavos") {
-                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
+                actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) > KnockoutCalculator.roundLevel(prediction.round)
             } else {
-                actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
+                actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) >= KnockoutCalculator.roundLevel(prediction.round)
             }
             val roundPoints = PointsCalculator.getKnockoutPoints(prediction.round)
             val pointsEarned = if (isCorrect) roundPoints else 0
@@ -235,20 +188,6 @@ class ResultsViewModel @Inject constructor(
         }
     }
 
-    private fun parseInstant(dateTime: String): Instant? {
-        if (dateTime.isBlank()) return null
-        return try {
-            if (dateTime.endsWith("Z")) {
-                Instant.parse(dateTime)
-            } else {
-                val local = LocalDateTime.parse(dateTime, dateTimeFormatter)
-                local.atZone(madridZone).toInstant()
-            }
-        } catch (e: Exception) { android.util.Log.e("ResultsVM", "parseMadridInstant failed for dateTime=$dateTime", e); null }
-    }
-
-    companion object {
-        private val madridZone = ZoneId.of("Europe/Madrid")
-        private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-    }
+    private fun parseInstant(dateTime: String): Instant? =
+        DateTimeUtil.parseMadridInstant(dateTime, "ResultsVM")
 }

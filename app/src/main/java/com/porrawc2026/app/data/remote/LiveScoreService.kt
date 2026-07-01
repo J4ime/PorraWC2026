@@ -2,9 +2,8 @@ package com.porrawc2026.app.data.remote
 
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
+import com.porrawc2026.app.util.GsonHolder
 import com.porrawc2026.app.util.LogManager
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -50,31 +49,19 @@ class LiveScoreService @Inject constructor(
         val allUpdates = mutableListOf<LiveScoreUpdate>()
         val dateFmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")
 
-        // Fetch by ESPN event ID for matches that have one
-        val withId = matches.filter { it.espnId != null }
-        for (match in withId) {
-            try {
-                val event = espnService.getEvent(match.espnId!!)
-                val update = parseEvent(event, matches)
-                if (update != null) allUpdates.add(update)
-            } catch (e: Exception) {
-                LogManager.log("LiveScoreService", "Failed to fetch event ${match.espnId} for match ${match.id}", e)
-            }
-        }
+        if (matches.isEmpty()) return allUpdates
 
-        // Fetch by date range as fallback for matches not resolved by individual event ID
-        // (Includes matches with espnId whose getEvent() may have failed — e.g. future events returning 404)
-        if (matches.isNotEmpty()) {
-            val dateGroups = groupMatchesByDate(matches)
-            for ((dateStr, dayMatches) in dateGroups) {
-                val dateObj = try { java.time.LocalDate.parse(dateStr, dateFmt) } catch (e: Exception) { LogManager.log("LiveScoreService", "Failed to parse date group $dateStr", e); continue }
-                val rangeStart = dateObj.minusDays(1).format(dateFmt)
-                val rangeEnd = dateObj.plusDays(1).format(dateFmt)
-                val scoreboard = espnService.getScoreboard(dates = "$rangeStart-$rangeEnd")
-                val events = scoreboard.events ?: continue
-                val parsed = coroutineScope { events.mapNotNull { parseEvent(it, matches) } }
-                allUpdates.addAll(parsed)
-            }
+        // Single fetch by date range — scoreboard covers all matches including those with espnId.
+        // Removed individual getEvent() calls that were double-fetching the same data.
+        val dateGroups = groupMatchesByDate(matches)
+        for ((dateStr, _) in dateGroups) {
+            val dateObj = try { java.time.LocalDate.parse(dateStr, dateFmt) } catch (e: Exception) { LogManager.log("LiveScoreService", "Failed to parse date group $dateStr", e); continue }
+            val rangeStart = dateObj.minusDays(1).format(dateFmt)
+            val rangeEnd = dateObj.plusDays(1).format(dateFmt)
+            val scoreboard = espnService.getScoreboard(dates = "$rangeStart-$rangeEnd")
+            val events = scoreboard.events ?: continue
+            val parsed = coroutineScope { events.mapNotNull { parseEvent(it, matches) } }
+            allUpdates.addAll(parsed)
         }
 
         return allUpdates.distinctBy { it.matchId }
@@ -341,7 +328,7 @@ class LiveScoreService @Inject constructor(
 
     companion object {
         private val minuteRegex = Regex("""(\d+)'(\+(\d+))?""")
-        private val gson = Gson()
-        private val scorerListType = object : TypeToken<List<LiveScorer>>() {}.type
+        private val gson get() = GsonHolder.gson
+        private val scorerListType get() = GsonHolder.scorerListType
     }
 }

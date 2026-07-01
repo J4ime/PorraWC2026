@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.ui.components.TournamentBracket
@@ -27,7 +28,7 @@ fun KnockoutScreen(
     onBackClick: () -> Unit,
     viewModel: KnockoutViewModel = hiltViewModel()
 ) {
-    val predictions by viewModel.predictions.collectAsState()
+    val predictions by viewModel.predictions.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableIntStateOf(0) }
 
     Column(
@@ -111,7 +112,7 @@ private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) 
                     )
                 }
 
-                items(roundPredictions) { prediction ->
+                items(roundPredictions, key = { prediction -> prediction.matchNumber }) { prediction ->
                     KnockoutPredictionCard(
                         prediction = prediction,
                         homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef,

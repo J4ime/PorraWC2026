@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
@@ -22,10 +23,10 @@ import com.porrawc2026.app.ui.theme.*
 
 @Composable
 fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewModel()) {
-    val allMatches by viewModel.allMatches.collectAsState()
-    val allTeams by viewModel.allTeams.collectAsState()
-    val koPredictions by viewModel.allKnockoutPredictions.collectAsState()
-    val koPointsMap by viewModel.knockoutPointsMap.collectAsState()
+    val allMatches by viewModel.allMatches.collectAsStateWithLifecycle()
+    val allTeams by viewModel.allTeams.collectAsStateWithLifecycle()
+    val koPredictions by viewModel.allKnockoutPredictions.collectAsStateWithLifecycle()
+    val koPointsMap by viewModel.knockoutPointsMap.collectAsStateWithLifecycle()
     val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
     val listState = rememberLazyListState()
 

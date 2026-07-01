@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
 import com.porrawc2026.app.util.ShareUtil
@@ -30,18 +31,18 @@ fun ResultsScreen(
     viewModel: ResultsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val totalPoints by viewModel.totalPoints.collectAsState()
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
-    val matches by viewModel.allMatches.collectAsState()
-    val questions by viewModel.questions.collectAsState()
-    val playerPredictions by viewModel.playerPredictions.collectAsState()
-    val knockoutPredictions by viewModel.knockoutPredictions.collectAsState()
+    val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val matches by viewModel.allMatches.collectAsStateWithLifecycle()
+    val questions by viewModel.questions.collectAsStateWithLifecycle()
+    val playerPredictions by viewModel.playerPredictions.collectAsStateWithLifecycle()
+    val knockoutPredictions by viewModel.knockoutPredictions.collectAsStateWithLifecycle()
 
-    val groupPoints by viewModel.groupPoints.collectAsState()
-    val kokoPoints by viewModel.kokoPoints.collectAsState()
-    val knockoutResults by viewModel.knockoutResults.collectAsState()
-    val qPoints by viewModel.qPoints.collectAsState()
-    val pPoints by viewModel.pPoints.collectAsState()
+    val groupPoints by viewModel.groupPoints.collectAsStateWithLifecycle()
+    val kokoPoints by viewModel.kokoPoints.collectAsStateWithLifecycle()
+    val knockoutResults by viewModel.knockoutResults.collectAsStateWithLifecycle()
+    val qPoints by viewModel.qPoints.collectAsStateWithLifecycle()
+    val pPoints by viewModel.pPoints.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -154,7 +155,7 @@ fun ResultsScreen(
                 SectionHeader("FASE DE GRUPOS", "+$groupPoints pts")
             }
 
-            items(matches.filter { !it.isKnockout }.take(12)) { match ->
+            items(matches.filter { !it.isKnockout }.take(12), key = { match -> match.id }) { match ->
                 ResultRow(match)
             }
 
@@ -178,7 +179,7 @@ fun ResultsScreen(
                     item {
                         SectionHeader(round.uppercase(), if (roundTotal > 0) "+$roundTotal pts" else "0 pts")
                     }
-                    items(roundResults) { result ->
+                    items(roundResults, key = { result -> result.matchNumber }) { result ->
                         KnockoutResultRow(result)
                     }
                 }

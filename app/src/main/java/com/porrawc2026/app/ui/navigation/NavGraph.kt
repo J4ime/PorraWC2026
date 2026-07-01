@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.R
 import com.porrawc2026.app.ui.screens.goalscorers.GoalscorersScreen
 import com.porrawc2026.app.ui.theme.*
@@ -47,7 +48,7 @@ sealed class DetailScreen {
 @Composable
 fun PorraNavGraph() {
     val homeVM: HomeViewModel = hiltViewModel()
-    val totalPoints by homeVM.totalPoints.collectAsState()
+    val totalPoints by homeVM.totalPoints.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(initialPage = 2, pageCount = { 5 })
     val scope = rememberCoroutineScope()
 

@@ -21,6 +21,8 @@ import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
 import com.porrawc2026.app.util.GoalNotifier
+import com.porrawc2026.app.util.GsonHolder
+import com.porrawc2026.app.util.DateTimeUtil
 import com.porrawc2026.app.util.LiveMatchStore
 import com.porrawc2026.app.util.LogManager
 import com.porrawc2026.app.util.PdfRankingExtractor
@@ -183,9 +185,6 @@ class HomeViewModel @Inject constructor(
         }
         refreshPoints(); loadPlayers(); preloadSchedule()
         forceCheckUpdate()
-        viewModelScope.launch(Dispatchers.IO) {
-            goalEventBus.goalScored.collect { }
-        }
     }
 
     private fun preloadSchedule() {
@@ -636,17 +635,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun parseMadridInstant(dateTime: String): Instant? {
-        if (dateTime.isBlank()) return null
-        return try {
-            if (dateTime.endsWith("Z")) {
-                Instant.parse(dateTime)
-            } else {
-                val local = LocalDateTime.parse(dateTime, dateTimeFormatter)
-                local.atZone(madridZone).toInstant()
-            }
-        } catch (e: Exception) { Log.e(TAG, "parseMadridInstant failed for dateTime=$dateTime", e); null }
-    }
+    fun parseMadridInstant(dateTime: String): Instant? =
+        DateTimeUtil.parseMadridInstant(dateTime, TAG)
 
     private fun getTodayMatchesWithDates(): List<MatchEntity> {
         val todayZoned = LocalDate.now(madridZone)
@@ -1099,9 +1089,7 @@ class HomeViewModel @Inject constructor(
         return MatchStatus.UPCOMING
     }
 
-    override fun onCleared() {
-        super.onCleared()
-    }
+    
 
     private fun extractUserName(displayName: String?): String? {
         if (displayName == null) return null
@@ -1134,8 +1122,8 @@ class HomeViewModel @Inject constructor(
         private val diacriticsRegex = Regex("\\p{M}")
         private val whitespaceRegex = Regex("\\s+")
         private val nameRegex = Regex(".*[a-zA-Z].*")
-        private val gson = Gson()
-        private val scorerListType = object : TypeToken<List<LiveScorer>>() {}.type
+        private val gson get() = GsonHolder.gson
+        private val scorerListType get() = GsonHolder.scorerListType
         private val madridZone = ZoneId.of("Europe/Madrid")
     }
 }

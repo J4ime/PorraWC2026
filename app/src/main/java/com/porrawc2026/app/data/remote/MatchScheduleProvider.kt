@@ -120,7 +120,7 @@ object MatchScheduleProvider {
         data[76] = MatchSchedule(76, "2026-06-30T03:00:00", "DAZN", "", "")  // ESPN 760488: Netherlands vs Morocco 01:00Z
         data[77] = MatchSchedule(77, "2026-06-30T19:00:00", "DAZN", "", "")  // ESPN 760490: Ivory Coast vs Norway 17:00Z
         data[78] = MatchSchedule(78, "2026-06-30T23:00:00", "RTVE", "", "")  // ESPN 760492: France vs Sweden 21:00Z
-        data[79] = MatchSchedule(79, "2026-07-01T03:00:00", "DAZN", "", "")  // ESPN 760491: Mexico vs Ecuador 01:00Z
+        data[79] = MatchSchedule(79, "2026-07-01T04:00:00", "DAZN", "", "")  // ESPN 760491: Mexico vs Ecuador 02:00Z
         data[80] = MatchSchedule(80, "2026-07-01T18:00:00", "DAZN", "", "")  // ESPN 760495: England vs Congo DR 16:00Z
         data[81] = MatchSchedule(81, "2026-07-01T22:00:00", "DAZN", "", "")  // ESPN 760493: Belgium vs Senegal 20:00Z
         data[82] = MatchSchedule(82, "2026-07-02T02:00:00", "DAZN", "", "")  // ESPN 760494: United States vs Bosnia-Herzegovina 00:00Z

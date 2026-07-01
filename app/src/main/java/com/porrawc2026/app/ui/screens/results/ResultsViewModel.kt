@@ -91,6 +91,49 @@ class ResultsViewModel @Inject constructor(
         }
     }
 
+    // Map each team to the furthest round they actually reached
+    private fun buildAdvancement(matches: List<MatchEntity>): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val koRounds = listOf("Dieciseisavos", "Octavos", "Cuartos", "Semifinales", "Final")
+
+        for (match in matches.filter { it.homeTeam.isNotBlank() }) {
+            if (!match.isKnockout || match.knockoutRound == null) continue
+            val round = match.knockoutRound
+            if (round !in koRounds) continue
+
+            for (team in listOf(match.homeTeam, match.awayTeam)) {
+                val prev = result[team]
+                if (prev == null || roundLevel(round) > roundLevel(prev)) {
+                    result[team] = round
+                }
+            }
+            // Winner advances to the next round
+            val winner = match.winnerTeam
+            if (!winner.isNullOrBlank()) {
+                val nextIdx = koRounds.indexOf(round) + 1
+                if (nextIdx < koRounds.size) {
+                    val nextRound = koRounds[nextIdx]
+                    val prev = result[winner]
+                    if (prev == null || roundLevel(nextRound) > roundLevel(prev)) {
+                        result[winner] = nextRound
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    private fun roundLevel(round: String): Int = when (round) {
+        "Dieciseisavos" -> 1
+        "Octavos" -> 2
+        "Cuartos" -> 3
+        "Semifinales" -> 4
+        "3er puesto" -> 5
+        "Final" -> 6
+        "Campeón" -> 7
+        else -> 0
+    }
+
     private fun computeKnockoutResults(
         matches: List<MatchEntity>,
         predictions: List<KnockoutPredictionEntity>
@@ -101,22 +144,43 @@ class ResultsViewModel @Inject constructor(
         val resolvedAway = predictions.associate {
             it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions)
         }
+        val advancement = buildAdvancement(matches)
+
+        // Per-match actual winner for strikethrough display (the team that won the match)
         val matchByNumber = matches.filter { it.matchNumber != null }.associateBy { it.matchNumber!! }
+        val actualWinnerByMatch: Map<Int, String?> = matchByNumber.mapValues { (_, m) ->
+            val mtch = m
+            val wTeam = mtch.winnerTeam
+            if (!wTeam.isNullOrBlank()) {
+                // Convert English winner name to Spanish for display consistency
+                TeamNameNormalizer.enToEs(wTeam)
+            } else if (mtch.homeGoals != null && mtch.awayGoals != null && mtch.homeGoals != mtch.awayGoals) {
+                if (mtch.homeGoals!! > mtch.awayGoals!!) mtch.homeTeam else mtch.awayTeam
+            } else null
+        }
 
         return predictions.map { prediction ->
             val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
             val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
-            val match = matchByNumber[prediction.matchNumber]
-            val actualWinner = match?.winnerTeam
             val predictedWinner = when (prediction.winner) {
                 1 -> homeTeam
                 2 -> awayTeam
                 else -> null
             }
-            val isCorrect = predictedWinner != null && actualWinner != null &&
-                TeamNameNormalizer.matches(predictedWinner, actualWinner)
+            // Check if the predicted winner advanced past this round (advancement-based)
+            val actualReachedRound = predictedWinner?.let { winner ->
+                advancement.entries.firstOrNull { (team, _) ->
+                    TeamNameNormalizer.matches(team, winner)
+                }?.value
+            }
+            val isCorrect = if (prediction.round == "3er puesto") {
+                actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
+            } else {
+                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
+            }
             val roundPoints = PointsCalculator.getKnockoutPoints(prediction.round)
             val pointsEarned = if (isCorrect) roundPoints else 0
+            val actualWinner = actualWinnerByMatch[prediction.matchNumber]
 
             KnockoutResultDisplay(
                 matchNumber = prediction.matchNumber,

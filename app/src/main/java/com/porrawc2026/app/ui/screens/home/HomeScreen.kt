@@ -174,9 +174,9 @@ fun HomeScreen(
                 }
             }, contentPadding = PaddingValues(bottom = 8.dp)) {
                 if (visibleMatches.isNotEmpty()) {
-                    items(visibleMatches.take(12), key = { it.id }) { match ->
+                    items(visibleMatches.take(40), key = { it.id }) { match ->
                         MatchRow(match)
-                        if (match != visibleMatches.take(12).last()) Spacer(Modifier.height(6.dp))
+                        if (match != visibleMatches.take(40).last()) Spacer(Modifier.height(6.dp))
                     }
                 } else if (hasData && !isBusy) {
                     item { Text("Sin partidos", Modifier.fillMaxWidth().padding(24.dp), color = Color(0xFF777777), textAlign = TextAlign.Center) }

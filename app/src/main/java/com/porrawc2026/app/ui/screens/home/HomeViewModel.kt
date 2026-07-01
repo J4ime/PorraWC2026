@@ -1061,17 +1061,12 @@ class HomeViewModel @Inject constructor(
         }
 
         if (todayMatches.isNotEmpty()) {
-            // Also include the next future date's matches so knockout rounds show up
             val futureMatches = allDisplay.filter { display ->
                 val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false
                 d.atZone(madridZone).toLocalDate() > todayZoned
             }
-            val nextDateMatches = if (futureMatches.isNotEmpty()) {
-                val firstDate = futureMatches.first().dateLabel
-                futureMatches.filter { it.dateLabel == firstDate }
-            } else emptyList()
             _sectionTitle.value = "HOY \u2014 ${todayMatches.first().dateLabel.uppercase()}"
-            _upcomingMatches.value = (todayMatches + nextDateMatches).distinctBy { it.id }
+            _upcomingMatches.value = (todayMatches + futureMatches).distinctBy { it.id }
         } else {
             val futureMatches = allDisplay.filter { display ->
                 val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false

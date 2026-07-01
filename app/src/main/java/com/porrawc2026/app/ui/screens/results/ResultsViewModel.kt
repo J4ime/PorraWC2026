@@ -176,7 +176,7 @@ class ResultsViewModel @Inject constructor(
             val isCorrect = if (prediction.round == "3er puesto") {
                 actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
             } else {
-                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
+                actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
             }
             val roundPoints = PointsCalculator.getKnockoutPoints(prediction.round)
             val pointsEarned = if (isCorrect) roundPoints else 0

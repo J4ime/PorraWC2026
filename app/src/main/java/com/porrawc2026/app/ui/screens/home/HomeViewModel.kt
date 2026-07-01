@@ -539,7 +539,7 @@ class HomeViewModel @Inject constructor(
             val isCorrect = if (prediction.round == "3er puesto") {
                 actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
             } else {
-                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
+                actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
             }
             if (isCorrect) prediction.matchNumber to PointsCalculator.getKnockoutPoints(prediction.round) else null
         }.toMap()
@@ -1081,10 +1081,9 @@ class HomeViewModel @Inject constructor(
             }
         }
         _allMatches.value = allDisplay
-        val maxVisibleId = MatchScheduleProvider.getMaxVisibleRoundId()
         _dayKeys.value = allDisplay
-            .filter { it.id <= maxVisibleId }
-            .mapNotNull { d -> if (d.dayKey.isBlank()) null else d.dayKey }.distinct()
+            .filter { it.dayKey.isNotBlank() }
+            .map { it.dayKey }.distinct()
             .sortedBy { d -> allDisplay.firstOrNull { it.dayKey == d }?.sortKey ?: d }
     }
 

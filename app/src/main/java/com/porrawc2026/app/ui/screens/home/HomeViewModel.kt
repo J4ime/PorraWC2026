@@ -209,6 +209,7 @@ class HomeViewModel @Inject constructor(
                 // Migration: reset dieciseisavo placeholder names ("2º Grupo A") to empty,
                 // and force correct dates from schedule so findMatchByDate matches API times
                 fixDieciseisavoDatesAndNames()
+                forceFinalPredictions()
                 enrichSchedule()
                 recalcAllPoints()
                 refreshPoints()
@@ -557,28 +558,41 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fixDieciseisavoDatesAndNames() {
-        repository.clearKnockoutMatchData(*(73..96).toList().toIntArray())
         val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
         val now = Instant.now()
+        // For matches that already started, preserve team names (they come from API).
+        // Only reset placeholder names for future matches or empty names.
         cachedMatches = cachedMatches.map { m ->
             if (m.id in 73..88) {
                 val sched = schedule[m.id]
-                if (sched != null) m.copy(
-                    homeTeam = "",
-                    awayTeam = "",
-                    dateTime = sched.date,
-                    homeGoals = null, awayGoals = null,
-                    homeScorers = null, awayScorers = null,
-                    homeRedCards = null, awayRedCards = null,
-                    homeYellowCards = null, awayYellowCards = null,
-                    homeMissedPenalties = 0, awayMissedPenalties = 0,
-                    winnerTeam = null,
-                    homeHeadedGoals = 0, awayHeadedGoals = 0,
-                    hasSubGoal = false,
-                    pointsEarned = 0
-                ) else m
+                if (sched != null) {
+                    val hasRealNames = m.homeTeam.isNotBlank() && m.awayTeam.isNotBlank()
+                    val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
+                    val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
+                    if (hasRealNames && alreadyStarted) {
+                        // Preserve API-set names and results, just ensure correct date
+                        m.copy(dateTime = sched.date)
+                    } else {
+                        m.copy(
+                            homeTeam = "",
+                            awayTeam = "",
+                            dateTime = sched.date,
+                            homeGoals = null, awayGoals = null,
+                            homeScorers = null, awayScorers = null,
+                            homeRedCards = null, awayRedCards = null,
+                            homeYellowCards = null, awayYellowCards = null,
+                            homeMissedPenalties = 0, awayMissedPenalties = 0,
+                            winnerTeam = null,
+                            homeHeadedGoals = 0, awayHeadedGoals = 0,
+                            hasSubGoal = false,
+                            homeShootoutScore = 0, awayShootoutScore = 0,
+                            pointsEarned = 0
+                        )
+                    }
+                } else m
             } else if (m.id in 89..96) {
-                m.copy(
+                val hasRealNames = m.homeTeam.isNotBlank() && m.awayTeam.isNotBlank()
+                if (hasRealNames) m else m.copy(
                     homeTeam = "", awayTeam = "",
                     homeGoals = null, awayGoals = null,
                     homeScorers = null, awayScorers = null,
@@ -588,11 +602,28 @@ class HomeViewModel @Inject constructor(
                     winnerTeam = null,
                     homeHeadedGoals = 0, awayHeadedGoals = 0,
                     hasSubGoal = false,
+                    homeShootoutScore = 0, awayShootoutScore = 0,
                     pointsEarned = 0
                 )
             } else m
         }
-        repository.insertMatches(cachedMatches.filter { it.id in 73..96 })
+        // Only persist the cleared data; preserve API-set scores for already-started matches
+        val toPersist = cachedMatches.filter { it.id in 73..96 }
+        repository.insertMatches(toPersist)
+    }
+
+    private suspend fun forceFinalPredictions() {
+        runCatching {
+            val predictions = repository.getKnockoutPredictions().first()
+            val thirdPlace = predictions.firstOrNull { it.matchNumber == 103 }
+            val final = predictions.firstOrNull { it.matchNumber == 104 }
+            if (thirdPlace == null || thirdPlace.homeTeamRef != "España" || thirdPlace.awayTeamRef != "Inglaterra" || thirdPlace.winner != 1) {
+                repository.updateKnockoutPrediction(KnockoutPredictionEntity(103, "3er puesto", "España", "Inglaterra", winner = 1))
+            }
+            if (final == null || final.homeTeamRef != "Francia" || final.awayTeamRef != "Portugal" || final.winner != 1) {
+                repository.updateKnockoutPrediction(KnockoutPredictionEntity(104, "Final", "Francia", "Portugal", winner = 1))
+            }
+        }
     }
 
     fun parseMadridInstant(dateTime: String): Instant? {

@@ -25,6 +25,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
     val allMatches by viewModel.allMatches.collectAsState()
     val allTeams by viewModel.allTeams.collectAsState()
     val koPredictions by viewModel.allKnockoutPredictions.collectAsState()
+    val koPointsMap by viewModel.knockoutPointsMap.collectAsState()
     val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
     val listState = rememberLazyListState()
 
@@ -69,7 +70,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                     lastRound = round
                     item { Text(round.uppercase(), style = MaterialTheme.typography.titleSmall, color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) }
                 }
-                item { KnockoutMatchRow(match, koPredictions, allMatches) }
+                item { KnockoutMatchRow(match, koPredictions, allMatches, koPointsMap) }
             }
         }
 
@@ -127,12 +128,14 @@ private fun GroupMatchRow(match: MatchEntity) {
             Text(match.awayTeam, fontSize = 11.sp, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
 
-        Text(if (pts > 0) "$pts" else "", Modifier.width(24.dp), fontSize = 11.sp, color = AccentGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        val ptsText = if (pts > 0) "$pts" else "0"
+        val ptsColor = if (pts > 0) AccentGreen else TextMuted
+        Text(ptsText, Modifier.width(24.dp), fontSize = 11.sp, color = ptsColor, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPredictionEntity>, allMatches: List<MatchEntity>) {
+private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPredictionEntity>, allMatches: List<MatchEntity>, koPointsMap: Map<Int, Int> = emptyMap()) {
     val koPred = koPredictions.firstOrNull { it.matchNumber == match.id }
     val homeWins = koPred?.winner == 1
     val awayWins = koPred?.winner == 2
@@ -163,6 +166,7 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
         else -> TextPrimary
     }
 
+    val koPts = koPointsMap[match.id] ?: 0
     Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(fmtDate(match), Modifier.width(72.dp), fontSize = 9.sp, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 
@@ -173,6 +177,10 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
             Text(" vs ", fontSize = 11.sp, color = TextMuted, maxLines = 1)
             Text(aText, fontSize = 11.sp, color = aColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), fontWeight = if (awayWins) FontWeight.Bold else FontWeight.Normal)
         }
+
+        val ptsText = if (koPts > 0) "$koPts" else "0"
+        val ptsColor = if (koPts > 0) AccentGreen else TextMuted
+        Text(ptsText, Modifier.width(24.dp), fontSize = 11.sp, color = ptsColor, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 

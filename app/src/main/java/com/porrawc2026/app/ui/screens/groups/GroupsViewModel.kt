@@ -6,6 +6,7 @@ import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.TeamEntity
 import com.porrawc2026.app.data.repository.PorraRepository
+import com.porrawc2026.app.domain.model.KnockoutCalculator
 import com.porrawc2026.app.domain.model.PointsCalculator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -25,6 +26,17 @@ class GroupsViewModel @Inject constructor(
 
     val allKnockoutPredictions: StateFlow<List<KnockoutPredictionEntity>> = repository.getKnockoutPredictions()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    private val _knockoutPointsMap = MutableStateFlow<Map<Int, Int>>(emptyMap())
+    val knockoutPointsMap: StateFlow<Map<Int, Int>> = _knockoutPointsMap.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            combine(allMatches, allKnockoutPredictions) { matches, predictions ->
+                KnockoutCalculator.computePoints(matches, predictions)
+            }.collect { _knockoutPointsMap.value = it }
+        }
+    }
 
     fun getGroupTeams(group: String): Flow<List<TeamEntity>> = repository.getTeamsByGroup(group)
 

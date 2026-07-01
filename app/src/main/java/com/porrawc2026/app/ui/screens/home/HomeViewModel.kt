@@ -1061,12 +1061,8 @@ class HomeViewModel @Inject constructor(
         }
 
         if (todayMatches.isNotEmpty()) {
-            val futureMatches = allDisplay.filter { display ->
-                val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false
-                d.atZone(madridZone).toLocalDate() > todayZoned
-            }
             _sectionTitle.value = "HOY \u2014 ${todayMatches.first().dateLabel.uppercase()}"
-            _upcomingMatches.value = (todayMatches + futureMatches).distinctBy { it.id }
+            _upcomingMatches.value = todayMatches
         } else {
             val futureMatches = allDisplay.filter { display ->
                 val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false

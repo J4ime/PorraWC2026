@@ -33,5 +33,6 @@ data class MatchEntity(
     val awayHeadedGoals: Int = 0,
     val hasSubGoal: Boolean = false,
     val homeShootoutScore: Int = 0,
-    val awayShootoutScore: Int = 0
+    val awayShootoutScore: Int = 0,
+    val espnId: String? = null
 )

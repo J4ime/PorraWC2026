@@ -108,8 +108,14 @@ class ResultsViewModel @Inject constructor(
                 }
             }
             // Winner advances to the next round
-            val winner = match.winnerTeam
-            if (!winner.isNullOrBlank()) {
+            val winner = match.winnerTeam?.let { w ->
+                val es = TeamNameNormalizer.enToEs(w)
+                // Only use winner name if it matches one of the teams in this match
+                if (TeamNameNormalizer.matches(es, match.homeTeam) || TeamNameNormalizer.matches(es, match.awayTeam)) es else null
+            } ?: if (match.homeGoals != null && match.awayGoals != null && match.homeGoals != match.awayGoals) {
+                if (match.homeGoals!! > match.awayGoals!!) match.homeTeam else match.awayTeam
+            } else null
+            if (winner != null) {
                 val nextIdx = koRounds.indexOf(round) + 1
                 if (nextIdx < koRounds.size) {
                     val nextRound = koRounds[nextIdx]
@@ -175,6 +181,8 @@ class ResultsViewModel @Inject constructor(
             }
             val isCorrect = if (prediction.round == "3er puesto") {
                 actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
+            } else if (prediction.round == "Dieciseisavos") {
+                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
             } else {
                 actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
             }

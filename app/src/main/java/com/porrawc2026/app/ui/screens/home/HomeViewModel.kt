@@ -538,6 +538,8 @@ class HomeViewModel @Inject constructor(
             val actualReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, predictedWinner) }?.value
             val isCorrect = if (prediction.round == "3er puesto") {
                 actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
+            } else if (prediction.round == "Dieciseisavos") {
+                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
             } else {
                 actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
             }
@@ -577,36 +579,6 @@ class HomeViewModel @Inject constructor(
     private fun roundLevel(round: String): Int = when (round) {
         "Dieciseisavos" -> 1; "Octavos" -> 2; "Cuartos" -> 3; "Semifinales" -> 4
         "3er puesto" -> 5; "Final" -> 6; "Campeón" -> 7; else -> 0
-    }
-
-    // Resolve Octavos match "Ganador 74" names to actual team names from Dieciseisavos winners
-    private fun resolveOctavosTeamNames() {
-        val schedule = MatchScheduleProvider.getHardcodedSchedule()
-        cachedMatches = cachedMatches.map { match ->
-            if (match.id !in 89..96) return@map match
-            val sched = schedule[match.id] ?: return@map match
-            val homeTeam = resolveWinnerRef(sched.home, match.id)
-            val awayTeam = resolveWinnerRef(sched.away, match.id)
-            if (homeTeam != match.homeTeam || awayTeam != match.awayTeam) {
-                match.copy(homeTeam = homeTeam, awayTeam = awayTeam)
-            } else match
-        }
-    }
-
-    private fun resolveWinnerRef(ref: String, currentMatchId: Int): String {
-        val matchId = when {
-            ref.startsWith("Ganador ") || ref.startsWith("W") -> ref.removePrefix("Ganador ").removePrefix("W").trim().toIntOrNull()
-            else -> return ref
-        } ?: return ref
-        // Find the actual winner from the referenced match's data
-        val refMatch = cachedMatches.firstOrNull { it.id == matchId } ?: return ref
-        val wTeam = refMatch.winnerTeam
-        if (!wTeam.isNullOrBlank()) return TeamNameNormalizer.enToEs(wTeam)
-        // If no explicit winner, determine from scores
-        if (refMatch.homeGoals != null && refMatch.awayGoals != null && refMatch.homeGoals != refMatch.awayGoals) {
-            return if (refMatch.homeGoals!! > refMatch.awayGoals!!) refMatch.homeTeam else refMatch.awayTeam
-        }
-        return ref
     }
 
     private suspend fun checkGoalNotifications() {
@@ -820,22 +792,26 @@ class HomeViewModel @Inject constructor(
     private suspend fun filterMatchesForFetch(fullFetch: Boolean): List<MatchEntity>? {
         val todayMatches = getTodayMatchesWithDates()
         val staleMatches = if (fullFetch) emptyList() else getStaleMatches()
-        val dieciseisavosToFetch = if (fullFetch) emptyList() else {
-            cachedMatches.filter { it.id in 73..88 }
+        val koToFetch = if (fullFetch) emptyList() else {
+            cachedMatches.filter { it.id in 73..104 }
         }
         val matchesForWc = if (fullFetch) {
             cachedMatches
         } else {
-            (todayMatches + staleMatches + dieciseisavosToFetch).distinctBy { it.id }
+            (todayMatches + staleMatches + koToFetch).distinctBy { it.id }
         }
         if (matchesForWc.isEmpty()) return null
 
-        val cachedIds = loadCachedScorers()
-        val finishedByTimeIds = matchesForWc.filter { isFinishedByTime(it) }.map { it.id }.toSet()
-        val skipApiIds = cachedIds.intersect(finishedByTimeIds)
+        // Load cached scorers into memory for display
+        loadCachedScorers()
 
-        val wcMatches = if (skipApiIds.size == matchesForWc.size) emptyList()
-        else matchesForWc.filter { it.id !in skipApiIds }
+        // Finished matches with saved results: never fetch from API again, use DB only
+        val finishedInDb = matchesForWc.filter {
+            it.homeGoals != null && it.awayGoals != null && isFinishedByTime(it)
+        }.map { it.id }.toSet()
+
+        val wcMatches = if (finishedInDb.size == matchesForWc.size) emptyList()
+        else matchesForWc.filter { it.id !in finishedInDb }
 
         if (wcMatches.isEmpty()) {
             refreshUpcomingMatches()
@@ -869,15 +845,22 @@ class HomeViewModel @Inject constructor(
                 val start = parseMadridInstant(match.dateTime)
                 if (start != null && start.isAfter(Instant.now())) {
                     // Future match: update team names only (scores can't exist yet)
-                    if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+                    if (update.matchId in 73..96 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
                         val esHome = TeamNameNormalizer.enToEs(update.apiHomeTeam)
                         val esAway = TeamNameNormalizer.enToEs(update.apiAwayTeam)
                         if (match.homeTeam != esHome || match.awayTeam != esAway) {
-                            LogManager.log("HomeVM", "Setting 1/16 #${update.matchId} from API (future): ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
+                            LogManager.log("HomeVM", "Setting KO #${update.matchId} from API (future): ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
                             repository.updateMatchTeams(update.matchId, esHome, esAway)
                             cachedMatches = cachedMatches.map {
                                 if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
                             }
+                        }
+                    }
+                    // Save ESPN event ID for future fetches
+                    if (update.espnId != null && match.espnId != update.espnId) {
+                        repository.updateMatchEspnId(update.matchId, update.espnId)
+                        cachedMatches = cachedMatches.map {
+                            if (it.id == update.matchId) it.copy(espnId = update.espnId) else it
                         }
                     }
                     return@forEach
@@ -926,16 +909,26 @@ class HomeViewModel @Inject constructor(
                 repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
             }
         }
-        // For dieciseisavo matches, always use API team names (authoritative source), converted to Spanish
-        if (update.matchId in 73..88 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+        // For knockout matches, always use API team names (authoritative source), converted to Spanish
+        if (update.matchId in 73..96 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
             val esHome = TeamNameNormalizer.enToEs(update.apiHomeTeam)
             val esAway = TeamNameNormalizer.enToEs(update.apiAwayTeam)
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
             if (match != null && (match.homeTeam != esHome || match.awayTeam != esAway)) {
-                LogManager.log("HomeVM", "Setting 1/16 #${update.matchId} from API: ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
+                LogManager.log("HomeVM", "Setting KO #${update.matchId} from API: ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
                 repository.updateMatchTeams(update.matchId, esHome, esAway)
                 cachedMatches = cachedMatches.map {
                     if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
+                }
+            }
+        }
+        // Save ESPN event ID when received from API
+        if (update.espnId != null) {
+            val match = cachedMatches.firstOrNull { it.id == update.matchId }
+            if (match != null && match.espnId != update.espnId) {
+                repository.updateMatchEspnId(update.matchId, update.espnId)
+                cachedMatches = cachedMatches.map {
+                    if (it.id == update.matchId) it.copy(espnId = update.espnId) else it
                 }
             }
         }
@@ -1037,13 +1030,13 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshUpcomingMatches() {
-        resolveOctavosTeamNames()
         val todayZoned = LocalDate.now(madridZone)
         val matches = cachedMatches
 
         val allSorted = matches
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = allSorted.map { match -> toDisplay(match) }
+            .filter { it.homeTeam.isNotBlank() && it.awayTeam.isNotBlank() }
 
         val yesterdayMatches = allDisplay.filter { display ->
             val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false

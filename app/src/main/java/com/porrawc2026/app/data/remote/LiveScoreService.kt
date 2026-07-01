@@ -30,7 +30,8 @@ data class LiveScoreUpdate(
     val homeShootoutScore: Int = 0,
     val awayShootoutScore: Int = 0,
     val apiHomeTeam: String? = null,
-    val apiAwayTeam: String? = null
+    val apiAwayTeam: String? = null,
+    val espnId: String? = null
 )
 
 data class LiveScorer(val playerName: String, val minute: Int, val minuteLabel: String? = null)
@@ -47,19 +48,36 @@ class LiveScoreService @Inject constructor(
 ) {
     suspend fun fetchScoreUpdates(matches: List<MatchEntity>): List<LiveScoreUpdate> {
         val allUpdates = mutableListOf<LiveScoreUpdate>()
-        val dateGroups = groupMatchesByDate(matches)
         val dateFmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")
-        for ((dateStr, dayMatches) in dateGroups) {
-            val dateObj = try { java.time.LocalDate.parse(dateStr, dateFmt) } catch (e: Exception) { LogManager.log("LiveScoreService", "Failed to parse date group $dateStr", e); continue }
-            val rangeStart = dateObj.minusDays(1).format(dateFmt)
-            val rangeEnd = dateObj.plusDays(1).format(dateFmt)
-            val scoreboard = espnService.getScoreboard(dates = "$rangeStart-$rangeEnd")
-            val events = scoreboard.events ?: continue
-            // Use the FULL matches list (not just dayMatches) for lookup, so timezone-shifted events match
-            val parsed = coroutineScope { events.mapNotNull { parseEvent(it, matches) } }
-            allUpdates.addAll(parsed)
+
+        // Fetch by ESPN event ID for matches that have one
+        val withId = matches.filter { it.espnId != null }
+        for (match in withId) {
+            try {
+                val event = espnService.getEvent(match.espnId!!)
+                val update = parseEvent(event, matches)
+                if (update != null) allUpdates.add(update)
+            } catch (e: Exception) {
+                LogManager.log("LiveScoreService", "Failed to fetch event ${match.espnId} for match ${match.id}", e)
+            }
         }
-        return allUpdates
+
+        // Fetch by date range as fallback for matches not resolved by individual event ID
+        // (Includes matches with espnId whose getEvent() may have failed — e.g. future events returning 404)
+        if (matches.isNotEmpty()) {
+            val dateGroups = groupMatchesByDate(matches)
+            for ((dateStr, dayMatches) in dateGroups) {
+                val dateObj = try { java.time.LocalDate.parse(dateStr, dateFmt) } catch (e: Exception) { LogManager.log("LiveScoreService", "Failed to parse date group $dateStr", e); continue }
+                val rangeStart = dateObj.minusDays(1).format(dateFmt)
+                val rangeEnd = dateObj.plusDays(1).format(dateFmt)
+                val scoreboard = espnService.getScoreboard(dates = "$rangeStart-$rangeEnd")
+                val events = scoreboard.events ?: continue
+                val parsed = coroutineScope { events.mapNotNull { parseEvent(it, matches) } }
+                allUpdates.addAll(parsed)
+            }
+        }
+
+        return allUpdates.distinctBy { it.matchId }
     }
 
     private fun groupMatchesByDate(matches: List<MatchEntity>): Map<String, List<MatchEntity>> {
@@ -90,7 +108,13 @@ class LiveScoreService @Inject constructor(
         val homeName = homeTeam.team?.displayName ?: homeTeam.team?.name ?: return null
         val awayName = awayTeam.team?.displayName ?: awayTeam.team?.name ?: return null
 
-        var entity = findMatchingMatch(matches, homeName, awayName)
+        // Match by ESPN event ID first (most reliable), then by team name, then by date
+        var entity = event.id?.let { eid ->
+            matches.firstOrNull { it.espnId == eid }
+        }
+        if (entity == null) {
+            entity = findMatchingMatch(matches, homeName, awayName)
+        }
         if (entity == null) {
             entity = findMatchByDate(competition.date ?: event.date, event.name, matches)
             if (entity == null) {
@@ -125,10 +149,9 @@ class LiveScoreService @Inject constructor(
             winnerTeam = winnerName,
             homeHeadedGoals = hHeaded, awayHeadedGoals = aHeaded,
             hasSubGoal = hasSubGoal,
-            homeShootoutScore = homeShootout,
-            awayShootoutScore = awayShootout,
-            apiHomeTeam = homeName,
-            apiAwayTeam = awayName
+            homeShootoutScore = homeShootout, awayShootoutScore = awayShootout,
+            apiHomeTeam = homeName, apiAwayTeam = awayName,
+            espnId = event.id
         )
     }
 

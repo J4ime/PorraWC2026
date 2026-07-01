@@ -112,6 +112,11 @@ interface EspnService {
         @Query("dates") dates: String? = null
     ): EspnScoreboardResponse
 
+    @GET("site/v2/sports/soccer/fifa.world/events/{eventId}")
+    suspend fun getEvent(
+        @Path("eventId") eventId: String
+    ): EspnEvent
+
     @GET("https://sports.core.api.espn.com/v2/sports/soccer/leagues/fifa.world/events/{eventId}/competitions/{competitionId}/plays")
     suspend fun getPlays(
         @Path("eventId") eventId: String,

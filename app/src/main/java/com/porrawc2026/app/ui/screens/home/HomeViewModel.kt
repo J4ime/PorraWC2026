@@ -984,9 +984,10 @@ class HomeViewModel @Inject constructor(
 
         val allSorted = matches
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
+        val maxVisibleId = MatchScheduleProvider.getMaxVisibleRoundId()
         val allDisplay = allSorted.map { match -> toDisplay(match) }
             .filter { it.homeTeam.isNotBlank() && it.awayTeam.isNotBlank() }
-            .filter { !it.homeTeam.startsWith("Ganador") && !it.homeTeam.startsWith("Perdedor") }
+            .filter { it.id <= maxVisibleId }
 
         val yesterdayMatches = allDisplay.filter { display ->
             val d = parseMadridInstant(matches.first { it.id == display.id }.dateTime) ?: return@filter false

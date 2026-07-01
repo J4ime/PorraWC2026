@@ -159,8 +159,8 @@ class LiveScoreService @Inject constructor(
         val statusType = status.type ?: return null
         return when {
             statusType.completed == true -> "FINAL"
-            statusType.state == "in" && !status.displayClock.isNullOrBlank() -> status.displayClock
             statusType.shortDetail == "Halftime" || statusType.shortDetail == "HT" -> "HT"
+            statusType.state == "in" && !status.displayClock.isNullOrBlank() -> status.displayClock
             else -> null
         }
     }

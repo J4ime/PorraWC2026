@@ -154,6 +154,7 @@ class HomeViewModel @Inject constructor(
     private val goalScorers = ConcurrentHashMap<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
     private val liveMinutes = ConcurrentHashMap<Int, String>()
     private var knockoutPredictionMap = mapOf<Int, Boolean>()
+    private var knockoutPointsMap = mapOf<Int, Int>()
     private val seenScorers = ConcurrentHashMap<Int, MutableSet<String>>()
     private val notifiedScorers = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val processedGoalKeys = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
@@ -508,16 +509,104 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun recalcAllPoints() {
-        val knockoutPredictions = repository.getKnockoutPredictions().first()
-        knockoutPredictionMap = knockoutPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.winner != null } }
+        val koPredictions = repository.getKnockoutPredictions().first()
+        knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.winner != null } }
 
+        // Group/match prediction points (10+10+30)
         cachedMatches = cachedMatches.map { m ->
             val pts = PointsCalculator.calculateMatchPoints(m)
             if (pts != m.pointsEarned) repository.updateMatchPoints(m.id, pts)
             m.copy(pointsEarned = pts)
         }
 
+        // Knockout advancement points for display in MatchRow
+        knockoutPointsMap = computeKnockoutPoints(cachedMatches, koPredictions)
         _advancementPoints.value = 0
+    }
+
+    private fun computeKnockoutPoints(
+        matches: List<MatchEntity>,
+        predictions: List<KnockoutPredictionEntity>
+    ): Map<Int, Int> {
+        val advancement = buildAdvancement(matches)
+        val resolvedHome = predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions) }
+        val resolvedAway = predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions) }
+        return predictions.mapNotNull { prediction ->
+            val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
+            val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
+            val predictedWinner = when (prediction.winner) { 1 -> homeTeam; 2 -> awayTeam; else -> null } ?: return@mapNotNull null
+            val actualReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, predictedWinner) }?.value
+            val isCorrect = if (prediction.round == "3er puesto") {
+                actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
+            } else {
+                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
+            }
+            if (isCorrect) prediction.matchNumber to PointsCalculator.getKnockoutPoints(prediction.round) else null
+        }.toMap()
+    }
+
+    private fun buildAdvancement(matches: List<MatchEntity>): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val koRounds = listOf("Dieciseisavos", "Octavos", "Cuartos", "Semifinales", "Final")
+        for (match in matches.filter { it.homeTeam.isNotBlank() }) {
+            if (!match.isKnockout || match.knockoutRound == null || match.knockoutRound !in koRounds) continue
+            val round = match.knockoutRound
+            for (team in listOf(match.homeTeam, match.awayTeam)) {
+                val prev = result[team]
+                if (prev == null || roundLevel(round) > roundLevel(prev)) result[team] = round
+            }
+            val winner = match.winnerTeam?.let { w ->
+                val es = TeamNameNormalizer.enToEs(w)
+                // Only use winner name if it matches one of the teams in this match
+                if (TeamNameNormalizer.matches(es, match.homeTeam) || TeamNameNormalizer.matches(es, match.awayTeam)) es else null
+            } ?: if (match.homeGoals != null && match.awayGoals != null && match.homeGoals != match.awayGoals) {
+                if (match.homeGoals!! > match.awayGoals!!) match.homeTeam else match.awayTeam
+            } else null
+            if (winner != null) {
+                val nextIdx = koRounds.indexOf(round) + 1
+                if (nextIdx < koRounds.size) {
+                    val nextRound = koRounds[nextIdx]
+                    val prev = result[winner]
+                    if (prev == null || roundLevel(nextRound) > roundLevel(prev)) result[winner] = nextRound
+                }
+            }
+        }
+        return result
+    }
+
+    private fun roundLevel(round: String): Int = when (round) {
+        "Dieciseisavos" -> 1; "Octavos" -> 2; "Cuartos" -> 3; "Semifinales" -> 4
+        "3er puesto" -> 5; "Final" -> 6; "Campeón" -> 7; else -> 0
+    }
+
+    // Resolve Octavos match "Ganador 74" names to actual team names from Dieciseisavos winners
+    private fun resolveOctavosTeamNames() {
+        val schedule = MatchScheduleProvider.getHardcodedSchedule()
+        cachedMatches = cachedMatches.map { match ->
+            if (match.id !in 89..96) return@map match
+            val sched = schedule[match.id] ?: return@map match
+            val homeTeam = resolveWinnerRef(sched.home, match.id)
+            val awayTeam = resolveWinnerRef(sched.away, match.id)
+            if (homeTeam != match.homeTeam || awayTeam != match.awayTeam) {
+                match.copy(homeTeam = homeTeam, awayTeam = awayTeam)
+            } else match
+        }
+    }
+
+    private fun resolveWinnerRef(ref: String, currentMatchId: Int): String {
+        val matchId = when {
+            ref.startsWith("Ganador ") || ref.startsWith("W") -> ref.removePrefix("Ganador ").removePrefix("W").trim().toIntOrNull()
+            else -> return ref
+        } ?: return ref
+        // Find the actual winner from the referenced match's data
+        val refMatch = cachedMatches.firstOrNull { it.id == matchId } ?: return ref
+        val wTeam = refMatch.winnerTeam
+        if (!wTeam.isNullOrBlank()) return TeamNameNormalizer.enToEs(wTeam)
+        // If no explicit winner, determine from scores
+        if (refMatch.homeGoals != null && refMatch.awayGoals != null && refMatch.homeGoals != refMatch.awayGoals) {
+            return if (refMatch.homeGoals!! > refMatch.awayGoals!!) refMatch.homeTeam else refMatch.awayTeam
+        }
+        return ref
     }
 
     private suspend fun checkGoalNotifications() {
@@ -948,6 +1037,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshUpcomingMatches() {
+        resolveOctavosTeamNames()
         val todayZoned = LocalDate.now(madridZone)
         val matches = cachedMatches
 
@@ -1036,7 +1126,7 @@ class HomeViewModel @Inject constructor(
             homeGoals = match.homeGoals, awayGoals = match.awayGoals,
             predictedHomeGoals = match.predictedHomeGoals,
             predictedAwayGoals = match.predictedAwayGoals,
-            pointsEarned = match.pointsEarned,
+            pointsEarned = if (match.isKnockout) (knockoutPointsMap[match.id] ?: 0) else match.pointsEarned,
             groupLabel = match.groupName, status = status, tvChannel = match.tvChannel,
             liveMinute = liveMin,
             homeScorers = homeScr,

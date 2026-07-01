@@ -274,27 +274,25 @@ class LiveScoreService @Inject constructor(
         return g
     }
 
-    private val espnDateRegex = Regex("""(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(Z?)""")
-
     private fun parseEspnDate(date: String): java.time.Instant? {
-        val m = espnDateRegex.matchEntire(date) ?: return null
-        val datePart = m.groupValues[1]
-        val hh = m.groupValues[2]
-        val mm = m.groupValues[3]
-        val ss = m.groupValues[4].ifEmpty { "00" }
-        val z = m.groupValues[5]
-        val full = "${datePart}T${hh}:${mm}:${ss}${z}"
-        return if (z == "Z") java.time.Instant.parse(full)
-        else java.time.LocalDateTime.parse(full, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US))
-            .toInstant(java.time.ZoneOffset.UTC)
+        return try {
+            java.time.Instant.parse(date)
+        } catch (e: java.time.format.DateTimeParseException) {
+            try {
+                java.time.OffsetDateTime.parse(date).toInstant()
+            } catch (e2: java.time.format.DateTimeParseException) {
+                null
+            }
+        }
     }
 
     private fun parseMadridDate(date: String): java.time.Instant? {
-        val m = espnDateRegex.matchEntire(date) ?: return null
-        val full = m.groupValues[1] + "T" + m.groupValues[2] + ":" + m.groupValues[3] + ":" +
-            m.groupValues[4].ifEmpty { "00" }
-        return java.time.LocalDateTime.parse(full, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US))
-            .atZone(java.time.ZoneId.of("Europe/Madrid")).toInstant()
+        return try {
+            java.time.LocalDateTime.parse(date, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                .atZone(java.time.ZoneId.of("Europe/Madrid")).toInstant()
+        } catch (e: java.time.format.DateTimeParseException) {
+            null
+        }
     }
 
     private fun findMatchingMatch(matches: List<MatchEntity>, homeName: String, awayName: String): MatchEntity? {

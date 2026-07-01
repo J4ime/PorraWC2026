@@ -16,12 +16,19 @@ data class EspnEvent(
     val competitions: List<EspnCompetition>?
 )
 
+data class EspnShootout(
+    val team: EspnTeam?,
+    val made: Int?,
+    val attempts: Int?
+)
+
 data class EspnCompetition(
     val id: String?,
     val date: String?,
     val status: EspnStatus?,
     val competitors: List<EspnCompetitor>?,
-    val details: List<EspnDetail>?
+    val details: List<EspnDetail>?,
+    val shootout: List<EspnShootout>?
 )
 
 data class EspnStatus(

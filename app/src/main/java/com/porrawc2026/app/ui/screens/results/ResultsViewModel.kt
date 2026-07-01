@@ -2,10 +2,10 @@ package com.porrawc2026.app.ui.screens.results
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.porrawc2026.app.data.local.entity.MatchEntity
-import com.porrawc2026.app.data.local.entity.QuestionEntity
-import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
+import com.porrawc2026.app.data.local.entity.MatchEntity
+import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
+import com.porrawc2026.app.data.local.entity.QuestionEntity
 import com.porrawc2026.app.data.remote.ApiService
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.PointsCalculator
@@ -21,6 +21,17 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
+
+data class KnockoutResultDisplay(
+    val matchNumber: Int,
+    val round: String,
+    val homeTeam: String,
+    val awayTeam: String,
+    val predictedWinnerTeam: String?,
+    val actualWinnerTeam: String?,
+    val pointsEarned: Int,
+    val isCorrect: Boolean
+)
 
 @HiltViewModel
 class ResultsViewModel @Inject constructor(
@@ -41,8 +52,17 @@ class ResultsViewModel @Inject constructor(
     val knockoutPredictions: StateFlow<List<KnockoutPredictionEntity>> = repository.getKnockoutPredictions()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    private val _totalPoints = MutableStateFlow(0)
-    val totalPoints: StateFlow<Int> = _totalPoints.asStateFlow()
+    val groupPoints: StateFlow<Int> = allMatches
+        .map { matches -> matches.filter { !it.isKnockout }.sumOf { it.pointsEarned } }
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0)
+
+    val qPoints: StateFlow<Int> = questions
+        .map { questions -> questions.sumOf { it.pointsEarned } }
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0)
+
+    val pPoints: StateFlow<Int> = playerPredictions
+        .map { players -> players.sumOf { it.pointsEarned } }
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0)
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -50,8 +70,65 @@ class ResultsViewModel @Inject constructor(
     private val _errorMessage = MutableSharedFlow<String>()
     val errorMessage: SharedFlow<String> = _errorMessage.asSharedFlow()
 
+    private val _knockoutResults = MutableStateFlow<List<KnockoutResultDisplay>>(emptyList())
+    val knockoutResults: StateFlow<List<KnockoutResultDisplay>> = _knockoutResults.asStateFlow()
+
+    val kokoPoints: StateFlow<Int> = _knockoutResults
+        .map { results -> results.sumOf { it.pointsEarned } }
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0)
+
+    val totalPoints: StateFlow<Int> = combine(groupPoints, kokoPoints, qPoints, pPoints) { g, k, q, p ->
+        g + k + q + p
+    }.stateIn(viewModelScope, SharingStarted.Lazily, 0)
+
     init {
-        refreshPoints()
+        viewModelScope.launch {
+            combine(allMatches, knockoutPredictions) { matches, predictions ->
+                computeKnockoutResults(matches, predictions)
+            }.collect { results ->
+                _knockoutResults.value = results
+            }
+        }
+    }
+
+    private fun computeKnockoutResults(
+        matches: List<MatchEntity>,
+        predictions: List<KnockoutPredictionEntity>
+    ): List<KnockoutResultDisplay> {
+        val resolvedHome = predictions.associate {
+            it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions)
+        }
+        val resolvedAway = predictions.associate {
+            it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions)
+        }
+        val matchByNumber = matches.filter { it.matchNumber != null }.associateBy { it.matchNumber!! }
+
+        return predictions.map { prediction ->
+            val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
+            val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
+            val match = matchByNumber[prediction.matchNumber]
+            val actualWinner = match?.winnerTeam
+            val predictedWinner = when (prediction.winner) {
+                1 -> homeTeam
+                2 -> awayTeam
+                else -> null
+            }
+            val isCorrect = predictedWinner != null && actualWinner != null &&
+                TeamNameNormalizer.matches(predictedWinner, actualWinner)
+            val roundPoints = PointsCalculator.getKnockoutPoints(prediction.round)
+            val pointsEarned = if (isCorrect) roundPoints else 0
+
+            KnockoutResultDisplay(
+                matchNumber = prediction.matchNumber,
+                round = prediction.round,
+                homeTeam = homeTeam,
+                awayTeam = awayTeam,
+                predictedWinnerTeam = predictedWinner,
+                actualWinnerTeam = actualWinner,
+                pointsEarned = pointsEarned,
+                isCorrect = isCorrect
+            )
+        }
     }
 
     fun refreshLiveScores() {
@@ -79,17 +156,10 @@ class ResultsViewModel @Inject constructor(
                         repository.updateMatchPrediction(localMatch.copy(homeGoals = homeGoals, awayGoals = awayGoals, pointsEarned = pts))
                     }
                 }
-                refreshPoints()
             }.onFailure { e ->
                 _errorMessage.emit("Error conectando al servidor: ${e.message}")
             }
             _isRefreshing.value = false
-        }
-    }
-
-    private fun refreshPoints() {
-        viewModelScope.launch {
-            _totalPoints.value = repository.calculateTotalPoints()
         }
     }
 

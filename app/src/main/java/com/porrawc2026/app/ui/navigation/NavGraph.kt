@@ -26,7 +26,6 @@ import com.porrawc2026.app.R
 import com.porrawc2026.app.ui.screens.goalscorers.GoalscorersScreen
 import com.porrawc2026.app.ui.theme.*
 import androidx.compose.ui.graphics.Color
-import com.porrawc2026.app.ui.screens.groups.GroupDetailScreen
 import com.porrawc2026.app.ui.screens.groups.MatchesScreen
 import com.porrawc2026.app.ui.screens.home.AjustesScreen
 import com.porrawc2026.app.ui.screens.home.HomeScreen
@@ -43,7 +42,6 @@ sealed class DetailScreen {
     data object Results : DetailScreen()
     data object Knockout : DetailScreen()
     data object Players : DetailScreen()
-    data class GroupDetail(val groupLetter: String) : DetailScreen()
 }
 
 @Composable
@@ -72,7 +70,6 @@ fun PorraNavGraph() {
                     is DetailScreen.Results -> "RESULTADOS"
                     is DetailScreen.Knockout -> "ELIMINATORIAS"
                     is DetailScreen.Players -> "JUGADORES"
-                    is DetailScreen.GroupDetail -> "GRUPO ${(detailScreen as DetailScreen.GroupDetail).groupLetter}"
                     null -> "PORRA WC 2026"
                 }
                 else -> when (pagerState.currentPage) {
@@ -98,10 +95,6 @@ fun PorraNavGraph() {
                     is DetailScreen.Results -> ResultsScreen(onBackClick = { detailScreen = null })
                     is DetailScreen.Knockout -> KnockoutScreen(onBackClick = { detailScreen = null })
                     is DetailScreen.Players -> PlayersScreen(onBackClick = { detailScreen = null })
-                    is DetailScreen.GroupDetail -> GroupDetailScreen(
-                        groupLetter = screen.groupLetter,
-                        onBackClick = { detailScreen = null }
-                    )
                     null -> {}
                 }
             } else {

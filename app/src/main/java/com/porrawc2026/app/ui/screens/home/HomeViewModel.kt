@@ -83,7 +83,10 @@ data class MatchDisplay(
     val dayKey: String = "",
     val sortKey: String = "",
     val isKnockout: Boolean = false,
-    val hasKnockoutPred: Boolean = false
+    val hasKnockoutPred: Boolean = false,
+    val winnerTeam: String? = null,
+    val homeShootoutScore: Int = 0,
+    val awayShootoutScore: Int = 0
 )
 
 @HiltViewModel
@@ -504,25 +507,16 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun recalcAllPoints() {
-        val teams = repository.getAllTeams().first()
         val knockoutPredictions = repository.getKnockoutPredictions().first()
         knockoutPredictionMap = knockoutPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.winner != null } }
 
-        val actual = PointsCalculator.computeActualAdvancingTeams(cachedMatches, teams)
-        val predicted = PointsCalculator.computePredictedAdvancingTeams(cachedMatches, teams, knockoutPredictions)
-
         cachedMatches = cachedMatches.map { m ->
-            val pts = if (!m.isKnockout) {
-                PointsCalculator.calculateMatchPoints(m)
-            } else {
-                PointsCalculator.computeKnockoutAdvancementPoints(m, predicted)
-            }
+            val pts = PointsCalculator.calculateMatchPoints(m)
             if (pts != m.pointsEarned) repository.updateMatchPoints(m.id, pts)
             m.copy(pointsEarned = pts)
         }
 
-        val advPoints = PointsCalculator.calculateTotalAdvancementPoints(predicted, actual)
-        _advancementPoints.value = advPoints
+        _advancementPoints.value = 0
     }
 
     private suspend fun checkGoalNotifications() {
@@ -785,6 +779,15 @@ class HomeViewModel @Inject constructor(
                 if (update.winnerTeam != null) {
                     repository.updateMatchWinner(update.matchId, update.winnerTeam)
                 }
+                if (update.homeShootoutScore > 0 || update.awayShootoutScore > 0) {
+                    repository.updateMatchShootout(update.matchId, update.homeShootoutScore, update.awayShootoutScore)
+                    cachedMatches = cachedMatches.map {
+                        if (it.id == update.matchId) it.copy(
+                            homeShootoutScore = update.homeShootoutScore,
+                            awayShootoutScore = update.awayShootoutScore
+                        ) else it
+                    }
+                }
             }
             // Dieciseisavo team names come from ESPN API in updateMatchScores()
             // tryGenerateDieciseisavos() preserves the API-set names.
@@ -918,7 +921,6 @@ class HomeViewModel @Inject constructor(
         val matches = cachedMatches
 
         val allSorted = matches
-            .filter { it.homeTeam.isNotBlank() && it.awayTeam.isNotBlank() }
             .sortedBy { it.dateTime.ifBlank { "zzz" } }
         val allDisplay = allSorted.map { match -> toDisplay(match) }
 
@@ -1011,7 +1013,10 @@ class HomeViewModel @Inject constructor(
             dayKey = dayKey,
             sortKey = sortKey,
             isKnockout = match.isKnockout,
-            hasKnockoutPred = knockoutPredictionMap[match.id] == true
+            hasKnockoutPred = knockoutPredictionMap[match.id] == true,
+            winnerTeam = match.winnerTeam,
+            homeShootoutScore = match.homeShootoutScore,
+            awayShootoutScore = match.awayShootoutScore
         )
     }
 

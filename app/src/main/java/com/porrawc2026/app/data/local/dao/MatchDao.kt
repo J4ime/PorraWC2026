@@ -54,12 +54,15 @@ interface MatchDao {
     @Query("UPDATE matches SET pointsEarned = :points WHERE id = :matchId")
     suspend fun updateMatchPoints(matchId: Int, points: Int)
 
-    @Query("UPDATE matches SET homeScorers = NULL, awayScorers = NULL, homeGoals = NULL, awayGoals = NULL, homeRedCards = NULL, awayRedCards = NULL, homeYellowCards = NULL, awayYellowCards = NULL, homeMissedPenalties = 0, awayMissedPenalties = 0, winnerTeam = NULL, homeHeadedGoals = 0, awayHeadedGoals = 0, hasSubGoal = 0")
+    @Query("UPDATE matches SET homeShootoutScore = :homeShootout, awayShootoutScore = :awayShootout WHERE id = :matchId")
+    suspend fun updateMatchShootout(matchId: Int, homeShootout: Int, awayShootout: Int)
+
+    @Query("UPDATE matches SET homeScorers = NULL, awayScorers = NULL, homeGoals = NULL, awayGoals = NULL, homeRedCards = NULL, awayRedCards = NULL, homeYellowCards = NULL, awayYellowCards = NULL, homeMissedPenalties = 0, awayMissedPenalties = 0, winnerTeam = NULL, homeHeadedGoals = 0, awayHeadedGoals = 0, hasSubGoal = 0, homeShootoutScore = 0, awayShootoutScore = 0")
     suspend fun clearAllMatchScores()
 
     @Query("UPDATE matches SET homeTeam = :homeTeam, awayTeam = :awayTeam WHERE id = :matchId")
     suspend fun updateMatchTeams(matchId: Int, homeTeam: String, awayTeam: String)
 
-    @Query("UPDATE matches SET homeTeam='', awayTeam='', homeGoals=NULL, awayGoals=NULL, homeScorers=NULL, awayScorers=NULL, homeRedCards=NULL, awayRedCards=NULL, homeYellowCards=NULL, awayYellowCards=NULL, homeMissedPenalties=0, awayMissedPenalties=0, winnerTeam=NULL, homeHeadedGoals=0, awayHeadedGoals=0, hasSubGoal=0, pointsEarned=0 WHERE id IN (:ids)")
+    @Query("UPDATE matches SET homeTeam='', awayTeam='', homeGoals=NULL, awayGoals=NULL, homeScorers=NULL, awayScorers=NULL, homeRedCards=NULL, awayRedCards=NULL, homeYellowCards=NULL, awayYellowCards=NULL, homeMissedPenalties=0, awayMissedPenalties=0, winnerTeam=NULL, homeHeadedGoals=0, awayHeadedGoals=0, hasSubGoal=0, homeShootoutScore=0, awayShootoutScore=0, pointsEarned=0 WHERE id IN (:ids)")
     suspend fun clearKnockoutMatchData(vararg ids: Int)
 }

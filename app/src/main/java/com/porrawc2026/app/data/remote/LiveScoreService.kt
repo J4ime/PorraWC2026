@@ -27,6 +27,8 @@ data class LiveScoreUpdate(
     val homeHeadedGoals: Int = 0,
     val awayHeadedGoals: Int = 0,
     val hasSubGoal: Boolean = false,
+    val homeShootoutScore: Int = 0,
+    val awayShootoutScore: Int = 0,
     val apiHomeTeam: String? = null,
     val apiAwayTeam: String? = null
 )
@@ -111,6 +113,8 @@ class LiveScoreService @Inject constructor(
             checkSubstituteGoals(event, competition)
         } else false
 
+        val (homeShootout, awayShootout) = parseShootout(competition.shootout, homeTeam.id, awayTeam.id)
+
         return LiveScoreUpdate(
             matchId = entity.id, homeGoals = hScore, awayGoals = aScore,
             homeScorers = homeScorers, awayScorers = awayScorers,
@@ -121,6 +125,8 @@ class LiveScoreService @Inject constructor(
             winnerTeam = winnerName,
             homeHeadedGoals = hHeaded, awayHeadedGoals = aHeaded,
             hasSubGoal = hasSubGoal,
+            homeShootoutScore = homeShootout,
+            awayShootoutScore = awayShootout,
             apiHomeTeam = homeName,
             apiAwayTeam = awayName
         )
@@ -144,6 +150,8 @@ class LiveScoreService @Inject constructor(
         var hHeaded = 0; var aHeaded = 0
         details?.forEach { detail ->
             if (detail.scoringPlay == true) {
+                // Skip penalty shootout goals: no match clock (displayValue "0'") + penaltyKick
+                if (detail.penaltyKick == true && detail.clock?.displayValue == "0'") return@forEach
                 val playerNameBase = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
                 val playerName = if (detail.ownGoal == true) "$playerNameBase (OG)" else playerNameBase
                 val minuteStr = detail.clock?.displayValue ?: return@forEach
@@ -301,6 +309,13 @@ class LiveScoreService @Inject constructor(
         }
         if (swapped.size == 1) return swapped.first()
         return null
+    }
+
+    private fun parseShootout(shootout: List<EspnShootout>?, homeId: String?, awayId: String?): Pair<Int, Int> {
+        if (shootout == null) return 0 to 0
+        val homeMade = shootout.firstOrNull { it.team?.id == homeId }?.made ?: 0
+        val awayMade = shootout.firstOrNull { it.team?.id == awayId }?.made ?: 0
+        return homeMade to awayMade
     }
 
     companion object {

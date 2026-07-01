@@ -21,7 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.ui.theme.*
 import com.porrawc2026.app.util.ShareUtil
-import com.porrawc2026.app.domain.model.StandingsCalculator
+import com.porrawc2026.app.ui.screens.results.KnockoutResultDisplay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,10 +37,11 @@ fun ResultsScreen(
     val playerPredictions by viewModel.playerPredictions.collectAsState()
     val knockoutPredictions by viewModel.knockoutPredictions.collectAsState()
 
-    val groupPoints by remember(matches) { derivedStateOf { matches.filter { !it.isKnockout }.sumOf { it.pointsEarned } } }
-    val kokoPoints by remember(knockoutPredictions) { derivedStateOf { knockoutPredictions.sumOf { it.pointsEarned } } }
-    val qPoints by remember(questions) { derivedStateOf { questions.sumOf { it.pointsEarned } } }
-    val pPoints by remember(playerPredictions) { derivedStateOf { playerPredictions.sumOf { it.pointsEarned } } }
+    val groupPoints by viewModel.groupPoints.collectAsState()
+    val kokoPoints by viewModel.kokoPoints.collectAsState()
+    val knockoutResults by viewModel.knockoutResults.collectAsState()
+    val qPoints by viewModel.qPoints.collectAsState()
+    val pPoints by viewModel.pPoints.collectAsState()
 
     Column(
         modifier = Modifier
@@ -148,12 +149,6 @@ fun ResultsScreen(
                 )
             }
 
-            // Prediction stats
-            item {
-                val stats = StandingsCalculator.calculatePredictionStats(matches)
-                PredictionStatsCard(stats)
-            }
-
             // Group stage results
             item {
                 SectionHeader("FASE DE GRUPOS", "+$groupPoints pts")
@@ -170,6 +165,21 @@ fun ResultsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Ver todos los ${matches.count { !it.isKnockout }} partidos...", color = AccentBlue)
+                    }
+                }
+            }
+
+            // Knockout results
+            val rounds = listOf("Dieciseisavos", "Octavos", "Cuartos", "Semifinales", "3er puesto", "Final")
+            rounds.forEach { round ->
+                val roundResults = knockoutResults.filter { it.round == round }
+                if (roundResults.isNotEmpty()) {
+                    val roundTotal = roundResults.sumOf { it.pointsEarned }
+                    item {
+                        SectionHeader(round.uppercase(), if (roundTotal > 0) "+$roundTotal pts" else "0 pts")
+                    }
+                    items(roundResults) { result ->
+                        KnockoutResultRow(result)
                     }
                 }
             }
@@ -295,49 +305,26 @@ private fun ResultRow(match: MatchEntity) {
 }
 
 @Composable
-private fun PredictionStatsCard(stats: StandingsCalculator.PredictionStats) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardDark),
-        shape = RoundedCornerShape(12.dp)
+private fun KnockoutResultRow(result: KnockoutResultDisplay) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceMedium, RoundedCornerShape(8.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "ESTADÍSTICAS DE ACIERTO",
-                style = MaterialTheme.typography.labelMedium,
-                color = TextMuted,
-                letterSpacing = 2.sp
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                StatItem("Resultados", "${stats.matchesWithResults}/${stats.totalMatches}", WCGold)
-                StatItem("Resultado", "${stats.resultHits}", AccentGreen)
-                StatItem("Exacto", "${stats.exactScoreHits}", AccentBlue)
-                StatItem("Precision", "${"%.0f".format(stats.accuracyPercent)}%", AccentOrange)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            val progress = if (stats.matchesWithResults > 0)
-                stats.resultHits.toFloat() / stats.matchesWithResults else 0f
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth(),
-                color = AccentGreen,
-                trackColor = InputBg
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "${stats.resultHits} aciertos de resultado en ${stats.matchesWithResults} partidos jugados",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
-            )
+        Text("#${result.matchNumber}", style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.width(28.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(result.homeTeam, style = MaterialTheme.typography.bodySmall, color = if (result.isCorrect && result.predictedWinnerTeam == result.homeTeam) AccentGreen else if (result.actualWinnerTeam != null && result.actualWinnerTeam != result.homeTeam) TextMuted else TextPrimary, maxLines = 1)
+            Spacer(Modifier.height(2.dp))
+            Text(result.awayTeam, style = MaterialTheme.typography.bodySmall, color = if (result.isCorrect && result.predictedWinnerTeam == result.awayTeam) AccentGreen else if (result.actualWinnerTeam != null && result.actualWinnerTeam != result.awayTeam) TextMuted else TextPrimary, maxLines = 1)
+        }
+        if (result.pointsEarned > 0) {
+            Text("+${result.pointsEarned}", style = MaterialTheme.typography.labelSmall, color = AccentGreen, fontWeight = FontWeight.Bold)
+        } else if (result.actualWinnerTeam != null) {
+            Text("0", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+        } else {
+            Text("-", style = MaterialTheme.typography.labelSmall, color = TextMuted)
         }
     }
 }

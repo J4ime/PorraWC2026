@@ -18,7 +18,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
-import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.ui.theme.*
 
 @Composable
@@ -28,11 +27,6 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
     val koPredictions by viewModel.allKnockoutPredictions.collectAsState()
     val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
     val listState = rememberLazyListState()
-
-    val actualAdvancing = remember(allMatches, allTeams) {
-        if (allMatches.isEmpty() || allTeams.isEmpty()) PointsCalculator.AdvancingTeams()
-        else PointsCalculator.computeActualAdvancingTeams(allMatches, allTeams)
-    }
 
     LaunchedEffect(scrollTrigger) {
         if (sorted.isEmpty()) return@LaunchedEffect
@@ -75,7 +69,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                     lastRound = round
                     item { Text(round.uppercase(), style = MaterialTheme.typography.titleSmall, color = WCGold, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)) }
                 }
-                item { KnockoutMatchRow(match, koPredictions, allMatches, actualAdvancing) }
+                item { KnockoutMatchRow(match, koPredictions, allMatches) }
             }
         }
 
@@ -138,7 +132,7 @@ private fun GroupMatchRow(match: MatchEntity) {
 }
 
 @Composable
-private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPredictionEntity>, allMatches: List<MatchEntity>, actualAdvancing: PointsCalculator.AdvancingTeams) {
+private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPredictionEntity>, allMatches: List<MatchEntity>) {
     val koPred = koPredictions.firstOrNull { it.matchNumber == match.id }
     val homeWins = koPred?.winner == 1
     val awayWins = koPred?.winner == 2
@@ -169,10 +163,6 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
         else -> TextPrimary
     }
 
-    val advPts = remember(match, allMatches, actualAdvancing) {
-        PointsCalculator.computeKnockoutMatchAdvancementPoints(match, allMatches, actualAdvancing)
-    }
-
     Row(Modifier.fillMaxWidth().background(bgColor, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(fmtDate(match), Modifier.width(72.dp), fontSize = 9.sp, color = WCGold, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
 
@@ -183,8 +173,6 @@ private fun KnockoutMatchRow(match: MatchEntity, koPredictions: List<KnockoutPre
             Text(" vs ", fontSize = 11.sp, color = TextMuted, maxLines = 1)
             Text(aText, fontSize = 11.sp, color = aColor, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), fontWeight = if (awayWins) FontWeight.Bold else FontWeight.Normal)
         }
-
-        Text(if (advPts > 0) "+$advPts" else "", Modifier.width(24.dp), fontSize = 11.sp, color = if (advPts > 0) AccentGreen else TextMuted, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 

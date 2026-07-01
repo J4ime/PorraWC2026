@@ -1,5 +1,6 @@
 package com.porrawc2026.app.ui.screens.home
 
+import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -26,6 +27,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -225,6 +227,9 @@ private fun MatchRow(match: MatchDisplay) {
     val hasLiveMinute = match.liveMinute != null
     val showScore = hasResult && match.status != MatchStatus.UPCOMING
 
+    val hasWinner = match.winnerTeam != null
+    val homeIsLoser = hasWinner && !TeamNameNormalizer.matches(match.homeTeam, match.winnerTeam!!)
+    val awayIsLoser = hasWinner && !TeamNameNormalizer.matches(match.awayTeam, match.winnerTeam!!)
     val borderColor = if (isLive) Color(0xFF4CAF50) else Color.Transparent
     Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp)).then(if (isLive) Modifier.border(2.dp, borderColor, RoundedCornerShape(10.dp)) else Modifier).padding(horizontal = 8.dp, vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -238,14 +243,17 @@ private fun MatchRow(match: MatchDisplay) {
                 Text(timeText, fontSize = 12.sp, color = if (isLive) Color(0xFF4CAF50) else Color(0xFF888888), fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             }
 
-            // Goals column  
-            Column(modifier = Modifier.width(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Goals column
+            val hasShootout = isFinished && (match.homeShootoutScore > 0 || match.awayShootoutScore > 0)
+            Column(modifier = Modifier.width(if (hasShootout) 42.dp else 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 val h = if (showScore || isLive) match.homeGoals?.toString() ?: "0" else "-"
                 val a = if (showScore || isLive) match.awayGoals?.toString() ?: "0" else "-"
                 val sc = when { isLive -> Color(0xFF4CAF50); showScore -> Color.White; else -> Color(0xFF777777) }
-                Text(h, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                val hDisplay = if (hasShootout) "$h (${match.homeShootoutScore})" else h
+                val aDisplay = if (hasShootout) "$a (${match.awayShootoutScore})" else a
+                Text(hDisplay, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1)
                 Spacer(Modifier.height(4.dp))
-                Text(a, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text(aDisplay, fontSize = 15.sp, color = sc, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1)
             }
 
             Spacer(Modifier.width(8.dp))
@@ -254,12 +262,12 @@ private fun MatchRow(match: MatchDisplay) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(match.homeFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
-                    Text(match.homeTeam, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(match.homeTeam, fontSize = 12.sp, color = if (homeIsLoser) Color(0xFF666666) else Color.White, textDecoration = if (homeIsLoser) TextDecoration.LineThrough else null, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(match.awayFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
-                    Text(match.awayTeam, fontSize = 12.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(match.awayTeam, fontSize = 12.sp, color = if (awayIsLoser) Color(0xFF666666) else Color.White, textDecoration = if (awayIsLoser) TextDecoration.LineThrough else null, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 }
             }
 

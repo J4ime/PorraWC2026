@@ -116,33 +116,34 @@ private fun computeKnockoutResults(
             val unresolvedTeams = homeTeam.startsWith("W") || homeTeam.startsWith("L") || 
                 awayTeam.startsWith("W") || awayTeam.startsWith("L")
             
-            val predictedWinner = when (prediction.winner) {
-                1 -> homeTeam
-                2 -> awayTeam
-                else -> null
-            }
-            val actualReachedRound = if (unresolvedTeams) null else predictedWinner?.let { winner ->
-                advancement.entries.firstOrNull { (team, _) ->
-                    TeamNameNormalizer.matches(team, winner)
+            val predictionRoundLevel = KnockoutCalculator.roundLevel(prediction.round)
+            var pointsEarned = 0
+            
+            if (!unresolvedTeams && predictionRoundLevel > 0) {
+                val homeReachedRound = advancement.entries.firstOrNull { (team, _) ->
+                    TeamNameNormalizer.matches(team, homeTeam)
                 }?.value
+                if (homeReachedRound != null && KnockoutCalculator.roundLevel(homeReachedRound) >= predictionRoundLevel) {
+                    pointsEarned += PointsCalculator.getKnockoutPoints(prediction.round)
+                }
+                
+                val awayReachedRound = advancement.entries.firstOrNull { (team, _) ->
+                    TeamNameNormalizer.matches(team, awayTeam)
+                }?.value
+                if (awayReachedRound != null && KnockoutCalculator.roundLevel(awayReachedRound) >= predictionRoundLevel) {
+                    pointsEarned += PointsCalculator.getKnockoutPoints(prediction.round)
+                }
             }
-            val isCorrect = if (unresolvedTeams) false else if (prediction.round == "3er puesto") {
-                actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) == KnockoutCalculator.roundLevel(prediction.round)
-            } else {
-                actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) >= KnockoutCalculator.roundLevel(prediction.round)
-            }
-            val roundPoints = PointsCalculator.getKnockoutPoints(prediction.round)
-            val pointsEarned = if (isCorrect) roundPoints else 0
 
             KnockoutResultDisplay(
                 matchNumber = prediction.matchNumber,
                 round = prediction.round,
                 homeTeam = homeTeam,
                 awayTeam = awayTeam,
-                predictedWinnerTeam = predictedWinner,
+                predictedWinnerTeam = null,
                 actualWinnerTeam = null,
                 pointsEarned = pointsEarned,
-                isCorrect = isCorrect
+                isCorrect = pointsEarned > 0
             )
         }
     }

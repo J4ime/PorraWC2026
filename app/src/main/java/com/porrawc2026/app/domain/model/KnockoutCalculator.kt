@@ -81,14 +81,22 @@ object KnockoutCalculator {
                 return@mapNotNull null
             }
             
-            val predictedWinner = when (prediction.winner) { 1 -> homeTeam; 2 -> awayTeam; else -> null } ?: return@mapNotNull null
-            val actualReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, predictedWinner) }?.value
-            val isCorrect = if (prediction.round == "3er puesto") {
-                actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
-            } else {
-                actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
+            val predictionRoundLevel = roundLevel(prediction.round)
+            if (predictionRoundLevel == 0) return@mapNotNull null
+            
+            var points = 0
+            
+            val homeReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, homeTeam) }?.value
+            if (homeReachedRound != null && roundLevel(homeReachedRound) >= predictionRoundLevel) {
+                points += PointsCalculator.getKnockoutPoints(prediction.round)
             }
-            if (isCorrect) prediction.matchNumber to PointsCalculator.getKnockoutPoints(prediction.round) else null
+            
+            val awayReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, awayTeam) }?.value
+            if (awayReachedRound != null && roundLevel(awayReachedRound) >= predictionRoundLevel) {
+                points += PointsCalculator.getKnockoutPoints(prediction.round)
+            }
+            
+            if (points > 0) prediction.matchNumber to points else null
         }.toMap()
     }
 
@@ -102,14 +110,23 @@ object KnockoutCalculator {
         return predictions.mapNotNull { prediction ->
             val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
             val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
-            val predictedWinner = when (prediction.winner) { 1 -> homeTeam; 2 -> awayTeam; else -> null } ?: return@mapNotNull null
-            val actualReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, predictedWinner) }?.value
-            val isCorrect = if (prediction.round == "3er puesto") {
-                actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
-            } else {
-                actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
+            
+            val predictionRoundLevel = roundLevel(prediction.round)
+            if (predictionRoundLevel == 0) return@mapNotNull null
+            
+            var points = 0
+            
+            val homeReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, homeTeam) }?.value
+            if (homeReachedRound != null && roundLevel(homeReachedRound) >= predictionRoundLevel) {
+                points += PointsCalculator.getKnockoutPoints(prediction.round)
             }
-            if (isCorrect) prediction.matchNumber to PointsCalculator.getKnockoutPoints(prediction.round) else null
+            
+            val awayReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, awayTeam) }?.value
+            if (awayReachedRound != null && roundLevel(awayReachedRound) >= predictionRoundLevel) {
+                points += PointsCalculator.getKnockoutPoints(prediction.round)
+            }
+            
+            if (points > 0) prediction.matchNumber to points else null
         }.toMap()
     }
 }

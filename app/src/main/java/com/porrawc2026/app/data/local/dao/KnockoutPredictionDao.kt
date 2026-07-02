@@ -23,4 +23,7 @@ interface KnockoutPredictionDao {
 
     @Query("SELECT SUM(pointsEarned) FROM knockout_predictions")
     suspend fun getTotalPoints(): Int
+
+    @Query("UPDATE knockout_predictions SET pointsEarned = :points WHERE matchNumber = :matchNumber")
+    suspend fun updatePoints(matchNumber: Int, points: Int)
 }

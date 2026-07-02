@@ -14,9 +14,10 @@ import com.porrawc2026.app.data.local.entity.*
         QuestionEntity::class,
         PlayerPredictionEntity::class,
         KnockoutPredictionEntity::class,
-        GroupStandingEntity::class
+        GroupStandingEntity::class,
+        KnockoutTeamProgressEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -26,6 +27,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun playerPredictionDao(): PlayerPredictionDao
     abstract fun knockoutPredictionDao(): KnockoutPredictionDao
     abstract fun groupStandingDao(): GroupStandingDao
+    abstract fun knockoutTeamProgressDao(): KnockoutTeamProgressDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -78,6 +80,11 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE matches ADD COLUMN espnId TEXT DEFAULT NULL")
+            }
+        }
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `knockout_team_progress` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `roundLevel` INTEGER NOT NULL, `roundName` TEXT NOT NULL, `teamName` TEXT NOT NULL)")
             }
         }
     }

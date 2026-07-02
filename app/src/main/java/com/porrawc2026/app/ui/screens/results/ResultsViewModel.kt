@@ -3,6 +3,7 @@ package com.porrawc2026.app.ui.screens.results
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
+import com.porrawc2026.app.data.local.entity.KnockoutTeamProgressEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.local.entity.QuestionEntity
@@ -54,6 +55,9 @@ class ResultsViewModel @Inject constructor(
     val knockoutPredictions: StateFlow<List<KnockoutPredictionEntity>> = repository.getKnockoutPredictions()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    val allTeamProgress: StateFlow<List<KnockoutTeamProgressEntity>> = repository.getKnockoutTeamProgress()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     val groupPoints: StateFlow<Int> = allMatches
         .map { matches -> matches.filter { !it.isKnockout }.sumOf { it.pointsEarned } }
         .stateIn(viewModelScope, SharingStarted.Lazily, 0)
@@ -85,8 +89,8 @@ class ResultsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            combine(allMatches, knockoutPredictions) { matches, predictions ->
-                computeKnockoutResults(matches, predictions)
+            combine(allTeamProgress, knockoutPredictions) { progress, predictions ->
+                computeKnockoutResults(progress, predictions)
             }.collect { results ->
                 _knockoutResults.value = results
             }
@@ -94,28 +98,15 @@ class ResultsViewModel @Inject constructor(
     }
 
 private fun computeKnockoutResults(
-        matches: List<MatchEntity>,
+        progress: List<KnockoutTeamProgressEntity>,
         predictions: List<KnockoutPredictionEntity>
     ): List<KnockoutResultDisplay> {
+        val advancement = KnockoutCalculator.advancementMapFromEntities(progress)
         val resolvedHome = predictions.associate {
             it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions)
         }
         val resolvedAway = predictions.associate {
             it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions)
-        }
-        val advancement = KnockoutCalculator.buildAdvancement(matches)
-
-        // Per-match actual winner for strikethrough display (the team that won the match)
-        val matchByNumber = matches.filter { it.matchNumber != null }.associateBy { it.matchNumber!! }
-        val actualWinnerByMatch: Map<Int, String?> = matchByNumber.mapValues { (_, m) ->
-            val mtch = m
-            val wTeam = mtch.winnerTeam
-            if (!wTeam.isNullOrBlank()) {
-                // Convert English winner name to Spanish for display consistency
-                TeamNameNormalizer.enToEs(wTeam)
-            } else if (mtch.homeGoals != null && mtch.awayGoals != null && mtch.homeGoals != mtch.awayGoals) {
-                if (mtch.homeGoals!! > mtch.awayGoals!!) mtch.homeTeam else mtch.awayTeam
-            } else null
         }
 
         return predictions.map { prediction ->
@@ -126,7 +117,6 @@ private fun computeKnockoutResults(
                 2 -> awayTeam
                 else -> null
             }
-            // Check if the predicted winner advanced past this round (advancement-based)
             val actualReachedRound = predictedWinner?.let { winner ->
                 advancement.entries.firstOrNull { (team, _) ->
                     TeamNameNormalizer.matches(team, winner)
@@ -141,7 +131,6 @@ private fun computeKnockoutResults(
             }
             val roundPoints = PointsCalculator.getKnockoutPoints(prediction.round)
             val pointsEarned = if (isCorrect) roundPoints else 0
-            val actualWinner = actualWinnerByMatch[prediction.matchNumber]
 
             KnockoutResultDisplay(
                 matchNumber = prediction.matchNumber,
@@ -149,7 +138,7 @@ private fun computeKnockoutResults(
                 homeTeam = homeTeam,
                 awayTeam = awayTeam,
                 predictedWinnerTeam = predictedWinner,
-                actualWinnerTeam = actualWinner,
+                actualWinnerTeam = null,
                 pointsEarned = pointsEarned,
                 isCorrect = isCorrect
             )

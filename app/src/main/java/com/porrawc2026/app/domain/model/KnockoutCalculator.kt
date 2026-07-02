@@ -1,6 +1,7 @@
 package com.porrawc2026.app.domain.model
 
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
+import com.porrawc2026.app.data.local.entity.KnockoutTeamProgressEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 
 object KnockoutCalculator {
@@ -38,6 +39,53 @@ object KnockoutCalculator {
             }
         }
         return result
+    }
+
+    fun buildAdvancementEntries(matches: List<MatchEntity>): List<KnockoutTeamProgressEntity> =
+        buildAdvancementEntries(buildAdvancement(matches))
+
+    fun buildAdvancementEntries(advancement: Map<String, String>): List<KnockoutTeamProgressEntity> {
+        val roundLevelMap = mapOf(
+            "Dieciseisavos" to 1, "Octavos" to 2, "Cuartos" to 3,
+            "Semifinales" to 4, "3er puesto" to 5, "Final" to 6
+        )
+        return advancement.mapNotNull { (team, round) ->
+            val level = roundLevelMap[round] ?: return@mapNotNull null
+            KnockoutTeamProgressEntity(roundLevel = level, roundName = round, teamName = team)
+        }
+    }
+
+    fun advancementMapFromEntities(entities: List<KnockoutTeamProgressEntity>): Map<String, String> {
+        val roundLevelRevMap = mapOf(
+            1 to "Dieciseisavos", 2 to "Octavos", 3 to "Cuartos",
+            4 to "Semifinales", 5 to "3er puesto", 6 to "Final"
+        )
+        return entities.mapNotNull { e ->
+            val round = roundLevelRevMap[e.roundLevel] ?: return@mapNotNull null
+            e.teamName to round
+        }.toMap()
+    }
+
+    fun computePointsFromAdvancement(
+        predictions: List<KnockoutPredictionEntity>,
+        advancement: Map<String, String>
+    ): Map<Int, Int> {
+        val resolvedHome = predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions) }
+        val resolvedAway = predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions) }
+        return predictions.mapNotNull { prediction ->
+            val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
+            val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
+            val predictedWinner = when (prediction.winner) { 1 -> homeTeam; 2 -> awayTeam; else -> null } ?: return@mapNotNull null
+            val actualReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, predictedWinner) }?.value
+            val isCorrect = if (prediction.round == "3er puesto") {
+                actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
+            } else if (prediction.round == "Dieciseisavos") {
+                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
+            } else {
+                actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
+            }
+            if (isCorrect) prediction.matchNumber to PointsCalculator.getKnockoutPoints(prediction.round) else null
+        }.toMap()
     }
 
     fun computePoints(

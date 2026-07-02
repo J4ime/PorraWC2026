@@ -4,6 +4,7 @@ import androidx.room.Transaction
 import com.porrawc2026.app.data.local.dao.*
 import com.porrawc2026.app.data.local.entity.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,7 +15,8 @@ class PorraRepository @Inject constructor(
     private val questionDao: QuestionDao,
     private val playerPredictionDao: PlayerPredictionDao,
     private val knockoutPredictionDao: KnockoutPredictionDao,
-    private val groupStandingDao: GroupStandingDao
+    private val groupStandingDao: GroupStandingDao,
+    private val knockoutTeamProgressDao: KnockoutTeamProgressDao
 ) {
     fun getAllTeams(): Flow<List<TeamEntity>> = teamDao.getAllTeams()
     fun getTeamsByGroup(group: String): Flow<List<TeamEntity>> = teamDao.getTeamsByGroup(group)
@@ -134,4 +136,18 @@ class PorraRepository @Inject constructor(
     suspend fun resetAllPlayerGoals() {
         playerPredictionDao.resetAllPlayerGoals()
     }
+
+    fun getKnockoutTeamProgress(): Flow<List<KnockoutTeamProgressEntity>> =
+        knockoutTeamProgressDao.getAll()
+
+    suspend fun saveKnockoutTeamProgress(entries: List<KnockoutTeamProgressEntity>) {
+        knockoutTeamProgressDao.replaceAll(entries)
+    }
+
+    suspend fun updateKnockoutPredictionPoints(matchNumber: Int, points: Int) {
+        knockoutPredictionDao.updatePoints(matchNumber, points)
+    }
+
+    suspend fun getKnockoutPredictionsList(): List<KnockoutPredictionEntity> =
+        knockoutPredictionDao.getAll().first()
 }

@@ -222,6 +222,23 @@ class HomeViewModel @Inject constructor(
             downloadPlayerPhotos()
             precachePhotosInBackground()
         }
+        // Polling cada hora: buscar partidos futuros con equipos definidos + detectar cambio de día
+        viewModelScope.launch(Dispatchers.IO) {
+            var lastDay = LocalDate.now(madridZone)
+            while (true) {
+                delay(60 * 60 * 1000L)
+                val today = LocalDate.now(madridZone)
+                val dayChanged = today != lastDay
+                if (dayChanged) {
+                    lastDay = today
+                    LogManager.log(TAG, "Day changed to $today, refreshing matches")
+                }
+                fetchLiveResults()
+                if (dayChanged) {
+                    refreshUpcomingMatches()
+                }
+            }
+        }
     }
 
     private fun loadPlayers() {
@@ -294,7 +311,17 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { prefsManager.setNotificationsEnabled(_notificationsEnabled.value) }
     }
 
+    @Volatile
+    private var lastFetchTime: Long = 0L
+    private val FETCH_COOLDOWN_MS = 60 * 60 * 1000L
+
     fun refreshLiveScores() {
+        val now = System.currentTimeMillis()
+        if (now - lastFetchTime < FETCH_COOLDOWN_MS) {
+            LogManager.log(TAG, "refreshLiveScores skipped: ${now - lastFetchTime}ms since last fetch")
+            return
+        }
+        lastFetchTime = now
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             refreshAll()
@@ -343,6 +370,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             repository.insertAllData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
+            repository.saveKnockoutTeamProgress(emptyList())
             cachedMatches = cachedMatches.map { match ->
                 match.copy(predictedHomeGoals = null, predictedAwayGoals = null, pointsEarned = 0, homeGoals = null, awayGoals = null)
             }
@@ -401,15 +429,24 @@ class HomeViewModel @Inject constructor(
             m.copy(pointsEarned = pts)
         }
 
-        // Knockout advancement points for display in MatchRow
-        knockoutPointsMap = computeKnockoutPoints(cachedMatches, koPredictions)
+        // Save knockout team progress to DB (which teams reached each round)
+        val advancement = KnockoutCalculator.buildAdvancement(cachedMatches)
+        repository.saveKnockoutTeamProgress(
+            KnockoutCalculator.buildAdvancementEntries(advancement)
+        )
+
+        // Compute knockout advancement points per prediction
+        knockoutPointsMap = KnockoutCalculator.computePointsFromAdvancement(
+            koPredictions, advancement
+        )
+
+        // Save points to knockout_predictions table so total points calculation works
+        for ((matchNumber, pts) in knockoutPointsMap) {
+            repository.updateKnockoutPredictionPoints(matchNumber, pts)
+        }
+
         _advancementPoints.value = 0
     }
-
-    private fun computeKnockoutPoints(
-        matches: List<MatchEntity>,
-        predictions: List<KnockoutPredictionEntity>
-    ): Map<Int, Int> = KnockoutCalculator.computePoints(matches, predictions)
 
     private suspend fun checkGoalNotifications() {
         if (!_notificationsEnabled.value) return

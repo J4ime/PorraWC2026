@@ -19,8 +19,6 @@ import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import com.porrawc2026.app.domain.usecase.CheckAppUpdateUseCase
 import com.porrawc2026.app.domain.usecase.InstallResult
-import com.porrawc2026.app.domain.usecase.PdfRankingUseCase
-import com.porrawc2026.app.domain.usecase.PdfResult
 import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
@@ -99,7 +97,6 @@ class HomeViewModel @Inject constructor(
     private val goalEventBus: GoalEventBus,
     private val liveMatchStore: LiveMatchStore,
     private val checkAppUpdateUseCase: CheckAppUpdateUseCase,
-    private val pdfRankingUseCase: PdfRankingUseCase,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -143,14 +140,8 @@ class HomeViewModel @Inject constructor(
     val allMatches: StateFlow<List<MatchDisplay>> = _allMatches.asStateFlow()
     private val _dayKeys = MutableStateFlow<List<String>>(emptyList())
     val dayKeys: StateFlow<List<String>> = _dayKeys.asStateFlow()
-    private val _pdfResult = MutableStateFlow<String?>(null)
-    val pdfResult: StateFlow<String?> = _pdfResult.asStateFlow()
     private val _userName = MutableStateFlow<String?>(null)
     val userName: StateFlow<String?> = _userName.asStateFlow()
-    private val _userPosition = MutableStateFlow<Int?>(null)
-    val userPosition: StateFlow<Int?> = _userPosition.asStateFlow()
-    private val _positionDiff = MutableStateFlow<Int?>(null)
-    val positionDiff: StateFlow<Int?> = _positionDiff.asStateFlow()
 
     @Volatile
     private var cachedMatches: List<MatchEntity> = emptyList()
@@ -177,7 +168,6 @@ class HomeViewModel @Inject constructor(
                 _excelFileName.value = prefsManager.getExcelFileNameSync()
                 _notificationsEnabled.value = prefsManager.getNotificationsSync()
                 _userName.value = prefsManager.getUserNameSync()
-                _userPosition.value = prefsManager.getUserPositionSync()
                 liveMinutes.putAll(liveMatchStore.liveMinutes)
                 goalScorers.putAll(liveMatchStore.goalScorers)
             }.onFailure { Log.e(TAG, "Failed to load prefs on init", it) }
@@ -330,38 +320,6 @@ class HomeViewModel @Inject constructor(
             liveMatchStore.liveMinutes.clear()
             fixDieciseisavoDatesAndNames()
             fetchLiveResults(fullFetch = true)
-            _isBusy.value = false
-        }
-    }
-
-    fun loadPdfResult(uri: Uri) {
-        viewModelScope.launch(Dispatchers.IO) {
-            _isBusy.value = true
-            Log.i(TAG, "loadPdfResult: uri=$uri")
-            val searchName = _userName.value.orEmpty()
-            val result = pdfRankingUseCase.loadPdf(uri, searchName)
-            when (result) {
-                is PdfResult.Success -> {
-                    val match = result.userEntry
-                    if (match != null) {
-                        val oldPos = _userPosition.value
-                        _positionDiff.value = if (oldPos != null && oldPos > 0) oldPos - match.position else null
-                        _userPosition.value = match.position
-                        prefsManager.setUserPosition(match.position)
-                        prefsManager.setPreviousPosition(oldPos)
-                        _pdfResult.value = "${match.position}"
-                        Log.i(TAG, "Encontrado en posición ${match.position}")
-                    } else {
-                        _userPosition.value = null
-                        _positionDiff.value = null
-                        _pdfResult.value = "No encontrado"
-                        Log.w(TAG, "No encontrado: searchName=\"$searchName\"")
-                    }
-                }
-                is PdfResult.Error -> {
-                    _pdfResult.value = "Error: ${result.message.take(25)}"
-                }
-            }
             _isBusy.value = false
         }
     }

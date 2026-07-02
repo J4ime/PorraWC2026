@@ -52,18 +52,11 @@ fun AjustesScreen(
     val isUpdating by viewModel.isUpdating.collectAsStateWithLifecycle()
     val appVersion by viewModel.appVersion.collectAsStateWithLifecycle()
     val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
-    val pdfResult by viewModel.pdfResult.collectAsStateWithLifecycle()
     val userName by viewModel.userName.collectAsStateWithLifecycle()
-    val userPosition by viewModel.userPosition.collectAsStateWithLifecycle()
-    val positionDiff by viewModel.positionDiff.collectAsStateWithLifecycle()
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let { viewModel.importExcel(it) } }
-
-    val pdfLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? -> uri?.let { viewModel.loadPdfResult(it) } }
 
     validationResult?.let { result ->
         ValidationDialog(result = result, onDismiss = { viewModel.dismissValidation() })
@@ -141,27 +134,6 @@ fun AjustesScreen(
                         loading = isBusy,
                         onClick = {                         viewModel.clearAndRefreshCache() }
                     )
-                }
-                if (hasData) {
-                    item {
-                        SquareButton(
-                            icon = Icons.Filled.Assessment,
-                            label = when {
-                                pdfResult != null -> pdfResult!!
-                                userPosition != null -> {
-                                    val diff = positionDiff
-                                    if (diff != null && diff != 0) {
-                                        if (diff > 0) "${userPosition} (+$diff)"
-                                        else "$userPosition ($diff)"
-                                    } else "${userPosition}"
-                                }
-                                else -> "Cargar result"
-                            },
-                            color = if (userPosition != null) Color(0xFF1565C0) else Color(0xFF444444),
-                            loading = isBusy,
-                            onClick = { pdfLauncher.launch(arrayOf("application/pdf")) }
-                        )
-                    }
                 }
                 item {
                     var showLogs by remember { mutableStateOf(false) }

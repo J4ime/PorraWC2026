@@ -14,12 +14,14 @@ object KnockoutCalculator {
         val result = mutableMapOf<String, String>()
         val koRounds = listOf("Dieciseisavos", "Octavos", "Cuartos", "Semifinales", "Final")
         for (match in matches.filter { it.homeTeam.isNotBlank() }) {
-            if (!match.isKnockout || match.knockoutRound == null || match.knockoutRound !in koRounds) continue
+            if (!match.isKnockout || match.knockoutRound == null) continue
             val round = match.knockoutRound
+            if (round !in koRounds && round != "3er puesto") continue
             for (team in listOf(match.homeTeam, match.awayTeam)) {
                 val prev = result[team]
                 if (prev == null || roundLevel(round) > roundLevel(prev)) result[team] = round
             }
+            if (round == "3er puesto") continue
             val winner = match.winnerTeam?.let { w ->
                 val es = TeamNameNormalizer.enToEs(w)
                 if (TeamNameNormalizer.matches(es, match.homeTeam) || TeamNameNormalizer.matches(es, match.awayTeam)) es else null

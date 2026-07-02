@@ -23,8 +23,6 @@ android {
         targetSdk = 35
         versionCode = 282
         versionName = "1.9.117"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
         buildConfigField("String", "FOOTBALL_DATA_API_KEY", "\"${localProperties.getProperty("FOOTBALL_DATA_API_KEY", "")}\"")
     }
 
@@ -139,10 +137,4 @@ dependencies {
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
-
-    testImplementation(libs.junit)
-    testImplementation(libs.mockk)
-    testImplementation(libs.coroutines.test)
-    testImplementation(libs.arch.core.testing)
-    testImplementation(libs.robolectric)
 }

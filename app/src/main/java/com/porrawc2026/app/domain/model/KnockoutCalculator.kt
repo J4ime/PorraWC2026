@@ -79,8 +79,6 @@ object KnockoutCalculator {
             val actualReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, predictedWinner) }?.value
             val isCorrect = if (prediction.round == "3er puesto") {
                 actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
-            } else if (prediction.round == "Dieciseisavos") {
-                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
             } else {
                 actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
             }
@@ -102,8 +100,6 @@ object KnockoutCalculator {
             val actualReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, predictedWinner) }?.value
             val isCorrect = if (prediction.round == "3er puesto") {
                 actualReachedRound != null && roundLevel(actualReachedRound) == roundLevel(prediction.round)
-            } else if (prediction.round == "Dieciseisavos") {
-                actualReachedRound != null && roundLevel(actualReachedRound) > roundLevel(prediction.round)
             } else {
                 actualReachedRound != null && roundLevel(actualReachedRound) >= roundLevel(prediction.round)
             }

@@ -124,8 +124,6 @@ private fun computeKnockoutResults(
             }
             val isCorrect = if (prediction.round == "3er puesto") {
                 actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) == KnockoutCalculator.roundLevel(prediction.round)
-            } else if (prediction.round == "Dieciseisavos") {
-                actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) > KnockoutCalculator.roundLevel(prediction.round)
             } else {
                 actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) >= KnockoutCalculator.roundLevel(prediction.round)
             }

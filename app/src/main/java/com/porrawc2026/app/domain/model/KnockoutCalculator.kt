@@ -14,27 +14,41 @@ object KnockoutCalculator {
     fun buildAdvancement(matches: List<MatchEntity>): Map<String, String> {
         val result = mutableMapOf<String, String>()
         val koRounds = listOf("Dieciseisavos", "Octavos", "Cuartos", "Semifinales", "Final")
-        for (match in matches.filter { it.homeTeam.isNotBlank() }) {
+        
+        // Primero, registrar equipos que han jugado en cada ronda
+        for (match in matches.filter { it.homeTeam.isNotBlank() && it.awayTeam.isNotBlank() }) {
             if (!match.isKnockout || match.knockoutRound == null) continue
             val round = match.knockoutRound
             if (round !in koRounds && round != "3er puesto") continue
+            
+            // Solo registrar equipos si el partido tiene resultado
+            if (match.homeGoals == null || match.awayGoals == null) continue
+            
             for (team in listOf(match.homeTeam, match.awayTeam)) {
                 val prev = result[team]
-                if (prev == null || roundLevel(round) > roundLevel(prev)) result[team] = round
+                if (prev == null || roundLevel(round) > roundLevel(prev)) {
+                    result[team] = round
+                }
             }
-            if (round == "3er puesto") continue
-            val winner = match.winnerTeam?.let { w ->
-                val es = TeamNameNormalizer.enToEs(w)
-                if (TeamNameNormalizer.matches(es, match.homeTeam) || TeamNameNormalizer.matches(es, match.awayTeam)) es else null
-            } ?: if (match.homeGoals != null && match.awayGoals != null && match.homeGoals != match.awayGoals) {
-                if (match.homeGoals!! > match.awayGoals!!) match.homeTeam else match.awayTeam
-            } else null
-            if (winner != null) {
-                val nextIdx = koRounds.indexOf(round) + 1
-                if (nextIdx < koRounds.size) {
-                    val nextRound = koRounds[nextIdx]
-                    val prev = result[winner]
-                    if (prev == null || roundLevel(nextRound) > roundLevel(prev)) result[winner] = nextRound
+            
+            // Si hay ganador, avanzar a la siguiente ronda
+            if (round != "3er puesto") {
+                val winner = match.winnerTeam?.let { w ->
+                    val es = TeamNameNormalizer.enToEs(w)
+                    if (TeamNameNormalizer.matches(es, match.homeTeam) || TeamNameNormalizer.matches(es, match.awayTeam)) es else null
+                } ?: if (match.homeGoals != match.awayGoals) {
+                    if (match.homeGoals!! > match.awayGoals!!) match.homeTeam else match.awayTeam
+                } else null
+                
+                if (winner != null) {
+                    val nextIdx = koRounds.indexOf(round) + 1
+                    if (nextIdx < koRounds.size) {
+                        val nextRound = koRounds[nextIdx]
+                        val prev = result[winner]
+                        if (prev == null || roundLevel(nextRound) > roundLevel(prev)) {
+                            result[winner] = nextRound
+                        }
+                    }
                 }
             }
         }
@@ -81,19 +95,17 @@ object KnockoutCalculator {
                 return@mapNotNull null
             }
             
-            val predictionRoundLevel = roundLevel(prediction.round)
-            if (predictionRoundLevel == 0) return@mapNotNull null
-            
             var points = 0
             
+            // Para cada equipo, sumar puntos de la ronda alcanzada
             val homeReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, homeTeam) }?.value
-            if (homeReachedRound != null && roundLevel(homeReachedRound) >= predictionRoundLevel) {
-                points += PointsCalculator.getKnockoutPoints(prediction.round)
+            if (homeReachedRound != null) {
+                points += PointsCalculator.getKnockoutPoints(homeReachedRound)
             }
             
             val awayReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, awayTeam) }?.value
-            if (awayReachedRound != null && roundLevel(awayReachedRound) >= predictionRoundLevel) {
-                points += PointsCalculator.getKnockoutPoints(prediction.round)
+            if (awayReachedRound != null) {
+                points += PointsCalculator.getKnockoutPoints(awayReachedRound)
             }
             
             if (points > 0) prediction.matchNumber to points else null
@@ -111,19 +123,17 @@ object KnockoutCalculator {
             val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
             val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
             
-            val predictionRoundLevel = roundLevel(prediction.round)
-            if (predictionRoundLevel == 0) return@mapNotNull null
-            
             var points = 0
             
+            // Para cada equipo, sumar puntos de la ronda alcanzada
             val homeReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, homeTeam) }?.value
-            if (homeReachedRound != null && roundLevel(homeReachedRound) >= predictionRoundLevel) {
-                points += PointsCalculator.getKnockoutPoints(prediction.round)
+            if (homeReachedRound != null) {
+                points += PointsCalculator.getKnockoutPoints(homeReachedRound)
             }
             
             val awayReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, awayTeam) }?.value
-            if (awayReachedRound != null && roundLevel(awayReachedRound) >= predictionRoundLevel) {
-                points += PointsCalculator.getKnockoutPoints(prediction.round)
+            if (awayReachedRound != null) {
+                points += PointsCalculator.getKnockoutPoints(awayReachedRound)
             }
             
             if (points > 0) prediction.matchNumber to points else null

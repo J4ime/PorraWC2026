@@ -123,15 +123,15 @@ private fun computeKnockoutResults(
                 val homeReachedRound = advancement.entries.firstOrNull { (team, _) ->
                     TeamNameNormalizer.matches(team, homeTeam)
                 }?.value
-                if (homeReachedRound != null && KnockoutCalculator.roundLevel(homeReachedRound) >= predictionRoundLevel) {
-                    pointsEarned += PointsCalculator.getKnockoutPoints(prediction.round)
+                if (homeReachedRound != null) {
+                    pointsEarned += PointsCalculator.getKnockoutPoints(homeReachedRound)
                 }
                 
                 val awayReachedRound = advancement.entries.firstOrNull { (team, _) ->
                     TeamNameNormalizer.matches(team, awayTeam)
                 }?.value
-                if (awayReachedRound != null && KnockoutCalculator.roundLevel(awayReachedRound) >= predictionRoundLevel) {
-                    pointsEarned += PointsCalculator.getKnockoutPoints(prediction.round)
+                if (awayReachedRound != null) {
+                    pointsEarned += PointsCalculator.getKnockoutPoints(awayReachedRound)
                 }
             }
 

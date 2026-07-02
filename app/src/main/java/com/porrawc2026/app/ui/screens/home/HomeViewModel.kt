@@ -441,8 +441,10 @@ class HomeViewModel @Inject constructor(
         )
 
         // Save points to knockout_predictions table so total points calculation works
-        for ((matchNumber, pts) in knockoutPointsMap) {
-            repository.updateKnockoutPredictionPoints(matchNumber, pts)
+        // First reset all to 0, then update the ones that have points
+        for (prediction in koPredictions) {
+            val pts = knockoutPointsMap[prediction.matchNumber] ?: 0
+            repository.updateKnockoutPredictionPoints(prediction.matchNumber, pts)
         }
 
         _advancementPoints.value = 0

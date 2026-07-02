@@ -112,17 +112,21 @@ private fun computeKnockoutResults(
         return predictions.map { prediction ->
             val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
             val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
+            
+            val unresolvedTeams = homeTeam.startsWith("W") || homeTeam.startsWith("L") || 
+                awayTeam.startsWith("W") || awayTeam.startsWith("L")
+            
             val predictedWinner = when (prediction.winner) {
                 1 -> homeTeam
                 2 -> awayTeam
                 else -> null
             }
-            val actualReachedRound = predictedWinner?.let { winner ->
+            val actualReachedRound = if (unresolvedTeams) null else predictedWinner?.let { winner ->
                 advancement.entries.firstOrNull { (team, _) ->
                     TeamNameNormalizer.matches(team, winner)
                 }?.value
             }
-            val isCorrect = if (prediction.round == "3er puesto") {
+            val isCorrect = if (unresolvedTeams) false else if (prediction.round == "3er puesto") {
                 actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) == KnockoutCalculator.roundLevel(prediction.round)
             } else {
                 actualReachedRound != null && KnockoutCalculator.roundLevel(actualReachedRound) >= KnockoutCalculator.roundLevel(prediction.round)

@@ -75,6 +75,12 @@ object KnockoutCalculator {
         return predictions.mapNotNull { prediction ->
             val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
             val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
+            
+            if (homeTeam.startsWith("W") || homeTeam.startsWith("L") || 
+                awayTeam.startsWith("W") || awayTeam.startsWith("L")) {
+                return@mapNotNull null
+            }
+            
             val predictedWinner = when (prediction.winner) { 1 -> homeTeam; 2 -> awayTeam; else -> null } ?: return@mapNotNull null
             val actualReachedRound = advancement.entries.firstOrNull { (team, _) -> TeamNameNormalizer.matches(team, predictedWinner) }?.value
             val isCorrect = if (prediction.round == "3er puesto") {

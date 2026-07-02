@@ -17,6 +17,10 @@ import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.KnockoutCalculator
 import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
+import com.porrawc2026.app.domain.usecase.CheckAppUpdateUseCase
+import com.porrawc2026.app.domain.usecase.InstallResult
+import com.porrawc2026.app.domain.usecase.PdfRankingUseCase
+import com.porrawc2026.app.domain.usecase.PdfResult
 import com.porrawc2026.app.data.remote.LiveScorer
 import com.porrawc2026.app.util.ExcelParser
 import com.porrawc2026.app.util.GoalEventBus
@@ -25,13 +29,8 @@ import com.porrawc2026.app.util.GsonHolder
 import com.porrawc2026.app.util.DateTimeUtil
 import com.porrawc2026.app.util.LiveMatchStore
 import com.porrawc2026.app.util.LogManager
-import com.porrawc2026.app.util.PdfRankingExtractor
-import com.porrawc2026.app.util.PdfRankingParser
-import com.porrawc2026.app.util.RankingEntry
-import java.io.File
 import com.porrawc2026.app.util.PlayerPhotoDownloader
 import com.porrawc2026.app.util.PrefsManager
-import com.porrawc2026.app.util.UpdateManager
 import com.porrawc2026.app.util.ValidationResult
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -99,6 +98,8 @@ class HomeViewModel @Inject constructor(
     private val prefsManager: PrefsManager,
     private val goalEventBus: GoalEventBus,
     private val liveMatchStore: LiveMatchStore,
+    private val checkAppUpdateUseCase: CheckAppUpdateUseCase,
+    private val pdfRankingUseCase: PdfRankingUseCase,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -162,8 +163,6 @@ class HomeViewModel @Inject constructor(
     private val notifiedScorers = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val processedGoalKeys = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val relevantMatchIds = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
-    private val pdfParser = PdfRankingParser()
-    private val pdfExtractor = PdfRankingExtractor()
 
     init {
         LogManager.init(context)
@@ -210,7 +209,6 @@ class HomeViewModel @Inject constructor(
                 // Migration: reset dieciseisavo placeholder names ("2º Grupo A") to empty,
                 // and force correct dates from schedule so findMatchByDate matches API times
                 fixDieciseisavoDatesAndNames()
-                forceFinalPredictions()
                 enrichSchedule()
                 recalcAllPoints()
                 refreshPoints()
@@ -295,7 +293,7 @@ class HomeViewModel @Inject constructor(
     fun forceCheckUpdate() {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                val info = UpdateManager.checkForUpdate(context)
+                val info = checkAppUpdateUseCase.check()
                 _updateAvailable.value = info?.isNewer == true
             }.onFailure { Log.e(TAG, "Failed to check for update", it) }
         }
@@ -340,115 +338,41 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
             Log.i(TAG, "loadPdfResult: uri=$uri")
-            runCatching {
-                val searchName = _userName.value?.takeIf { it.isNotBlank() }
-                    ?: error("No hay nombre de usuario. Importa un Excel primero en Ajustes.")
-                Log.i(TAG, "searchName=\"$searchName\"")
-
-                val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: error("No se pudo abrir el PDF")
-                val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(inputStream)
-                Log.i(TAG, "PDF loaded, pages=${doc.numberOfPages}")
-
-                val entries = pdfExtractor.extract(doc)
-                Log.i(TAG, "extracted ${entries.size} entries")
-
-                runCatching {
-                    val xlsmFile = File(context.cacheDir, "ClasificacionMundial_2026.xlsm")
-                    pdfExtractor.saveAsXlsm(entries, xlsmFile)
-                }.onFailure { e ->
-                    Log.e(TAG, "Failed to save XLSM", e)
-                }
-
-                doc.close()
-                inputStream.close()
-
-                val sampleSize = minOf(10, entries.size)
-                if (entries.isEmpty()) {
-                    Log.w(TAG, "No se extrajeron entradas del PDF")
-                } else {
-                    for (i in 0 until sampleSize) {
-                        val e = entries[i]
-                        Log.i(TAG, "  entrada[$i]: \"${e.name}\" (pos=${e.position}, pts=${e.totalPoints})")
+            val searchName = _userName.value.orEmpty()
+            val result = pdfRankingUseCase.loadPdf(uri, searchName)
+            when (result) {
+                is PdfResult.Success -> {
+                    val match = result.userEntry
+                    if (match != null) {
+                        val oldPos = _userPosition.value
+                        _positionDiff.value = if (oldPos != null && oldPos > 0) oldPos - match.position else null
+                        _userPosition.value = match.position
+                        prefsManager.setUserPosition(match.position)
+                        prefsManager.setPreviousPosition(oldPos)
+                        _pdfResult.value = "${match.position}"
+                        Log.i(TAG, "Encontrado en posición ${match.position}")
+                    } else {
+                        _userPosition.value = null
+                        _positionDiff.value = null
+                        _pdfResult.value = "No encontrado"
+                        Log.w(TAG, "No encontrado: searchName=\"$searchName\"")
                     }
                 }
-
-                val searchNorm = normalizeName(searchName)
-                Log.i(TAG, "Buscando \"$searchName\" (normalized=\"$searchNorm\") en ${entries.size} entradas")
-
-                val match = findUserInEntries(entries, searchName)
-
-                if (match != null) {
-                    val oldPos = _userPosition.value
-                    _positionDiff.value = if (oldPos != null && oldPos > 0) oldPos - match.position else null
-                    _userPosition.value = match.position
-                    prefsManager.setUserPosition(match.position)
-                    prefsManager.setPreviousPosition(oldPos)
-                    _pdfResult.value = "${match.position}"
-                    Log.i(TAG, "Encontrado en posición ${match.position}")
-                } else {
-                    _userPosition.value = null
-                    _positionDiff.value = null
-                    _pdfResult.value = "No encontrado"
-                    Log.w(TAG, "No encontrado: searchName=\"$searchName\" normalized=\"${normalizeName(searchName)}\"")
+                is PdfResult.Error -> {
+                    _pdfResult.value = "Error: ${result.message.take(25)}"
                 }
-            }.onFailure { e ->
-                _pdfResult.value = "Error: ${e.message?.take(25)}"
-                Log.e(TAG, "loadPdfResult error", e)
             }
             _isBusy.value = false
         }
-    }
-
-    private fun findUserInEntries(entries: List<RankingEntry>, searchName: String): RankingEntry? {
-        val searchNorm = normalizeName(searchName)
-        val searchFlat = searchNorm.replace(" ", "")
-
-        for (entry in entries) {
-            val nameNorm = normalizeName(entry.name)
-            if (nameNorm.contains(searchNorm)) {
-                Log.i(TAG, "Stage1 match: entry=\"${entry.name}\" contains \"$searchNorm\"")
-                return entry
-            }
-        }
-
-        for (entry in entries) {
-            val nameNorm = normalizeName(entry.name)
-            val flat = nameNorm.replace(" ", "")
-            if (flat.contains(searchFlat)) {
-                Log.i(TAG, "Stage2 match: entry=\"${entry.name}\" flat=\"$flat\" contains \"$searchFlat\"")
-                return entry
-            }
-        }
-
-        val searchLast = lastWord(searchNorm)
-        if (searchLast.length >= 3 && searchLast != searchNorm) {
-            for (entry in entries) {
-                val nameNorm = normalizeName(entry.name)
-                val nameLast = lastWord(nameNorm)
-                if (nameLast == searchLast || nameNorm.contains(searchLast)) {
-                    Log.i(TAG, "Stage3 match: entry=\"${entry.name}\" last=\"$nameLast\" searchLast=\"$searchLast\"")
-                    return entry
-                }
-            }
-        }
-
-        return null
     }
 
     fun installUpdate() {
         viewModelScope.launch(Dispatchers.IO) {
             _isUpdating.value = true
             runCatching {
-                val info = UpdateManager.checkForUpdate(context)
-                when {
-                    info == null -> _errorMessage.emit("Error al comprobar actualizacion. Sin conexion?")
-                    !info.isNewer -> _errorMessage.emit("Ya tienes la ultima version")
-                    else -> {
-                        val ok = UpdateManager.downloadAndInstall(context, info.downloadUrl)
-                        if (!ok) _errorMessage.emit("Error al descargar la actualizacion")
-                        else _appVersion.value = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
-                    }
+                when (val result = checkAppUpdateUseCase.install(context)) {
+                    is InstallResult.Success -> _appVersion.value = result.version
+                    is InstallResult.Error -> _errorMessage.emit(result.message)
                 }
             }.onFailure { e ->
                 _errorMessage.emit("Error al actualizar: ${e.message}")
@@ -621,19 +545,7 @@ class HomeViewModel @Inject constructor(
         repository.insertMatches(toPersist)
     }
 
-    private suspend fun forceFinalPredictions() {
-        runCatching {
-            val predictions = repository.getKnockoutPredictions().first()
-            val thirdPlace = predictions.firstOrNull { it.matchNumber == 103 }
-            val final = predictions.firstOrNull { it.matchNumber == 104 }
-            if (thirdPlace == null || thirdPlace.homeTeamRef != "España" || thirdPlace.awayTeamRef != "Inglaterra" || thirdPlace.winner != 1) {
-                repository.updateKnockoutPrediction(KnockoutPredictionEntity(103, "3er puesto", "España", "Inglaterra", winner = 1))
-            }
-            if (final == null || final.homeTeamRef != "Francia" || final.awayTeamRef != "Portugal" || final.winner != 1) {
-                repository.updateKnockoutPrediction(KnockoutPredictionEntity(104, "Final", "Francia", "Portugal", winner = 1))
-            }
-        }
-    }
+    
 
     fun parseMadridInstant(dateTime: String): Instant? =
         DateTimeUtil.parseMadridInstant(dateTime, TAG)

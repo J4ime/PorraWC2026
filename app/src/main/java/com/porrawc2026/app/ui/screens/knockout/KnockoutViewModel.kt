@@ -19,15 +19,6 @@ class KnockoutViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val predictions: StateFlow<List<KnockoutPredictionEntity>> = repository.getKnockoutPredictions()
-        .map { list ->
-            list.map { pred ->
-                when (pred.matchNumber) {
-                    103 -> pred.copy(homeTeamRef = "España", awayTeamRef = "Inglaterra", winner = 1)
-                    104 -> pred.copy(homeTeamRef = "Francia", awayTeamRef = "Portugal", winner = 1)
-                    else -> pred
-                }
-            }
-        }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun savePrediction(prediction: KnockoutPredictionEntity) {

@@ -552,14 +552,7 @@ object ExcelParser {
         }
 
         // Post-process: resolve Wxxx/Lxxx references recursively using parsed predictions
-        val resolved = resolvePredictionReferences(predictions)
-        // Force 3er puesto: Spain vs England, winner Spain
-        resolved.removeAll { it.matchNumber == 103 }
-        resolved.add(KnockoutPredictionEntity(103, "3er puesto", "España", "Inglaterra", winner = 1))
-        // Force Final: France vs Portugal, winner France
-        resolved.removeAll { it.matchNumber == 104 }
-        resolved.add(KnockoutPredictionEntity(104, "Final", "Francia", "Portugal", winner = 1))
-        return resolved
+        return resolvePredictionReferences(predictions)
     }
 
     private fun resolvePredictionReferences(predictions: MutableList<KnockoutPredictionEntity>): MutableList<KnockoutPredictionEntity> {

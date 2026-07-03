@@ -700,6 +700,8 @@ class HomeViewModel @Inject constructor(
                             cachedMatches = cachedMatches.map {
                                 if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
                             }
+                            // Recalculate points when teams are updated
+                            recalcAllPoints(); refreshPoints()
                         }
                         // Check if Spain is playing and add RTVE to tvChannel
                         val homeIsSpain = TeamNameNormalizer.matches(esHome, "España")
@@ -780,6 +782,8 @@ class HomeViewModel @Inject constructor(
                     cachedMatches = cachedMatches.map {
                         if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
                     }
+                    // Recalculate points when teams are updated
+                    recalcAllPoints(); refreshPoints()
                 }
                 // Check if Spain is playing and add RTVE to tvChannel
                 val homeIsSpain = TeamNameNormalizer.matches(esHome, "España")

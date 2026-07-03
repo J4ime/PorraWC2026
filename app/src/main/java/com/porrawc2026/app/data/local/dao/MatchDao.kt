@@ -66,6 +66,9 @@ interface MatchDao {
     @Query("UPDATE matches SET espnId = :espnId WHERE id = :matchId")
     suspend fun updateMatchEspnId(matchId: Int, espnId: String)
 
+    @Query("UPDATE matches SET tvChannel = :tvChannel WHERE id = :matchId")
+    suspend fun updateMatchTvChannel(matchId: Int, tvChannel: String)
+
     @Query("UPDATE matches SET homeTeam='', awayTeam='', homeGoals=NULL, awayGoals=NULL, homeScorers=NULL, awayScorers=NULL, homeRedCards=NULL, awayRedCards=NULL, homeYellowCards=NULL, awayYellowCards=NULL, homeMissedPenalties=0, awayMissedPenalties=0, winnerTeam=NULL, homeHeadedGoals=0, awayHeadedGoals=0, hasSubGoal=0, homeShootoutScore=0, awayShootoutScore=0, pointsEarned=0 WHERE id IN (:ids)")
     suspend fun clearKnockoutMatchData(vararg ids: Int)
 }

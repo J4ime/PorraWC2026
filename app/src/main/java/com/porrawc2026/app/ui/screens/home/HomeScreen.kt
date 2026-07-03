@@ -1,6 +1,7 @@
 package com.porrawc2026.app.ui.screens.home
 
 import com.porrawc2026.app.domain.model.TeamNameNormalizer
+import com.porrawc2026.app.util.ExcelParser
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -265,13 +266,31 @@ private fun MatchRow(match: MatchDisplay) {
             // Teams column
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(match.homeFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
-                    Text(match.homeTeam, fontSize = 12.sp, color = if (homeIsLoser) Color(0xFF666666) else Color.White, textDecoration = if (homeIsLoser) TextDecoration.LineThrough else null, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    if (match.homePossibleTeams.isNotBlank()) {
+                        Text("Ganador ", fontSize = 11.sp, color = Color(0xFFAAAAAA), maxLines = 1)
+                        val teams = match.homePossibleTeams.split("-")
+                        teams.forEachIndexed { index, team ->
+                            if (index > 0) Text("-", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                            Text(ExcelParser.getFlagEmoji(team), fontSize = 13.sp)
+                        }
+                    } else {
+                        Text(match.homeFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
+                        Text(match.homeTeam, fontSize = 12.sp, color = if (homeIsLoser) Color(0xFF666666) else Color.White, textDecoration = if (homeIsLoser) TextDecoration.LineThrough else null, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(match.awayFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
-                    Text(match.awayTeam, fontSize = 12.sp, color = if (awayIsLoser) Color(0xFF666666) else Color.White, textDecoration = if (awayIsLoser) TextDecoration.LineThrough else null, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    if (match.awayPossibleTeams.isNotBlank()) {
+                        Text("Ganador ", fontSize = 11.sp, color = Color(0xFFAAAAAA), maxLines = 1)
+                        val teams = match.awayPossibleTeams.split("-")
+                        teams.forEachIndexed { index, team ->
+                            if (index > 0) Text("-", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                            Text(ExcelParser.getFlagEmoji(team), fontSize = 13.sp)
+                        }
+                    } else {
+                        Text(match.awayFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
+                        Text(match.awayTeam, fontSize = 12.sp, color = if (awayIsLoser) Color(0xFF666666) else Color.White, textDecoration = if (awayIsLoser) TextDecoration.LineThrough else null, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    }
                 }
             }
 

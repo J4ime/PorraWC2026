@@ -86,7 +86,9 @@ data class MatchDisplay(
     val hasKnockoutPred: Boolean = false,
     val winnerTeam: String? = null,
     val homeShootoutScore: Int = 0,
-    val awayShootoutScore: Int = 0
+    val awayShootoutScore: Int = 0,
+    val homePossibleTeams: String = "",
+    val awayPossibleTeams: String = ""
 )
 
 @HiltViewModel
@@ -698,6 +700,18 @@ class HomeViewModel @Inject constructor(
                             cachedMatches = cachedMatches.map {
                                 if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
                             }
+                            // Check if Spain is playing and add RTVE to tvChannel
+                            val homeIsSpain = TeamNameNormalizer.matches(esHome, "España")
+                            val awayIsSpain = TeamNameNormalizer.matches(esAway, "España")
+                            if (homeIsSpain || awayIsSpain) {
+                                if (!match.tvChannel.contains("RTVE")) {
+                                    val newTvChannel = if (match.tvChannel.isBlank()) "RTVE" else "${match.tvChannel},RTVE"
+                                    repository.updateMatchTvChannel(update.matchId, newTvChannel)
+                                    cachedMatches = cachedMatches.map {
+                                        if (it.id == update.matchId) it.copy(tvChannel = newTvChannel) else it
+                                    }
+                                }
+                            }
                         }
                     }
                     // Save ESPN event ID for future fetches
@@ -763,6 +777,19 @@ class HomeViewModel @Inject constructor(
                 repository.updateMatchTeams(update.matchId, esHome, esAway)
                 cachedMatches = cachedMatches.map {
                     if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
+                }
+                // Check if Spain is playing and add RTVE to tvChannel
+                val homeIsSpain = TeamNameNormalizer.matches(esHome, "España")
+                val awayIsSpain = TeamNameNormalizer.matches(esAway, "España")
+                if (homeIsSpain || awayIsSpain) {
+                    val currentMatch = cachedMatches.firstOrNull { it.id == update.matchId }
+                    if (currentMatch != null && !currentMatch.tvChannel.contains("RTVE")) {
+                        val newTvChannel = if (currentMatch.tvChannel.isBlank()) "RTVE" else "${currentMatch.tvChannel},RTVE"
+                        repository.updateMatchTvChannel(update.matchId, newTvChannel)
+                        cachedMatches = cachedMatches.map {
+                            if (it.id == update.matchId) it.copy(tvChannel = newTvChannel) else it
+                        }
+                    }
                 }
             }
         }
@@ -926,6 +953,48 @@ class HomeViewModel @Inject constructor(
             .sortedBy { d -> allDisplay.firstOrNull { it.dayKey == d }?.sortKey ?: d }
     }
 
+    private fun resolvePossibleTeams(homeTeam: String, awayTeam: String): Pair<Pair<String, String>, Pair<String, String>> {
+        val homeRefMatchId = extractRefMatchId(homeTeam)
+        val awayRefMatchId = extractRefMatchId(awayTeam)
+        
+        val homeDisplay = if (homeRefMatchId != null) {
+            val refMatch = cachedMatches.firstOrNull { it.id == homeRefMatchId }
+            if (refMatch != null && refMatch.homeTeam.isNotBlank() && refMatch.awayTeam.isNotBlank()) {
+                "Ganador" to "${refMatch.homeTeam}-${refMatch.awayTeam}"
+            } else {
+                homeTeam to ""
+            }
+        } else {
+            homeTeam to ""
+        }
+        
+        val awayDisplay = if (awayRefMatchId != null) {
+            val refMatch = cachedMatches.firstOrNull { it.id == awayRefMatchId }
+            if (refMatch != null && refMatch.homeTeam.isNotBlank() && refMatch.awayTeam.isNotBlank()) {
+                "Ganador" to "${refMatch.homeTeam}-${refMatch.awayTeam}"
+            } else {
+                awayTeam to ""
+            }
+        } else {
+            awayTeam to ""
+        }
+        
+        return homeDisplay to awayDisplay
+    }
+    
+    private fun extractRefMatchId(teamName: String): Int? {
+        val patterns = listOf(
+            "Ganador (\\d+)".toRegex(),
+            "Perdedor (\\d+)".toRegex(),
+            "W(\\d+)".toRegex(),
+            "L(\\d+)".toRegex()
+        )
+        for (pattern in patterns) {
+            pattern.find(teamName)?.let { return it.groupValues[1].toIntOrNull() }
+        }
+        return null
+    }
+
     fun toDisplay(match: MatchEntity): MatchDisplay {
         val date = parseMadridInstant(match.dateTime)
         val zoned = date?.atZone(madridZone)
@@ -956,6 +1025,10 @@ class HomeViewModel @Inject constructor(
         val dayKey = if (zoned != null) "${dayAbbrFormatter.format(zoned).replace(".", "").uppercase(Locale.ROOT)} ${dayNumFormatter.format(zoned)}" else ""
         val sortKey = if (zoned != null) "${monthDayFormatter.format(zoned)}" else ""
 
+        val (homeDisplay, awayDisplay) = resolvePossibleTeams(match.homeTeam, match.awayTeam)
+        val homePossibleTeams = homeDisplay.second
+        val awayPossibleTeams = awayDisplay.second
+
         return MatchDisplay(
             id = match.id, dateLabel = dateLabel, time = time,
             homeTeam = match.homeTeam, awayTeam = match.awayTeam,
@@ -975,7 +1048,9 @@ class HomeViewModel @Inject constructor(
             hasKnockoutPred = knockoutPredictionMap[match.id] == true,
             winnerTeam = match.winnerTeam,
             homeShootoutScore = match.homeShootoutScore,
-            awayShootoutScore = match.awayShootoutScore
+            awayShootoutScore = match.awayShootoutScore,
+            homePossibleTeams = homePossibleTeams,
+            awayPossibleTeams = awayPossibleTeams
         )
     }
 

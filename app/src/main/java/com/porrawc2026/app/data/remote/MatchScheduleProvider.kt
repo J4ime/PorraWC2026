@@ -133,14 +133,14 @@ object MatchScheduleProvider {
         data[88] = MatchSchedule(88, "2026-07-04T03:30:00", "DAZN", "", "", "760501")  // Colombia vs Ghana 01:30Z
 
         // Octavos (Round of 16) — IDs 89-96. Team names come from ESPN API only.
-        data[89] = MatchSchedule(89, "2026-07-04T19:00:00", "DAZN", "", "", "760502")  // Houston: MAR @ CAN 17:00Z
-        data[90] = MatchSchedule(90, "2026-07-04T22:55:00", "RTVE", "", "", "760503")  // Philadelphia: PAR @ FRA 20:55Z (RTVE 22:55)
-        data[91] = MatchSchedule(91, "2026-07-05T21:55:00", "RTVE", "", "", "760504")  // New York: NOR @ BRA 20:00Z (RTVE 21:55)
-        data[92] = MatchSchedule(92, "2026-07-06T01:00:00", "DAZN", "", "", "760505")
-        data[93] = MatchSchedule(93, "2026-07-06T22:00:00", "DAZN", "", "", "760506")
-        data[94] = MatchSchedule(94, "2026-07-07T04:00:00", "DAZN", "", "", "760507")
-        data[95] = MatchSchedule(95, "2026-07-07T23:00:00", "DAZN", "", "", "760509")
-        data[96] = MatchSchedule(96, "2026-07-08T03:00:00", "DAZN", "", "", "760508")
+        data[89] = MatchSchedule(89, "2026-07-04T19:00:00", "DAZN", "", "", "760502")  // Houston: CAN vs MAR 19:00Z (ESPN 1PM ET)
+        data[90] = MatchSchedule(90, "2026-07-04T23:00:00", "RTVE", "", "", "760503")  // Philadelphia: FRA vs PAR 21:00Z (ESPN 5PM ET)
+        data[91] = MatchSchedule(91, "2026-07-05T22:00:00", "RTVE", "", "", "760504")  // New York: BRA vs NOR 20:00Z (ESPN 4PM ET)
+        data[92] = MatchSchedule(92, "2026-07-06T02:00:00", "DAZN", "", "", "760505")  // Mexico vs England 00:00Z (ESPN 8PM ET)
+        data[93] = MatchSchedule(93, "2026-07-06T21:00:00", "DAZN", "", "", "760506")  // Portugal vs Spain 19:00Z (ESPN 3PM ET)
+        data[94] = MatchSchedule(94, "2026-07-07T02:00:00", "DAZN", "", "", "760507")  // USA vs Belgium 00:00Z (ESPN 8PM ET)
+        data[95] = MatchSchedule(95, "2026-07-07T18:00:00", "DAZN", "", "", "760509")  // RD32 W14 vs Egypt 16:00Z (ESPN 12PM ET)
+        data[96] = MatchSchedule(96, "2026-07-07T22:00:00", "DAZN", "", "", "760508")  // Switzerland vs RD32 W15 20:00Z (ESPN 4PM ET)
 
         // Cuartos (Quarter-finals) — IDs 97-100
         data[97] = MatchSchedule(97, "2026-07-09T22:00:00", "DAZN", "Ganador 89", "Ganador 90")
@@ -288,7 +288,7 @@ object MatchScheduleProvider {
             val fb = fallback[match.id]
             val date = fb?.date ?: match.dateTime
             val tv = if (fb != null && rtveMatchIds.contains(fb.id)) "DAZN,RTVE" else "DAZN"
-            val espnId = match.espnId ?: fb?.espnId
+            val espnId = fb?.espnId ?: match.espnId
             match.copy(dateTime = date, tvChannel = tv, espnId = espnId)
         }
     }

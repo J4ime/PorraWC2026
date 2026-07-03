@@ -331,7 +331,8 @@ private fun MatchRow(match: MatchDisplay) {
                         Text("${minuteText}' [$runningH-$runningA]", fontSize = 9.sp, color = Color(0xFF888888))
                         Spacer(Modifier.width(6.dp))
                         Text("\u26BD", fontSize = 10.sp); Spacer(Modifier.width(4.dp))
-                        Text(goal.playerName.split(" ").last(), fontSize = 10.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val displayName = if (goal.playerName.endsWith("(OG)")) goal.playerName else goal.playerName.split(" ").last()
+                        Text(displayName, fontSize = 10.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Spacer(Modifier.height(2.dp))
                 }

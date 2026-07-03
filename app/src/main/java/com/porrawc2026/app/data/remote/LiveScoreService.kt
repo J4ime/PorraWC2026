@@ -80,6 +80,19 @@ class LiveScoreService @Inject constructor(
         }
     }
 
+    suspend fun fetchFullScoreByEspnId(match: MatchEntity): LiveScoreUpdate? {
+        val espnId = match.espnId ?: return null
+        return try {
+            val dateStr = match.dateTime.take(10).replace("-", "")
+            val scoreboard = espnService.getScoreboard(dates = "$dateStr-$dateStr")
+            val event = scoreboard.events?.firstOrNull { it.id == espnId } ?: return null
+            parseEvent(event, listOf(match))
+        } catch (e: Exception) {
+            LogManager.log("LiveScoreService", "Error fetching full score for match ${match.id} (espnId=$espnId)", e)
+            null
+        }
+    }
+
     private fun parseSimpleEvent(event: EspnSimpleEvent, match: MatchEntity): LiveScoreUpdate? {
         val status = event.fullStatus ?: return null
         val competitors = event.competitors ?: return null

@@ -152,6 +152,7 @@ class HomeViewModel @Inject constructor(
     private val liveMinutes = ConcurrentHashMap<Int, String>()
     private var knockoutPredictionMap = mapOf<Int, Boolean>()
     private var knockoutPointsMap = mapOf<Int, Int>()
+    private var matchPointsMap = mapOf<Int, Int>()
     private val seenScorers = ConcurrentHashMap<Int, MutableSet<String>>()
     private val notifiedScorers = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val processedGoalKeys = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
@@ -449,6 +450,7 @@ class HomeViewModel @Inject constructor(
         val (matchPoints, predPoints) = KnockoutCalculator.computePointsFromLiveLists(
             koPredictions, liveRoundLists, cachedMatches
         )
+        matchPointsMap = matchPoints
         knockoutPointsMap = matchPoints + predPoints
 
         // Save points to knockout_predictions table so total points calculation works
@@ -658,6 +660,23 @@ class HomeViewModel @Inject constructor(
         val updates = liveMatches.mapNotNull { liveScoreService.fetchLiveScoreByEspnId(it) }
         if (updates.isEmpty()) return
         processScoreUpdates(updates)
+
+        // Backfill: if any knockout match just finished without shootout data, fetch full scoreboard data
+        val finishedNoShootout = updates.filter {
+            it.isFinished && it.matchId in 73..104 &&
+            it.homeShootoutScore == 0 && it.awayShootoutScore == 0
+        }
+        if (finishedNoShootout.isNotEmpty()) {
+            LogManager.log("HomeVM", "Backfilling shootout for finished matches: ${finishedNoShootout.map { it.matchId }}")
+            val fullUpdates = finishedNoShootout.mapNotNull { update ->
+                val match = cachedMatches.firstOrNull { it.id == update.matchId }
+                if (match != null) liveScoreService.fetchFullScoreByEspnId(match) else null
+            }
+            if (fullUpdates.isNotEmpty()) {
+                processScoreUpdates(fullUpdates)
+            }
+        }
+
         notifyGoalEvents()
         recalculateAllPlayerGoals()
         refreshPoints()
@@ -1082,7 +1101,7 @@ class HomeViewModel @Inject constructor(
             homeGoals = match.homeGoals, awayGoals = match.awayGoals,
             predictedHomeGoals = match.predictedHomeGoals,
             predictedAwayGoals = match.predictedAwayGoals,
-            pointsEarned = if (match.isKnockout) (knockoutPointsMap[match.id] ?: 0) else match.pointsEarned,
+            pointsEarned = if (match.isKnockout) (matchPointsMap[match.id] ?: 0) else match.pointsEarned,
             groupLabel = match.groupName, status = status, tvChannel = match.tvChannel,
             liveMinute = liveMin,
             homeScorers = homeScr,

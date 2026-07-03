@@ -692,24 +692,25 @@ class HomeViewModel @Inject constructor(
                 if (start != null && start.isAfter(Instant.now())) {
                     // Future match: update team names only (scores can't exist yet)
                     if (update.matchId in 73..96 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
-                        val esHome = TeamNameNormalizer.enToEs(update.apiHomeTeam)
-                        val esAway = TeamNameNormalizer.enToEs(update.apiAwayTeam)
+                        val esHome = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiHomeTeam))
+                        val esAway = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiAwayTeam))
                         if (match.homeTeam != esHome || match.awayTeam != esAway) {
                             LogManager.log("HomeVM", "Setting KO #${update.matchId} from API (future): ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
                             repository.updateMatchTeams(update.matchId, esHome, esAway)
                             cachedMatches = cachedMatches.map {
                                 if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
                             }
-                            // Check if Spain is playing and add RTVE to tvChannel
-                            val homeIsSpain = TeamNameNormalizer.matches(esHome, "España")
-                            val awayIsSpain = TeamNameNormalizer.matches(esAway, "España")
-                            if (homeIsSpain || awayIsSpain) {
-                                if (!match.tvChannel.contains("RTVE")) {
-                                    val newTvChannel = if (match.tvChannel.isBlank()) "RTVE" else "${match.tvChannel},RTVE"
-                                    repository.updateMatchTvChannel(update.matchId, newTvChannel)
-                                    cachedMatches = cachedMatches.map {
-                                        if (it.id == update.matchId) it.copy(tvChannel = newTvChannel) else it
-                                    }
+                        }
+                        // Check if Spain is playing and add RTVE to tvChannel
+                        val homeIsSpain = TeamNameNormalizer.matches(esHome, "España")
+                        val awayIsSpain = TeamNameNormalizer.matches(esAway, "España")
+                        if (homeIsSpain || awayIsSpain) {
+                            val currentMatch = cachedMatches.firstOrNull { it.id == update.matchId }
+                            if (currentMatch != null && !currentMatch.tvChannel.contains("RTVE")) {
+                                val newTvChannel = if (currentMatch.tvChannel.isBlank()) "RTVE" else "${currentMatch.tvChannel},RTVE"
+                                repository.updateMatchTvChannel(update.matchId, newTvChannel)
+                                cachedMatches = cachedMatches.map {
+                                    if (it.id == update.matchId) it.copy(tvChannel = newTvChannel) else it
                                 }
                             }
                         }
@@ -769,14 +770,16 @@ class HomeViewModel @Inject constructor(
         }
         // For knockout matches, always use API team names (authoritative source), converted to Spanish
         if (update.matchId in 73..96 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
-            val esHome = TeamNameNormalizer.enToEs(update.apiHomeTeam)
-            val esAway = TeamNameNormalizer.enToEs(update.apiAwayTeam)
+            val esHome = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiHomeTeam))
+            val esAway = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiAwayTeam))
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
-            if (match != null && (match.homeTeam != esHome || match.awayTeam != esAway)) {
-                LogManager.log("HomeVM", "Setting KO #${update.matchId} from API: ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
-                repository.updateMatchTeams(update.matchId, esHome, esAway)
-                cachedMatches = cachedMatches.map {
-                    if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
+            if (match != null) {
+                if (match.homeTeam != esHome || match.awayTeam != esAway) {
+                    LogManager.log("HomeVM", "Setting KO #${update.matchId} from API: ${match.homeTeam} vs ${match.awayTeam} → $esHome vs $esAway")
+                    repository.updateMatchTeams(update.matchId, esHome, esAway)
+                    cachedMatches = cachedMatches.map {
+                        if (it.id == update.matchId) it.copy(homeTeam = esHome, awayTeam = esAway) else it
+                    }
                 }
                 // Check if Spain is playing and add RTVE to tvChannel
                 val homeIsSpain = TeamNameNormalizer.matches(esHome, "España")
@@ -951,6 +954,14 @@ class HomeViewModel @Inject constructor(
             .filter { it.dayKey.isNotBlank() }
             .map { it.dayKey }.distinct()
             .sortedBy { d -> allDisplay.firstOrNull { it.dayKey == d }?.sortKey ?: d }
+    }
+
+    private fun convertEspnRefToGanador(teamName: String): String {
+        val pattern = "Round of 32 (\\d+) Winner".toRegex()
+        val match = pattern.find(teamName) ?: return teamName
+        val roundOf32Num = match.groupValues[1].toIntOrNull() ?: return teamName
+        val matchId = 73 + roundOf32Num - 1
+        return "Ganador $matchId"
     }
 
     private fun resolvePossibleTeams(homeTeam: String, awayTeam: String): Pair<Pair<String, String>, Pair<String, String>> {

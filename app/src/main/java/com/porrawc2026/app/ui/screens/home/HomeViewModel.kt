@@ -1051,9 +1051,9 @@ class HomeViewModel @Inject constructor(
 
     private fun convertEspnRefToGanador(teamName: String): String {
         val pattern = "Round of 32 (\\d+) Winner".toRegex()
-        val match = pattern.find(teamName) ?: return teamName
-        val roundOf32Num = match.groupValues[1].toIntOrNull() ?: return teamName
-        val matchId = 73 + roundOf32Num - 1
+        val m = pattern.find(teamName) ?: return teamName
+        val roundOf32Num = m.groupValues[1].toIntOrNull() ?: return teamName
+        val matchId = ESPN_R32_TO_MATCH_ID[roundOf32Num] ?: return teamName
         return "Ganador $matchId"
     }
 
@@ -1233,6 +1233,12 @@ class HomeViewModel @Inject constructor(
         private const val TAG = "HomeViewModel"
         private const val MATCH_WINDOW_SECONDS = 150L * 60
         private const val KNOCKOUT_START_ID = 73
+        private val ESPN_R32_TO_MATCH_ID = mapOf(
+            1 to 73, 2 to 75, 3 to 76, 4 to 74,
+            5 to 78, 6 to 77, 7 to 79, 8 to 80,
+            9 to 82, 10 to 81, 11 to 83, 12 to 84,
+            13 to 85, 14 to 87, 15 to 88, 16 to 86
+        )
         private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
         private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
         private val dateFormatter = DateTimeFormatter.ofPattern("EEE d MMM", Locale("es", "ES"))

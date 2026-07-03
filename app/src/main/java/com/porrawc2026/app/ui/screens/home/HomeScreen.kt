@@ -231,7 +231,7 @@ private fun MatchRow(match: MatchDisplay) {
     val hasLiveMinute = match.liveMinute != null
     val showScore = hasResult && match.status != MatchStatus.UPCOMING
 
-    val hasWinner = match.winnerTeam != null
+    val hasWinner = match.isKnockout && match.winnerTeam != null
     val homeIsLoser = hasWinner && !TeamNameNormalizer.matches(match.homeTeam, match.winnerTeam!!)
     val awayIsLoser = hasWinner && !TeamNameNormalizer.matches(match.awayTeam, match.winnerTeam!!)
     val borderColor = if (isLive) Color(0xFF4CAF50) else Color.Transparent

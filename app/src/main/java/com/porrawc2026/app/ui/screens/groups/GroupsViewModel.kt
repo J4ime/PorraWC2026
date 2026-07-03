@@ -3,7 +3,6 @@ package com.porrawc2026.app.ui.screens.groups
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
-import com.porrawc2026.app.data.local.entity.KnockoutTeamProgressEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.TeamEntity
 import com.porrawc2026.app.data.repository.PorraRepository
@@ -31,15 +30,11 @@ class GroupsViewModel @Inject constructor(
     private val _knockoutPointsMap = MutableStateFlow<Map<Int, Int>>(emptyMap())
     val knockoutPointsMap: StateFlow<Map<Int, Int>> = _knockoutPointsMap.asStateFlow()
 
-    private val allTeamProgress: StateFlow<List<KnockoutTeamProgressEntity>> =
-        repository.getKnockoutTeamProgress()
-            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
     init {
         viewModelScope.launch {
-            combine(allTeamProgress, allKnockoutPredictions) { progress, predictions ->
-                val advancement = KnockoutCalculator.advancementMapFromEntities(progress)
-                KnockoutCalculator.computePointsFromAdvancement(predictions, advancement)
+            combine(allMatches, allKnockoutPredictions) { matches, predictions ->
+                val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(matches)
+                KnockoutCalculator.computePointsFromLiveLists(predictions, liveRoundLists, matches)
             }.collect { _knockoutPointsMap.value = it }
         }
     }

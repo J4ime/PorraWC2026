@@ -3,7 +3,6 @@ package com.porrawc2026.app.ui.screens.results
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
-import com.porrawc2026.app.data.local.entity.KnockoutTeamProgressEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 import com.porrawc2026.app.data.local.entity.PlayerPredictionEntity
 import com.porrawc2026.app.data.local.entity.QuestionEntity
@@ -55,9 +54,6 @@ class ResultsViewModel @Inject constructor(
     val knockoutPredictions: StateFlow<List<KnockoutPredictionEntity>> = repository.getKnockoutPredictions()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    val allTeamProgress: StateFlow<List<KnockoutTeamProgressEntity>> = repository.getKnockoutTeamProgress()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
     val groupPoints: StateFlow<Int> = allMatches
         .map { matches -> matches.filter { !it.isKnockout }.sumOf { it.pointsEarned } }
         .stateIn(viewModelScope, SharingStarted.Lazily, 0)
@@ -89,19 +85,19 @@ class ResultsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            combine(allTeamProgress, knockoutPredictions) { progress, predictions ->
-                computeKnockoutResults(progress, predictions)
+            combine(allMatches, knockoutPredictions) { matches, predictions ->
+                computeKnockoutResults(matches, predictions)
             }.collect { results ->
                 _knockoutResults.value = results
             }
         }
     }
 
-private fun computeKnockoutResults(
-        progress: List<KnockoutTeamProgressEntity>,
+    private fun computeKnockoutResults(
+        matches: List<MatchEntity>,
         predictions: List<KnockoutPredictionEntity>
     ): List<KnockoutResultDisplay> {
-        val advancement = KnockoutCalculator.advancementMapFromEntities(progress)
+        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(matches)
         val resolvedHome = predictions.associate {
             it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions)
         }
@@ -116,22 +112,27 @@ private fun computeKnockoutResults(
             val unresolvedTeams = homeTeam.startsWith("W") || homeTeam.startsWith("L") || 
                 awayTeam.startsWith("W") || awayTeam.startsWith("L")
             
-            val predictionRoundLevel = KnockoutCalculator.roundLevel(prediction.round)
             var pointsEarned = 0
             
-            if (!unresolvedTeams && predictionRoundLevel > 0) {
-                val homeReachedRound = advancement.entries.firstOrNull { (team, _) ->
-                    TeamNameNormalizer.matches(team, homeTeam)
-                }?.value
-                if (homeReachedRound != null) {
-                    pointsEarned += PointsCalculator.getKnockoutPoints(homeReachedRound)
-                }
-                
-                val awayReachedRound = advancement.entries.firstOrNull { (team, _) ->
-                    TeamNameNormalizer.matches(team, awayTeam)
-                }?.value
-                if (awayReachedRound != null) {
-                    pointsEarned += PointsCalculator.getKnockoutPoints(awayReachedRound)
+            if (!unresolvedTeams) {
+                if (prediction.round == "3er puesto") {
+                    val thirdPlaceMatch = matches.firstOrNull { it.isKnockout && it.knockoutRound == "3er puesto" }
+                    if (thirdPlaceMatch != null && thirdPlaceMatch.homeGoals != null && thirdPlaceMatch.awayGoals != null) {
+                        val actualWinner = if (thirdPlaceMatch.homeGoals!! > thirdPlaceMatch.awayGoals!!) thirdPlaceMatch.homeTeam else thirdPlaceMatch.awayTeam
+                        val predictedWinner = if (prediction.winner == 1) homeTeam else if (prediction.winner == 2) awayTeam else null
+                        if (predictedWinner != null && TeamNameNormalizer.matches(predictedWinner, actualWinner)) {
+                            pointsEarned = 200
+                        }
+                    }
+                } else {
+                    val roundList = liveRoundLists[prediction.round].orEmpty()
+                    
+                    if (roundList.any { TeamNameNormalizer.matches(it, homeTeam) }) {
+                        pointsEarned += PointsCalculator.getKnockoutPoints(prediction.round)
+                    }
+                    if (roundList.any { TeamNameNormalizer.matches(it, awayTeam) }) {
+                        pointsEarned += PointsCalculator.getKnockoutPoints(prediction.round)
+                    }
                 }
             }
 

@@ -89,7 +89,7 @@ private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) 
         "Octavos" to 40,
         "Cuartos" to 80,
         "Semifinales" to 160,
-        "3er puesto" to 250,
+        "3er puesto" to 200,
         "Final" to 500
     )
 

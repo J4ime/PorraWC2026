@@ -429,19 +429,15 @@ class HomeViewModel @Inject constructor(
             m.copy(pointsEarned = pts)
         }
 
-        // Save knockout team progress to DB (which teams reached each round)
-        val advancement = KnockoutCalculator.buildAdvancement(cachedMatches)
-        repository.saveKnockoutTeamProgress(
-            KnockoutCalculator.buildAdvancementEntries(advancement)
-        )
+        // Build live round lists (with provisional teams during live matches)
+        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
 
-        // Compute knockout advancement points per prediction
-        knockoutPointsMap = KnockoutCalculator.computePointsFromAdvancement(
-            koPredictions, advancement
+        // Compute knockout points per prediction using live round lists
+        knockoutPointsMap = KnockoutCalculator.computePointsFromLiveLists(
+            koPredictions, liveRoundLists, cachedMatches
         )
 
         // Save points to knockout_predictions table so total points calculation works
-        // First reset all to 0, then update the ones that have points
         for (prediction in koPredictions) {
             val pts = knockoutPointsMap[prediction.matchNumber] ?: 0
             repository.updateKnockoutPredictionPoints(prediction.matchNumber, pts)

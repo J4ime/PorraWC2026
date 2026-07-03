@@ -38,7 +38,7 @@ object ShareUtil {
             appendLine()
             appendLine("── MÁXIMO POSIBLE ──")
             val maxGroup = 72 * 50
-            val maxKnockout = (16 * 20) + (8 * 40) + (4 * 80) + (2 * 160) + 250 + 500
+            val maxKnockout = (32 * 20) + (16 * 40) + (8 * 80) + (4 * 160) + 200 + (2 * 500)
             val maxQuestions = 50 * 20
             val maxPlayers = 1000
             appendLine("Total máximo: ${maxGroup + maxKnockout + maxQuestions + maxPlayers} pts")

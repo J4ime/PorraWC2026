@@ -34,7 +34,7 @@ object PointsCalculator {
         "Octavos" -> 40
         "Cuartos" -> 80
         "Semifinales" -> 160
-        "3er puesto" -> 250
+        "3er puesto" -> 200
         "Final" -> 500
         else -> 0
     }

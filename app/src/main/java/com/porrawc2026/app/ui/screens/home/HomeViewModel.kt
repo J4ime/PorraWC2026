@@ -1064,6 +1064,8 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun getWinnerName(refMatch: MatchEntity): String? {
+        val start = parseMadridInstant(refMatch.dateTime) ?: return null
+        if (Instant.now().isBefore(start.plusSeconds(MATCH_WINDOW_SECONDS))) return null
         val apiWinner = refMatch.winnerTeam
         if (apiWinner != null) return TeamNameNormalizer.enToEs(apiWinner)
         val hg = refMatch.homeGoals ?: return null

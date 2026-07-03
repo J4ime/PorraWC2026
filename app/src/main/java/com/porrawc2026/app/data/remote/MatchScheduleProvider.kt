@@ -136,11 +136,11 @@ object MatchScheduleProvider {
         data[89] = MatchSchedule(89, "2026-07-04T19:00:00", "DAZN", "", "", "760502")  // Houston: MAR @ CAN 17:00Z
         data[90] = MatchSchedule(90, "2026-07-04T22:55:00", "RTVE", "", "", "760503")  // Philadelphia: PAR @ FRA 20:55Z (RTVE 22:55)
         data[91] = MatchSchedule(91, "2026-07-05T21:55:00", "RTVE", "", "", "760504")  // New York: NOR @ BRA 20:00Z (RTVE 21:55)
-        data[92] = MatchSchedule(92, "2026-07-06T01:00:00", "DAZN", "", "")
-        data[93] = MatchSchedule(93, "2026-07-06T22:00:00", "DAZN", "", "")
-        data[94] = MatchSchedule(94, "2026-07-07T04:00:00", "DAZN", "", "")
-        data[95] = MatchSchedule(95, "2026-07-07T23:00:00", "DAZN", "", "")
-        data[96] = MatchSchedule(96, "2026-07-08T03:00:00", "DAZN", "", "")
+        data[92] = MatchSchedule(92, "2026-07-06T01:00:00", "DAZN", "", "", "760505")
+        data[93] = MatchSchedule(93, "2026-07-06T22:00:00", "DAZN", "", "", "760506")
+        data[94] = MatchSchedule(94, "2026-07-07T04:00:00", "DAZN", "", "", "760507")
+        data[95] = MatchSchedule(95, "2026-07-07T23:00:00", "DAZN", "", "", "760508")
+        data[96] = MatchSchedule(96, "2026-07-08T03:00:00", "DAZN", "", "", "760509")
 
         // Cuartos (Quarter-finals) — IDs 97-100
         data[97] = MatchSchedule(97, "2026-07-09T22:00:00", "DAZN", "Ganador 89", "Ganador 90")

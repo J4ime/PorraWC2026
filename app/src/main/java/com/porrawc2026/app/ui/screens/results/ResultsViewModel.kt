@@ -98,6 +98,8 @@ class ResultsViewModel @Inject constructor(
         predictions: List<KnockoutPredictionEntity>
     ): List<KnockoutResultDisplay> {
         val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(matches)
+        val pointsByMatch = KnockoutCalculator.computePointsFromLiveLists(predictions, liveRoundLists, matches)
+        
         val resolvedHome = predictions.associate {
             it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions)
         }
@@ -115,24 +117,9 @@ class ResultsViewModel @Inject constructor(
             var pointsEarned = 0
             
             if (!unresolvedTeams) {
-                if (prediction.round == "3er puesto") {
-                    val thirdPlaceMatch = matches.firstOrNull { it.isKnockout && it.knockoutRound == "3er puesto" }
-                    if (thirdPlaceMatch != null && thirdPlaceMatch.homeGoals != null && thirdPlaceMatch.awayGoals != null) {
-                        val actualWinner = if (thirdPlaceMatch.homeGoals!! > thirdPlaceMatch.awayGoals!!) thirdPlaceMatch.homeTeam else thirdPlaceMatch.awayTeam
-                        val predictedWinner = if (prediction.winner == 1) homeTeam else if (prediction.winner == 2) awayTeam else null
-                        if (predictedWinner != null && TeamNameNormalizer.matches(predictedWinner, actualWinner)) {
-                            pointsEarned = 200
-                        }
-                    }
-                } else {
-                    val roundList = liveRoundLists[prediction.round].orEmpty()
-                    
-                    if (roundList.any { TeamNameNormalizer.matches(it, homeTeam) }) {
-                        pointsEarned += PointsCalculator.getKnockoutPoints(prediction.round)
-                    }
-                    if (roundList.any { TeamNameNormalizer.matches(it, awayTeam) }) {
-                        pointsEarned += PointsCalculator.getKnockoutPoints(prediction.round)
-                    }
+                val predictionMatch = matches.firstOrNull { it.id == prediction.matchNumber }
+                if (predictionMatch != null) {
+                    pointsEarned = pointsByMatch[prediction.matchNumber] ?: 0
                 }
             }
 

@@ -63,41 +63,85 @@ object KnockoutCalculator {
         liveRoundLists: Map<String, List<String>>,
         matches: List<MatchEntity>
     ): Map<Int, Int> {
-        val resolvedHome = predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions) }
-        val resolvedAway = predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions) }
-
-        return predictions.mapNotNull { prediction ->
-            val homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef
-            val awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
-
-            if (homeTeam.startsWith("W") || homeTeam.startsWith("L") ||
-                awayTeam.startsWith("W") || awayTeam.startsWith("L")) {
-                return@mapNotNull null
-            }
-
-            var points = 0
-
-            if (prediction.round == "3er puesto") {
-                val thirdPlaceMatch = matches.firstOrNull { it.isKnockout && it.knockoutRound == "3er puesto" }
-                if (thirdPlaceMatch != null && thirdPlaceMatch.homeGoals != null && thirdPlaceMatch.awayGoals != null) {
-                    val actualWinner = if (thirdPlaceMatch.homeGoals!! > thirdPlaceMatch.awayGoals!!) thirdPlaceMatch.homeTeam else thirdPlaceMatch.awayTeam
+        val result = mutableMapOf<Int, Int>()
+        
+        val roundToNextRound = mapOf(
+            "Dieciseisavos" to "Octavos",
+            "Octavos" to "Cuartos",
+            "Cuartos" to "Semifinales",
+            "Semifinales" to "Final"
+        )
+        
+        val roundPoints = mapOf(
+            "Dieciseisavos" to 20,
+            "Octavos" to 40,
+            "Cuartos" to 80,
+            "Semifinales" to 160,
+            "Final" to 500
+        )
+        
+        val predictionsByRound = predictions.groupBy { it.round }
+        
+        val koMatches = matches.filter { it.isKnockout && it.knockoutRound != null }
+        
+        for (match in koMatches) {
+            val hasResult = match.homeGoals != null && match.awayGoals != null
+            if (!hasResult) continue
+            
+            val round = match.knockoutRound ?: continue
+            
+            if (round == "3er puesto") {
+                val actualWinner = if (match.homeGoals!! > match.awayGoals!!) match.homeTeam else match.awayTeam
+                val prediction = predictions.firstOrNull { it.matchNumber == match.id }
+                if (prediction != null) {
+                    val homeTeam = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
+                    val awayTeam = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
                     val predictedWinner = if (prediction.winner == 1) homeTeam else if (prediction.winner == 2) awayTeam else null
                     if (predictedWinner != null && TeamNameNormalizer.matches(predictedWinner, actualWinner)) {
-                        points = 200
+                        result[match.id] = 200
                     }
                 }
-            } else {
-                val roundList = liveRoundLists[prediction.round].orEmpty()
-
-                if (roundList.any { TeamNameNormalizer.matches(it, homeTeam) }) {
-                    points += PointsCalculator.getKnockoutPoints(prediction.round)
+                continue
+            }
+            
+            val nextRound = roundToNextRound[round] ?: continue
+            val pointsForNextRound = roundPoints[nextRound] ?: continue
+            
+            val nextRoundPredictions = predictionsByRound[nextRound].orEmpty()
+            
+            val isTied = match.homeGoals == match.awayGoals
+            
+            if (isTied) {
+                val homeInNextRound = nextRoundPredictions.any { prediction ->
+                    val homeTeam = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
+                    val awayTeam = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
+                    TeamNameNormalizer.matches(homeTeam, match.homeTeam) || TeamNameNormalizer.matches(awayTeam, match.homeTeam)
                 }
-                if (roundList.any { TeamNameNormalizer.matches(it, awayTeam) }) {
-                    points += PointsCalculator.getKnockoutPoints(prediction.round)
+                val awayInNextRound = nextRoundPredictions.any { prediction ->
+                    val homeTeam = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
+                    val awayTeam = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
+                    TeamNameNormalizer.matches(homeTeam, match.awayTeam) || TeamNameNormalizer.matches(awayTeam, match.awayTeam)
+                }
+                
+                if (homeInNextRound && awayInNextRound) {
+                    result[match.id] = pointsForNextRound
+                }
+            } else {
+                val leadingTeam = if (match.homeGoals!! > match.awayGoals!!) match.homeTeam 
+                                 else match.awayTeam
+                
+                val userPredictedLeadingInNextRound = nextRoundPredictions.any { prediction ->
+                    val homeTeam = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
+                    val awayTeam = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
+                    TeamNameNormalizer.matches(homeTeam, leadingTeam) || TeamNameNormalizer.matches(awayTeam, leadingTeam)
+                }
+                
+                if (userPredictedLeadingInNextRound) {
+                    result[match.id] = pointsForNextRound
                 }
             }
-
-            if (points > 0) prediction.matchNumber to points else null
-        }.toMap()
+        }
+        
+        return result
     }
 }

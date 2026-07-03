@@ -8,6 +8,43 @@ data class EspnScoreboardResponse(
     val events: List<EspnEvent>?
 )
 
+data class EspnEventsResponse(
+    val league: EspnLeagueInfo?,
+    val events: List<EspnSimpleEvent>?
+)
+
+data class EspnLeagueInfo(
+    val name: String?,
+    val abbreviation: String?
+)
+
+data class EspnSimpleEvent(
+    val id: String?,
+    val date: String?,
+    val name: String?,
+    val shortName: String?,
+    val fullStatus: EspnSimpleStatus?,
+    val competitors: List<EspnSimpleCompetitor>?,
+    val neutralSite: Boolean? = false
+)
+
+data class EspnSimpleStatus(
+    val clock: Double?,
+    val displayClock: String?,
+    val period: Int?,
+    val displayPeriod: String?,
+    val type: EspnStatusType?
+)
+
+data class EspnSimpleCompetitor(
+    val id: String?,
+    val homeAway: String?,
+    val winner: Boolean? = false,
+    val displayName: String?,
+    val abbreviation: String?,
+    val score: String?
+)
+
 data class EspnEvent(
     val id: String?,
     val date: String?,
@@ -116,6 +153,11 @@ interface EspnService {
     suspend fun getEvent(
         @Path("eventId") eventId: String
     ): EspnEvent
+
+    @GET("site/v2/sports/soccer/fifa.world/events")
+    suspend fun getEvents(
+        @Query("event") eventId: String? = null
+    ): EspnEventsResponse
 
     @GET("https://sports.core.api.espn.com/v2/sports/soccer/leagues/fifa.world/events/{eventId}/competitions/{competitionId}/plays")
     suspend fun getPlays(

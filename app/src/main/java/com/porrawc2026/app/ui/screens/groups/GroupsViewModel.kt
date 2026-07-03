@@ -34,7 +34,8 @@ class GroupsViewModel @Inject constructor(
         viewModelScope.launch {
             combine(allMatches, allKnockoutPredictions) { matches, predictions ->
                 val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(matches)
-                KnockoutCalculator.computePointsFromLiveLists(predictions, liveRoundLists, matches)
+                val (matchPts, predPts) = KnockoutCalculator.computePointsFromLiveLists(predictions, liveRoundLists, matches)
+                matchPts + predPts
             }.collect { _knockoutPointsMap.value = it }
         }
     }

@@ -98,7 +98,7 @@ class ResultsViewModel @Inject constructor(
         predictions: List<KnockoutPredictionEntity>
     ): List<KnockoutResultDisplay> {
         val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(matches)
-        val pointsByMatch = KnockoutCalculator.computePointsFromLiveLists(predictions, liveRoundLists, matches)
+        val (_, pointsByMatch) = KnockoutCalculator.computePointsFromLiveLists(predictions, liveRoundLists, matches)
         
         val resolvedHome = predictions.associate {
             it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions)

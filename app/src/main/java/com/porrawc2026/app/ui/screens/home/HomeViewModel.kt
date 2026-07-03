@@ -224,19 +224,25 @@ class HomeViewModel @Inject constructor(
             downloadPlayerPhotos()
             precachePhotosInBackground()
         }
-        // Polling cada hora: buscar partidos futuros con equipos definidos + detectar cambio de día
+        // Polling: cada minuto si hay live (events endpoint), cada hora para descubrir partidos nuevos (scoreboard)
         viewModelScope.launch(Dispatchers.IO) {
+            var lastFullFetch = System.currentTimeMillis()
             var lastDay = LocalDate.now(madridZone)
             while (true) {
-                delay(60 * 60 * 1000L)
+                delay(60_000L)
+                val hasLive = hasLiveMatches()
+                if (hasLive) {
+                    fetchLiveMatchUpdates()
+                }
+                val now = System.currentTimeMillis()
+                if (now - lastFullFetch >= FETCH_COOLDOWN_MS) {
+                    lastFullFetch = now
+                    fetchLiveResults()
+                }
                 val today = LocalDate.now(madridZone)
-                val dayChanged = today != lastDay
-                if (dayChanged) {
+                if (today != lastDay) {
                     lastDay = today
                     LogManager.log(TAG, "Day changed to $today, refreshing matches")
-                }
-                fetchLiveResults()
-                if (dayChanged) {
                     refreshUpcomingMatches()
                 }
             }
@@ -318,15 +324,20 @@ class HomeViewModel @Inject constructor(
     private val FETCH_COOLDOWN_MS = 60 * 60 * 1000L
 
     fun refreshLiveScores() {
-        val now = System.currentTimeMillis()
-        if (now - lastFetchTime < FETCH_COOLDOWN_MS) {
-            LogManager.log(TAG, "refreshLiveScores skipped: ${now - lastFetchTime}ms since last fetch")
-            return
-        }
-        lastFetchTime = now
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
-            refreshAll()
+            if (hasLiveMatches()) {
+                fetchLiveMatchUpdates()
+            } else {
+                val now = System.currentTimeMillis()
+                if (now - lastFetchTime < FETCH_COOLDOWN_MS) {
+                    LogManager.log(TAG, "refreshLiveScores skipped: ${now - lastFetchTime}ms since last fetch")
+                    _isBusy.value = false
+                    return@launch
+                }
+                lastFetchTime = now
+                refreshAll()
+            }
             _isBusy.value = false
         }
     }
@@ -435,9 +446,10 @@ class HomeViewModel @Inject constructor(
         val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
 
         // Compute knockout points per prediction using live round lists
-        knockoutPointsMap = KnockoutCalculator.computePointsFromLiveLists(
+        val (matchPoints, predPoints) = KnockoutCalculator.computePointsFromLiveLists(
             koPredictions, liveRoundLists, cachedMatches
         )
+        knockoutPointsMap = matchPoints + predPoints
 
         // Save points to knockout_predictions table so total points calculation works
         for (prediction in koPredictions) {
@@ -598,6 +610,10 @@ class HomeViewModel @Inject constructor(
         return cachedIds
     }
 
+    private fun hasLiveMatches(): Boolean {
+        return cachedMatches.any { matchStatus(it) == MatchStatus.LIVE }
+    }
+
     private fun isFinishedByTime(match: MatchEntity): Boolean {
         val start = parseMadridInstant(match.dateTime) ?: return false
         return match.homeGoals != null && match.awayGoals != null &&
@@ -628,6 +644,20 @@ class HomeViewModel @Inject constructor(
             LogManager.log("HomeVM", "  #${m.id}: ${m.homeTeam} ${m.homeGoals}-${m.awayGoals} ${m.awayTeam}")
         }
         processScoreUpdates(scoreUpdates)
+        notifyGoalEvents()
+        recalculateAllPlayerGoals()
+        refreshPoints()
+        checkGoalNotifications()
+        refreshUpcomingMatches()
+    }
+
+    private suspend fun fetchLiveMatchUpdates() {
+        val liveMatches = cachedMatches.filter { matchStatus(it) == MatchStatus.LIVE && it.espnId != null }
+        if (liveMatches.isEmpty()) return
+        LogManager.log("HomeVM", "Fetching live match updates by espnId: ${liveMatches.map { "${it.id}:${it.espnId}" }}")
+        val updates = liveMatches.mapNotNull { liveScoreService.fetchLiveScoreByEspnId(it) }
+        if (updates.isEmpty()) return
+        processScoreUpdates(updates)
         notifyGoalEvents()
         recalculateAllPlayerGoals()
         refreshPoints()

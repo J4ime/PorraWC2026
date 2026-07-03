@@ -67,6 +67,50 @@ class LiveScoreService @Inject constructor(
         return allUpdates.distinctBy { it.matchId }
     }
 
+    suspend fun fetchLiveScoreByEspnId(match: MatchEntity): LiveScoreUpdate? {
+        val espnId = match.espnId ?: return null
+        return try {
+            val response = espnService.getEvents(eventId = espnId)
+            val events = response.events ?: return null
+            val event = events.firstOrNull { it.id == espnId } ?: return null
+            parseSimpleEvent(event, match)
+        } catch (e: Exception) {
+            LogManager.log("LiveScoreService", "Error fetching live score for match ${match.id} (espnId=$espnId)", e)
+            null
+        }
+    }
+
+    private fun parseSimpleEvent(event: EspnSimpleEvent, match: MatchEntity): LiveScoreUpdate? {
+        val status = event.fullStatus ?: return null
+        val competitors = event.competitors ?: return null
+        val home = competitors.firstOrNull { it.homeAway == "home" } ?: return null
+        val away = competitors.firstOrNull { it.homeAway == "away" } ?: return null
+        val hScore = home.score?.toIntOrNull() ?: 0
+        val aScore = away.score?.toIntOrNull() ?: 0
+        val isFinished = status.type?.completed == true
+        val minute = computeSimpleMinute(status)
+        val winnerName = if (isFinished) {
+            competitors.firstOrNull { it.winner == true }?.displayName
+        } else null
+        return LiveScoreUpdate(
+            matchId = match.id, homeGoals = hScore, awayGoals = aScore,
+            isFinished = isFinished, liveMinute = minute,
+            winnerTeam = winnerName,
+            apiHomeTeam = home.displayName, apiAwayTeam = away.displayName,
+            espnId = event.id
+        )
+    }
+
+    private fun computeSimpleMinute(status: EspnSimpleStatus): String? {
+        val statusType = status.type ?: return null
+        return when {
+            statusType.completed == true -> "FINAL"
+            statusType.shortDetail == "Halftime" || statusType.shortDetail == "HT" -> "HT"
+            statusType.state == "in" && !status.displayClock.isNullOrBlank() -> status.displayClock
+            else -> null
+        }
+    }
+
     private fun groupMatchesByDate(matches: List<MatchEntity>): Map<String, List<MatchEntity>> {
         return matches.groupBy { m ->
             try { m.dateTime.take(10).replace("-", "") } catch (e: Exception) { LogManager.log("LiveScoreService", "Failed to parse dateTime for match ${m.id}", e); "" }

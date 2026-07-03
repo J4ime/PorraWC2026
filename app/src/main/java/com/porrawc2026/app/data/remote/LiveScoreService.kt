@@ -30,10 +30,18 @@ data class LiveScoreUpdate(
     val awayShootoutScore: Int = 0,
     val apiHomeTeam: String? = null,
     val apiAwayTeam: String? = null,
-    val espnId: String? = null
+    val espnId: String? = null,
+    val shootoutAttempts: List<ShootoutAttempt> = emptyList()
 )
 
 data class LiveScorer(val playerName: String, val minute: Int, val minuteLabel: String? = null)
+
+data class ShootoutAttempt(
+    val playerName: String,
+    val isHome: Boolean,
+    val isScored: Boolean,
+    val order: Int
+)
 
 data class TopScorerData(
     val playerName: String,
@@ -86,7 +94,8 @@ class LiveScoreService @Inject constructor(
             val dateStr = match.dateTime.take(10).replace("-", "")
             val scoreboard = espnService.getScoreboard(dates = "$dateStr-$dateStr")
             val event = scoreboard.events?.firstOrNull { it.id == espnId } ?: return null
-            parseEvent(event, listOf(match))
+            val summary = espnService.getSummary(espnId)
+            parseEvent(event, listOf(match), summaryShootout = summary.shootout)
         } catch (e: Exception) {
             LogManager.log("LiveScoreService", "Error fetching full score for match ${match.id} (espnId=$espnId)", e)
             null
@@ -141,7 +150,7 @@ class LiveScoreService @Inject constructor(
         return "${minLocal.format(fmt)}-${maxLocal.format(fmt)}"
     }
 
-    private suspend fun parseEvent(event: EspnEvent, matches: List<MatchEntity>): LiveScoreUpdate? {
+    private suspend fun parseEvent(event: EspnEvent, matches: List<MatchEntity>, summaryShootout: List<EspnSummaryShootout>? = null): LiveScoreUpdate? {
         val competition = event.competitions?.firstOrNull() ?: return null
         val status = competition.status ?: return null
         val competitors = competition.competitors ?: return null
@@ -181,7 +190,12 @@ class LiveScoreService @Inject constructor(
             checkSubstituteGoals(event, competition)
         } else false
 
-        val (homeShootout, awayShootout) = parseShootout(competition.shootout, homeTeam.id, awayTeam.id)
+        val (homeShootout, awayShootout) = if (summaryShootout != null) {
+            parseShootoutFromSummary(summaryShootout, homeTeam.id, awayTeam.id)
+        } else {
+            parseShootout(competition.shootout, homeTeam.id, awayTeam.id)
+        }
+        val shootoutAttempts = parseShootoutAttempts(competition.details, homeTeam.id)
 
         return LiveScoreUpdate(
             matchId = entity.id, homeGoals = hScore, awayGoals = aScore,
@@ -195,7 +209,8 @@ class LiveScoreService @Inject constructor(
             hasSubGoal = hasSubGoal,
             homeShootoutScore = homeShootout, awayShootoutScore = awayShootout,
             apiHomeTeam = homeName, apiAwayTeam = awayName,
-            espnId = event.id
+            espnId = event.id,
+            shootoutAttempts = shootoutAttempts
         )
     }
 
@@ -381,6 +396,29 @@ class LiveScoreService @Inject constructor(
         val homeMade = shootout.firstOrNull { it.team?.id == homeId }?.made ?: 0
         val awayMade = shootout.firstOrNull { it.team?.id == awayId }?.made ?: 0
         return homeMade to awayMade
+    }
+
+    private fun parseShootoutFromSummary(shootout: List<EspnSummaryShootout>?, homeId: String?, awayId: String?): Pair<Int, Int> {
+        if (shootout == null) return 0 to 0
+        val homeMade = shootout.firstOrNull { it.id == homeId }
+            ?.shots?.count { it.didScore == true } ?: 0
+        val awayMade = shootout.firstOrNull { it.id == awayId }
+            ?.shots?.count { it.didScore == true } ?: 0
+        return homeMade to awayMade
+    }
+
+    private fun parseShootoutAttempts(details: List<EspnDetail>?, homeTeamId: String?): List<ShootoutAttempt> {
+        if (details == null) return emptyList()
+        val attempts = mutableListOf<ShootoutAttempt>()
+        details.forEachIndexed { index, detail ->
+            if (detail.penaltyKick == true && detail.clock?.displayValue == "0'") {
+                val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: "?"
+                val isScored = detail.scoringPlay == true
+                val isHome = detail.team?.id == homeTeamId
+                attempts.add(ShootoutAttempt(playerName, isHome, isScored, index))
+            }
+        }
+        return attempts
     }
 
     companion object {

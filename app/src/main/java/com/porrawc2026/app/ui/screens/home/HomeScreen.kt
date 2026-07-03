@@ -337,6 +337,41 @@ private fun MatchRow(match: MatchDisplay) {
                     Spacer(Modifier.height(2.dp))
                 }
             }
+            // Penalty shootout attempts
+            if (match.shootoutAttempts.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth().padding(start = 50.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("TANDA DE PENALTIS", fontSize = 8.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(8.dp))
+                    Text("${match.homeShootoutScore}-${match.awayShootoutScore}", fontSize = 9.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
+                }
+                Row(Modifier.fillMaxWidth().padding(start = 50.dp)) {
+                    // Home team column
+                    Column(Modifier.weight(1f)) {
+                        match.shootoutAttempts.filter { it.isHome }.forEach { attempt ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val icon = if (attempt.isScored) "\u26BD" else "\u274C"
+                                Text(icon, fontSize = 10.sp)
+                                Spacer(Modifier.width(4.dp))
+                                Text(attempt.playerName.split(" ").last(), fontSize = 10.sp, color = if (attempt.isScored) Color(0xFF4CAF50) else Color(0xFFFF5252), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Spacer(Modifier.height(2.dp))
+                        }
+                    }
+                    // Away team column
+                    Column(Modifier.weight(1f)) {
+                        match.shootoutAttempts.filter { !it.isHome }.forEach { attempt ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val icon = if (attempt.isScored) "\u26BD" else "\u274C"
+                                Text(icon, fontSize = 10.sp)
+                                Spacer(Modifier.width(4.dp))
+                                Text(attempt.playerName.split(" ").last(), fontSize = 10.sp, color = if (attempt.isScored) Color(0xFF4CAF50) else Color(0xFFFF5252), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            Spacer(Modifier.height(2.dp))
+                        }
+                    }
+                }
+            }
         }
     }
 }

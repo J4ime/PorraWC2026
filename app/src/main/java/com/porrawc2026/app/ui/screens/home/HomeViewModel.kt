@@ -13,6 +13,7 @@ import com.porrawc2026.app.data.local.entity.TeamEntity
 import com.porrawc2026.app.data.remote.LiveScoreService
 import com.porrawc2026.app.data.remote.LiveScoreUpdate
 import com.porrawc2026.app.data.remote.MatchScheduleProvider
+import com.porrawc2026.app.data.remote.ShootoutAttempt
 import com.porrawc2026.app.data.repository.PorraRepository
 import com.porrawc2026.app.domain.model.KnockoutCalculator
 import com.porrawc2026.app.domain.model.PointsCalculator
@@ -61,6 +62,12 @@ enum class MatchStatus { UPCOMING, LIVE, FINISHED }
 
 data class GoalEvent(val playerName: String, val minute: Int, val minuteLabel: String? = null)
 
+data class ShootoutAttemptDisplay(
+    val playerName: String,
+    val isScored: Boolean,
+    val isHome: Boolean
+)
+
 data class MatchDisplay(
     val id: Int,
     val dateLabel: String,
@@ -88,7 +95,8 @@ data class MatchDisplay(
     val homeShootoutScore: Int = 0,
     val awayShootoutScore: Int = 0,
     val homePossibleTeams: String = "",
-    val awayPossibleTeams: String = ""
+    val awayPossibleTeams: String = "",
+    val shootoutAttempts: List<ShootoutAttemptDisplay> = emptyList()
 )
 
 @HiltViewModel
@@ -149,6 +157,7 @@ class HomeViewModel @Inject constructor(
     private var cachedMatches: List<MatchEntity> = emptyList()
     private val lastWrittenScores = ConcurrentHashMap<Int, Pair<Int, Int>>()
     private val goalScorers = ConcurrentHashMap<Int, Pair<List<GoalEvent>, List<GoalEvent>>>()
+    private val shootoutAttempts = ConcurrentHashMap<Int, List<ShootoutAttempt>>()
     private val liveMinutes = ConcurrentHashMap<Int, String>()
     private var knockoutPredictionMap = mapOf<Int, Boolean>()
     private var knockoutPointsMap = mapOf<Int, Int>()
@@ -646,6 +655,20 @@ class HomeViewModel @Inject constructor(
             LogManager.log("HomeVM", "  #${m.id}: ${m.homeTeam} ${m.homeGoals}-${m.awayGoals} ${m.awayTeam}")
         }
         processScoreUpdates(scoreUpdates)
+
+        // Backfill: KO matches that finished without shootout data — refetch via summary endpoint
+        val koNoShootout = cachedMatches.filter {
+            it.id in 73..104 && it.homeGoals != null && it.awayGoals != null &&
+            isFinishedByTime(it) && it.homeShootoutScore == 0 && it.awayShootoutScore == 0
+        }
+        if (koNoShootout.isNotEmpty()) {
+            LogManager.log("HomeVM", "Backfilling shootout for KO matches: ${koNoShootout.map { it.id }}")
+            val fullUpdates = koNoShootout.mapNotNull { liveScoreService.fetchFullScoreByEspnId(it) }
+            if (fullUpdates.isNotEmpty()) {
+                processScoreUpdates(fullUpdates)
+            }
+        }
+
         notifyGoalEvents()
         recalculateAllPlayerGoals()
         refreshPoints()
@@ -660,6 +683,18 @@ class HomeViewModel @Inject constructor(
         val updates = liveMatches.mapNotNull { liveScoreService.fetchLiveScoreByEspnId(it) }
         if (updates.isEmpty()) return
         processScoreUpdates(updates)
+
+        // For live KO matches (73-104), fetch summary endpoint for shootout data during penalties
+        val liveKo = liveMatches.filter { it.id in 73..104 }
+        if (liveKo.isNotEmpty()) {
+            LogManager.log("HomeVM", "Fetching summary for live KO matches: ${liveKo.map { it.id }}")
+            val shootoutUpdates = liveKo.mapNotNull { liveScoreService.fetchFullScoreByEspnId(it) }
+                .filter { it.homeShootoutScore > 0 || it.awayShootoutScore > 0 }
+            if (shootoutUpdates.isNotEmpty()) {
+                LogManager.log("HomeVM", "Shootout updates: ${shootoutUpdates.map { "${it.matchId}:${it.homeShootoutScore}-${it.awayShootoutScore}" }}")
+                processScoreUpdates(shootoutUpdates)
+            }
+        }
 
         // Backfill: if any knockout match just finished without shootout data, fetch full scoreboard data
         val finishedNoShootout = updates.filter {
@@ -701,8 +736,10 @@ class HomeViewModel @Inject constructor(
         loadCachedScorers()
 
         // Finished matches with saved results: never fetch from API again, use DB only
-        val finishedInDb = matchesForWc.filter {
-            it.homeGoals != null && it.awayGoals != null && isFinishedByTime(it)
+        // But for KO matches, re-fetch if shootout scores are missing (Option B)
+        val finishedInDb = matchesForWc.filter { match ->
+            match.homeGoals != null && match.awayGoals != null && isFinishedByTime(match) &&
+            !(match.id in 73..104 && match.homeShootoutScore == 0 && match.awayShootoutScore == 0)
         }.map { it.id }.toSet()
 
         val wcMatches = if (finishedInDb.size == matchesForWc.size) emptyList()
@@ -784,6 +821,9 @@ class HomeViewModel @Inject constructor(
             }
             updateMatchScores(update)
             updateGoalScorers(update)
+            if (update.shootoutAttempts.isNotEmpty()) {
+                shootoutAttempts[update.matchId] = update.shootoutAttempts
+            }
             if (update.isFinished) {
                 repository.updateMatchCards(update.matchId, update.homeRedCards, update.awayRedCards, update.homeYellowCards, update.awayYellowCards)
                 repository.updateMatchMissedPenalties(update.matchId, update.homeMissedPenalties, update.awayMissedPenalties)
@@ -1017,32 +1057,60 @@ class HomeViewModel @Inject constructor(
         return "Ganador $matchId"
     }
 
+    private fun resolveTeamNameIfPossible(teamName: String): String {
+        val refMatchId = extractRefMatchId(teamName) ?: return teamName
+        val refMatch = cachedMatches.firstOrNull { it.id == refMatchId } ?: return teamName
+        return getWinnerName(refMatch) ?: teamName
+    }
+
+    private fun getWinnerName(refMatch: MatchEntity): String? {
+        val apiWinner = refMatch.winnerTeam
+        if (apiWinner != null) return TeamNameNormalizer.enToEs(apiWinner)
+        val hg = refMatch.homeGoals ?: return null
+        val ag = refMatch.awayGoals ?: return null
+        return when {
+            hg > ag -> refMatch.homeTeam
+            ag > hg -> refMatch.awayTeam
+            refMatch.homeShootoutScore > refMatch.awayShootoutScore -> refMatch.homeTeam
+            refMatch.awayShootoutScore > refMatch.homeShootoutScore -> refMatch.awayTeam
+            else -> null
+        }
+    }
+
     private fun resolvePossibleTeams(homeTeam: String, awayTeam: String): Pair<Pair<String, String>, Pair<String, String>> {
         val homeRefMatchId = extractRefMatchId(homeTeam)
         val awayRefMatchId = extractRefMatchId(awayTeam)
-        
+
         val homeDisplay = if (homeRefMatchId != null) {
             val refMatch = cachedMatches.firstOrNull { it.id == homeRefMatchId }
             if (refMatch != null && refMatch.homeTeam.isNotBlank() && refMatch.awayTeam.isNotBlank()) {
-                "Ganador" to "${refMatch.homeTeam}-${refMatch.awayTeam}"
+                if (getWinnerName(refMatch) != null) {
+                    homeTeam to ""
+                } else {
+                    "Ganador" to "${refMatch.homeTeam}-${refMatch.awayTeam}"
+                }
             } else {
                 homeTeam to ""
             }
         } else {
             homeTeam to ""
         }
-        
+
         val awayDisplay = if (awayRefMatchId != null) {
             val refMatch = cachedMatches.firstOrNull { it.id == awayRefMatchId }
             if (refMatch != null && refMatch.homeTeam.isNotBlank() && refMatch.awayTeam.isNotBlank()) {
-                "Ganador" to "${refMatch.homeTeam}-${refMatch.awayTeam}"
+                if (getWinnerName(refMatch) != null) {
+                    awayTeam to ""
+                } else {
+                    "Ganador" to "${refMatch.homeTeam}-${refMatch.awayTeam}"
+                }
             } else {
                 awayTeam to ""
             }
         } else {
             awayTeam to ""
         }
-        
+
         return homeDisplay to awayDisplay
     }
     
@@ -1075,6 +1143,9 @@ class HomeViewModel @Inject constructor(
         } else ""
         val status = matchStatus(match)
 
+        val resolvedHome = resolveTeamNameIfPossible(match.homeTeam)
+        val resolvedAway = resolveTeamNameIfPossible(match.awayTeam)
+
         val liveMin = if (date != null && date.isAfter(Instant.now())) null else when {
             status == MatchStatus.FINISHED -> "FINAL"
             liveMinutes.containsKey(match.id) -> {
@@ -1090,14 +1161,14 @@ class HomeViewModel @Inject constructor(
         val sortKey = if (zoned != null) "${monthDayFormatter.format(zoned)}" else ""
 
         val (homeDisplay, awayDisplay) = resolvePossibleTeams(match.homeTeam, match.awayTeam)
-        val homePossibleTeams = homeDisplay.second
-        val awayPossibleTeams = awayDisplay.second
+        val homePossibleTeams = if (resolvedHome == match.homeTeam) homeDisplay.second else ""
+        val awayPossibleTeams = if (resolvedAway == match.awayTeam) awayDisplay.second else ""
 
         return MatchDisplay(
             id = match.id, dateLabel = dateLabel, time = time,
-            homeTeam = match.homeTeam, awayTeam = match.awayTeam,
-            homeFlag = ExcelParser.getFlagEmoji(match.homeTeam),
-            awayFlag = ExcelParser.getFlagEmoji(match.awayTeam),
+            homeTeam = resolvedHome, awayTeam = resolvedAway,
+            homeFlag = ExcelParser.getFlagEmoji(resolvedHome),
+            awayFlag = ExcelParser.getFlagEmoji(resolvedAway),
             homeGoals = match.homeGoals, awayGoals = match.awayGoals,
             predictedHomeGoals = match.predictedHomeGoals,
             predictedAwayGoals = match.predictedAwayGoals,
@@ -1114,7 +1185,10 @@ class HomeViewModel @Inject constructor(
             homeShootoutScore = match.homeShootoutScore,
             awayShootoutScore = match.awayShootoutScore,
             homePossibleTeams = homePossibleTeams,
-            awayPossibleTeams = awayPossibleTeams
+            awayPossibleTeams = awayPossibleTeams,
+            shootoutAttempts = shootoutAttempts[match.id]?.map {
+                ShootoutAttemptDisplay(it.playerName, it.isScored, it.isHome)
+            } ?: emptyList()
         )
     }
 

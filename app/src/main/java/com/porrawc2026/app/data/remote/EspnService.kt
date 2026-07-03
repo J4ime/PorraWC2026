@@ -143,6 +143,20 @@ data class EspnPlayParticipant(
     val athlete: EspnAthlete?
 )
 
+data class EspnSummaryResponse(
+    val shootout: List<EspnSummaryShootout>?
+)
+
+data class EspnSummaryShootout(
+    val id: String?,
+    val team: String?,
+    val shots: List<EspnShootoutShot>?
+)
+
+data class EspnShootoutShot(
+    val didScore: Boolean?
+)
+
 interface EspnService {
     @GET("site/v2/sports/soccer/fifa.world/scoreboard")
     suspend fun getScoreboard(
@@ -158,6 +172,11 @@ interface EspnService {
     suspend fun getEvents(
         @Query("event") eventId: String? = null
     ): EspnEventsResponse
+
+    @GET("site/v2/sports/soccer/fifa.world/summary")
+    suspend fun getSummary(
+        @Query("event") eventId: String
+    ): EspnSummaryResponse
 
     @GET("https://sports.core.api.espn.com/v2/sports/soccer/leagues/fifa.world/events/{eventId}/competitions/{competitionId}/plays")
     suspend fun getPlays(

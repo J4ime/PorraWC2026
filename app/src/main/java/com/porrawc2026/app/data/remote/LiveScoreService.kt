@@ -233,7 +233,7 @@ class LiveScoreService @Inject constructor(
         details?.forEach { detail ->
             if (detail.scoringPlay == true) {
                 // Skip penalty shootout goals: no match clock (displayValue "0'") + penaltyKick
-                if (detail.penaltyKick == true && detail.clock?.displayValue == "0'") return@forEach
+                if (detail.penaltyKick == true && detail.shootout == true) return@forEach
                 val playerNameBase = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
                 val playerName = when {
                     detail.ownGoal == true -> "$playerNameBase (OG)"
@@ -259,7 +259,7 @@ class LiveScoreService @Inject constructor(
             }
             if (detail.yellowCard == true) { if (detail.team?.id == homeTeamId) hYellows++ else aYellows++ }
             if (detail.redCard == true) { if (detail.team?.id == homeTeamId) hReds++ else aReds++ }
-            if (detail.penaltyKick == true && detail.scoringPlay != true && detail.clock?.displayValue != "0'") {
+            if (detail.penaltyKick == true && detail.scoringPlay != true && detail.shootout != true) {
                 if (detail.team?.id == homeTeamId) hMissedPens++ else aMissedPens++
                 val playerNameBase = detail.athletesInvolved?.firstOrNull()?.displayName ?: "?"
                 val minuteStr = detail.clock?.displayValue ?: "?"
@@ -430,7 +430,7 @@ class LiveScoreService @Inject constructor(
         if (details == null) return emptyList()
         val attempts = mutableListOf<ShootoutAttempt>()
         details.forEachIndexed { index, detail ->
-            if (detail.penaltyKick == true && detail.clock?.displayValue == "0'") {
+            if (detail.penaltyKick == true && detail.shootout == true) {
                 val playerName = detail.athletesInvolved?.firstOrNull()?.displayName ?: "?"
                 val isScored = detail.scoringPlay == true
                 val isHome = detail.team?.id == homeTeamId

@@ -110,7 +110,8 @@ data class EspnDetail(
     val yellowCard: Boolean?,
     val redCard: Boolean?,
     val ownGoal: Boolean?,
-    val penaltyKick: Boolean?
+    val penaltyKick: Boolean?,
+    val shootout: Boolean?
 )
 
 data class EspnDetailType(

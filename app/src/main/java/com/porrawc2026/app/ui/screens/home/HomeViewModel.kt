@@ -541,7 +541,7 @@ class HomeViewModel @Inject constructor(
                         )
                     }
                 } else m
-            } else if (m.id in 89..96) {
+            } else if (m.id in 89..100) {
                 val hasRealNames = m.homeTeam.isNotBlank() && m.awayTeam.isNotBlank()
                 if (hasRealNames) m else m.copy(
                     homeTeam = "", awayTeam = "",
@@ -559,7 +559,7 @@ class HomeViewModel @Inject constructor(
             } else m
         }
         // Only persist the cleared data; preserve API-set scores for already-started matches
-        val toPersist = cachedMatches.filter { it.id in 73..96 }
+        val toPersist = cachedMatches.filter { it.id in 73..100 }
         repository.insertMatches(toPersist)
     }
 
@@ -777,7 +777,7 @@ class HomeViewModel @Inject constructor(
                 val start = parseMadridInstant(match.dateTime)
                 if (start != null && start.isAfter(Instant.now())) {
                     // Future match: update team names only (scores can't exist yet)
-                    if (update.matchId in 73..96 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+        if (update.matchId in 73..100 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
                         val esHome = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiHomeTeam))
                         val esAway = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiAwayTeam))
                         if (match.homeTeam != esHome || match.awayTeam != esAway) {
@@ -860,7 +860,7 @@ class HomeViewModel @Inject constructor(
             }
         }
         // For knockout matches, always use API team names (authoritative source), converted to Spanish
-        if (update.matchId in 73..96 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+        if (update.matchId in 73..100 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
             val esHome = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiHomeTeam))
             val esAway = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiAwayTeam))
             val match = cachedMatches.firstOrNull { it.id == update.matchId }
@@ -1050,11 +1050,21 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun convertEspnRefToGanador(teamName: String): String {
-        val pattern = "Round of 32 (\\d+) Winner".toRegex()
-        val m = pattern.find(teamName) ?: return teamName
-        val roundOf32Num = m.groupValues[1].toIntOrNull() ?: return teamName
-        val matchId = ESPN_R32_TO_MATCH_ID[roundOf32Num] ?: return teamName
-        return "Ganador $matchId"
+        val r32Pattern = "Round of 32 (\\d+) Winner".toRegex()
+        val r32Match = r32Pattern.find(teamName)
+        if (r32Match != null) {
+            val num = r32Match.groupValues[1].toIntOrNull() ?: return teamName
+            val matchId = ESPN_R32_TO_MATCH_ID[num] ?: return teamName
+            return "Ganador $matchId"
+        }
+        val r16Pattern = "Round of 16 (\\d+) Winner".toRegex()
+        val r16Match = r16Pattern.find(teamName)
+        if (r16Match != null) {
+            val num = r16Match.groupValues[1].toIntOrNull() ?: return teamName
+            val matchId = ESPN_R16_TO_MATCH_ID[num] ?: return teamName
+            return "Ganador $matchId"
+        }
+        return teamName
     }
 
     private fun resolveTeamNameIfPossible(teamName: String): String {
@@ -1238,6 +1248,10 @@ class HomeViewModel @Inject constructor(
             5 to 78, 6 to 77, 7 to 79, 8 to 80,
             9 to 82, 10 to 81, 11 to 83, 12 to 84,
             13 to 85, 14 to 87, 15 to 88, 16 to 86
+        )
+        private val ESPN_R16_TO_MATCH_ID = mapOf(
+            1 to 90, 2 to 89, 3 to 91, 4 to 92,
+            5 to 93, 6 to 94, 7 to 95, 8 to 96
         )
         private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
         private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)

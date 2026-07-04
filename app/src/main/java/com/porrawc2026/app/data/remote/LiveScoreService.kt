@@ -235,7 +235,11 @@ class LiveScoreService @Inject constructor(
                 // Skip penalty shootout goals: no match clock (displayValue "0'") + penaltyKick
                 if (detail.penaltyKick == true && detail.clock?.displayValue == "0'") return@forEach
                 val playerNameBase = detail.athletesInvolved?.firstOrNull()?.displayName ?: return@forEach
-                val playerName = if (detail.ownGoal == true) "$playerNameBase (OG)" else playerNameBase
+                val playerName = when {
+                    detail.ownGoal == true -> "$playerNameBase (OG)"
+                    detail.penaltyKick == true -> "$playerNameBase (pen)"
+                    else -> playerNameBase
+                }
                 val minuteStr = detail.clock?.displayValue ?: return@forEach
                 val m = minuteRegex.find(minuteStr)
                 val goalMinute = if (m != null) {
@@ -255,8 +259,23 @@ class LiveScoreService @Inject constructor(
             }
             if (detail.yellowCard == true) { if (detail.team?.id == homeTeamId) hYellows++ else aYellows++ }
             if (detail.redCard == true) { if (detail.team?.id == homeTeamId) hReds++ else aReds++ }
-            if (detail.penaltyKick == true && detail.scoringPlay == false) {
+            if (detail.penaltyKick == true && detail.scoringPlay != true && detail.clock?.displayValue != "0'") {
                 if (detail.team?.id == homeTeamId) hMissedPens++ else aMissedPens++
+                val playerNameBase = detail.athletesInvolved?.firstOrNull()?.displayName ?: "?"
+                val minuteStr = detail.clock?.displayValue ?: "?"
+                val m = minuteRegex.find(minuteStr)
+                val goalMinute = if (m != null) {
+                    (m.groupValues[1].toIntOrNull() ?: 0) + (m.groupValues[3].toIntOrNull() ?: 0)
+                } else 0
+                val minuteLabel = m?.let {
+                    val base = it.groupValues[1]
+                    val extra = it.groupValues[3]
+                    if (extra.isNotEmpty()) "${base}+${extra}" else base
+                } ?: minuteStr
+                val playerName = "$playerNameBase (pen miss)"
+                val isHome = detail.team?.id == homeTeamId
+                if (isHome) homeScorers.add(LiveScorer(playerName, goalMinute, minuteLabel))
+                else awayScorers.add(LiveScorer(playerName, goalMinute, minuteLabel))
             }
         }
         return ParsedDetails(homeScorers, awayScorers, hYellows, aYellows, hReds, aReds, hMissedPens, aMissedPens, hHeaded, aHeaded)

@@ -325,13 +325,25 @@ private fun MatchRow(match: MatchDisplay) {
                 var runningH = 0
                 var runningA = 0
                 sortedScorers.forEach { (goal, isHome, team) ->
-                    if (isHome) runningH++ else runningA++
+                    val isMissedPen = goal.playerName.endsWith("(pen miss)")
+                    if (!isMissedPen) {
+                        if (isHome) runningH++ else runningA++
+                    }
                     Row(Modifier.fillMaxWidth().padding(start = 50.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                         val minuteText = goal.minuteLabel ?: "${goal.minute}"
-                        Text("${minuteText}' [$runningH-$runningA]", fontSize = 9.sp, color = Color(0xFF888888))
-                        Spacer(Modifier.width(6.dp))
-                        Text("\u26BD", fontSize = 10.sp); Spacer(Modifier.width(4.dp))
-                        val displayName = if (goal.playerName.endsWith("(OG)")) goal.playerName else goal.playerName.split(" ").last()
+                        if (isMissedPen) {
+                            Text("${minuteText}' [--]", fontSize = 9.sp, color = Color(0xFF888888))
+                            Spacer(Modifier.width(6.dp))
+                            Text("\u274C", fontSize = 10.sp); Spacer(Modifier.width(4.dp))
+                        } else {
+                            Text("${minuteText}' [$runningH-$runningA]", fontSize = 9.sp, color = Color(0xFF888888))
+                            Spacer(Modifier.width(6.dp))
+                            Text("\u26BD", fontSize = 10.sp); Spacer(Modifier.width(4.dp))
+                        }
+                        val displayName = when {
+                            goal.playerName.endsWith("(OG)") || goal.playerName.endsWith("(pen)") || goal.playerName.endsWith("(pen miss)") -> goal.playerName
+                            else -> goal.playerName.split(" ").last()
+                        }
                         Text(displayName, fontSize = 10.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Spacer(Modifier.height(2.dp))

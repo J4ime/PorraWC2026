@@ -81,15 +81,16 @@ object KnockoutCalculator {
         )
         
         // Puntos por acertar equipos en Dieciseisavos y Octavos (20 pts por equipo)
-        for (round in listOf("Dieciseisavos", "Octavos")) {
+        for (round in listOf("Dieciseisavos", "Octavos", "Cuartos")) {
             val actualTeams = liveRoundLists[round].orEmpty()
             if (actualTeams.isEmpty()) continue
             for (prediction in predictions.filter { it.round == round }) {
                 val home = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
                 val away = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
+                val ptsPerTeam = PointsCalculator.getKnockoutPoints(round)
                 var pts = 0
-                if (actualTeams.any { TeamNameNormalizer.matches(it, home) }) pts += 20
-                if (actualTeams.any { TeamNameNormalizer.matches(it, away) }) pts += 20
+                if (actualTeams.any { TeamNameNormalizer.matches(it, home) }) pts += ptsPerTeam
+                if (actualTeams.any { TeamNameNormalizer.matches(it, away) }) pts += ptsPerTeam
                 if (pts > 0) {
                     pointsByMatch[prediction.matchNumber] = (pointsByMatch[prediction.matchNumber] ?: 0) + pts
                     pointsByPrediction[prediction.matchNumber] = (pointsByPrediction[prediction.matchNumber] ?: 0) + pts

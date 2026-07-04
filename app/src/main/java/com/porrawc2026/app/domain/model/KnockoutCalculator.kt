@@ -92,7 +92,6 @@ object KnockoutCalculator {
                 if (actualTeams.any { TeamNameNormalizer.matches(it, home) }) pts += ptsPerTeam
                 if (actualTeams.any { TeamNameNormalizer.matches(it, away) }) pts += ptsPerTeam
                 if (pts > 0) {
-                    pointsByMatch[prediction.matchNumber] = (pointsByMatch[prediction.matchNumber] ?: 0) + pts
                     pointsByPrediction[prediction.matchNumber] = (pointsByPrediction[prediction.matchNumber] ?: 0) + pts
                 }
             }

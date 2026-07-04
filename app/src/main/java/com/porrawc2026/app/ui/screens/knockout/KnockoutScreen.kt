@@ -4,23 +4,30 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
+import com.porrawc2026.app.data.remote.MatchScheduleProvider
 import com.porrawc2026.app.domain.model.PointsCalculator
 import com.porrawc2026.app.ui.components.TournamentBracket
 import com.porrawc2026.app.ui.theme.*
+import com.porrawc2026.app.util.ExcelParser
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,15 +82,19 @@ fun KnockoutScreen(
                 predictions = predictions,
                 modifier = Modifier.fillMaxSize()
             )
-            1 -> KnockoutPredictionList(predictions = predictions)
+            1 -> KnockoutSelectedTeamsList(
+                predictions = predictions,
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
 
 @Composable
-private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) {
-    val resolvedHome = remember(predictions) { predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions) } }
-    val resolvedAway = remember(predictions) { predictions.associate { it.matchNumber to PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions) } }
+private fun KnockoutSelectedTeamsList(
+    predictions: List<KnockoutPredictionEntity>,
+    modifier: Modifier = Modifier
+) {
     val rounds = listOf(
         "Dieciseisavos" to 20,
         "Octavos" to 40,
@@ -93,16 +104,50 @@ private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) 
         "Final" to 500
     )
 
+    val currentRound = remember {
+        getCurrentKnockoutRound()
+    }
+
+    val teamsByRound = remember(predictions) {
+        predictions
+            .filter { it.winner != null }
+            .groupBy { it.round }
+            .mapValues { (_, preds) ->
+                preds.mapNotNull { p ->
+                    val ref = if (p.winner == 1) p.homeTeamRef else p.awayTeamRef
+                    val resolved = PointsCalculator.resolvePredictionTeamName(ref, predictions)
+                    val isRef = (resolved.startsWith("W") && resolved.drop(1).toIntOrNull() != null) ||
+                            (resolved.startsWith("L") && resolved.drop(1).toIntOrNull() != null)
+                    if (isRef) null else resolved
+                }.sorted()
+            }
+    }
+
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(predictions) {
+        if (predictions.isNotEmpty()) {
+            var targetIdx = 0
+            for ((round, _) in rounds) {
+                if (round == currentRound) break
+                val teams = teamsByRound[round].orEmpty()
+                if (teams.isNotEmpty()) targetIdx += 1 + teams.size
+            }
+            if (targetIdx > 0) {
+                listState.animateScrollToItem(targetIdx)
+            }
+        }
+    }
+
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        state = listState,
+        modifier = modifier.padding(horizontal = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         rounds.forEach { (round, pts) ->
-            val roundPredictions = predictions.filter { it.round == round }
-            if (roundPredictions.isNotEmpty()) {
-                item {
+            val teams = teamsByRound[round].orEmpty()
+            if (teams.isNotEmpty()) {
+                item(key = "header_$round") {
                     Text(
                         text = "${round.uppercase()} — $pts pts",
                         style = MaterialTheme.typography.titleMedium,
@@ -111,124 +156,67 @@ private fun KnockoutPredictionList(predictions: List<KnockoutPredictionEntity>) 
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                     )
                 }
-
-                items(roundPredictions, key = { prediction -> prediction.matchNumber }) { prediction ->
-                    KnockoutPredictionCard(
-                        prediction = prediction,
-                        homeTeam = resolvedHome[prediction.matchNumber] ?: prediction.homeTeamRef,
-                        awayTeam = resolvedAway[prediction.matchNumber] ?: prediction.awayTeamRef
-                    )
+                items(teams, key = { "team_${round}_$it" }) { team ->
+                    TeamRow(team = team, points = pts)
                 }
             }
         }
-
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 
 @Composable
-private fun KnockoutPredictionCard(prediction: KnockoutPredictionEntity, homeTeam: String = prediction.homeTeamRef, awayTeam: String = prediction.awayTeamRef) {
-    val isSelectedHome = prediction.winner == 1
-    val isSelectedAway = prediction.winner == 2
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardDark),
-        shape = RoundedCornerShape(10.dp)
+private fun TeamRow(team: String, points: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MatchBg, RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    "Partido ${prediction.matchNumber}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
-                if (prediction.pointsEarned > 0) {
-                    Text(
-                        "+${prediction.pointsEarned} pts",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AccentGreen,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+        Text(
+            text = ExcelParser.getFlagEmoji(team),
+            fontSize = 16.sp
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = team,
+            fontSize = 14.sp,
+            color = TextPrimary,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$points",
+            fontSize = 14.sp,
+            color = WCGold,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
 
-            Spacer(modifier = Modifier.height(10.dp))
+private fun getCurrentKnockoutRound(): String {
+    val schedule = MatchScheduleProvider.getHardcodedSchedule()
+    val now = Instant.now()
+    val madridZone = ZoneId.of("Europe/Madrid")
+    val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSelectedHome) AccentGreen.copy(alpha = 0.2f) else SurfaceMedium
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (isSelectedHome) {
-                            Icon(
-                                Icons.Filled.CheckCircle,
-                                contentDescription = null,
-                                tint = AccentGreen,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Text(
-                            homeTeam,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isSelectedHome) AccentGreen else TextPrimary,
-                            fontWeight = if (isSelectedHome) FontWeight.Bold else FontWeight.Normal,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+    fun parseInstant(dateStr: String?): Instant? {
+        if (dateStr.isNullOrBlank()) return null
+        return try {
+            LocalDateTime.parse(dateStr, fmt).atZone(madridZone).toInstant()
+        } catch (_: Exception) { null }
+    }
 
-                Text(
-                    "VS",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = WCGold,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
+    val semiStart = parseInstant(schedule[101]?.date)
+    val cuartosStart = parseInstant(schedule[97]?.date)
+    val octavosStart = parseInstant(schedule[89]?.date)
+    val dieciseisavosStart = parseInstant(schedule[73]?.date)
 
-                Card(
-                    modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSelectedAway) AccentGreen.copy(alpha = 0.2f) else SurfaceMedium
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (isSelectedAway) {
-                            Icon(
-                                Icons.Filled.CheckCircle,
-                                contentDescription = null,
-                                tint = AccentGreen,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Text(
-                            awayTeam,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isSelectedAway) AccentGreen else TextPrimary,
-                            fontWeight = if (isSelectedAway) FontWeight.Bold else FontWeight.Normal,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-        }
+    return when {
+        semiStart != null && now >= semiStart -> "Semifinales"
+        cuartosStart != null && now >= cuartosStart -> "Cuartos"
+        octavosStart != null && now >= octavosStart -> "Octavos"
+        dieciseisavosStart != null && now >= dieciseisavosStart -> "Dieciseisavos"
+        else -> "Dieciseisavos"
     }
 }

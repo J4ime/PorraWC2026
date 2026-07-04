@@ -1092,7 +1092,7 @@ class HomeViewModel @Inject constructor(
                     "Ganador" to "${refMatch.homeTeam}-${refMatch.awayTeam}"
                 }
             } else {
-                homeTeam to ""
+                "Ganador" to "P$homeRefMatchId"
             }
         } else {
             homeTeam to ""
@@ -1107,7 +1107,7 @@ class HomeViewModel @Inject constructor(
                     "Ganador" to "${refMatch.homeTeam}-${refMatch.awayTeam}"
                 }
             } else {
-                awayTeam to ""
+                "Ganador" to "P$awayRefMatchId"
             }
         } else {
             awayTeam to ""

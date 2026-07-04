@@ -267,11 +267,15 @@ private fun MatchRow(match: MatchDisplay) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (match.homePossibleTeams.isNotBlank()) {
-                        Text("Ganador ", fontSize = 11.sp, color = Color(0xFFAAAAAA), maxLines = 1)
+                        Text("Ganador ", fontSize = 11.sp, color = Color(0xFFAAAAAA))
                         val teams = match.homePossibleTeams.split("-")
-                        teams.forEachIndexed { index, team ->
-                            if (index > 0) Text("-", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                            Text(ExcelParser.getFlagEmoji(team), fontSize = 13.sp)
+                        if (teams.size == 1 && teams[0].startsWith("P")) {
+                            Text("partido ${teams[0].removePrefix("P")}", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                        } else {
+                            teams.forEachIndexed { index, team ->
+                                if (index > 0) Text(" vs ", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                Text("${ExcelParser.getFlagEmoji(team)} $team", fontSize = 11.sp, color = Color.White, maxLines = 1)
+                            }
                         }
                     } else {
                         Text(match.homeFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))
@@ -281,11 +285,15 @@ private fun MatchRow(match: MatchDisplay) {
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (match.awayPossibleTeams.isNotBlank()) {
-                        Text("Ganador ", fontSize = 11.sp, color = Color(0xFFAAAAAA), maxLines = 1)
+                        Text("Ganador ", fontSize = 11.sp, color = Color(0xFFAAAAAA))
                         val teams = match.awayPossibleTeams.split("-")
-                        teams.forEachIndexed { index, team ->
-                            if (index > 0) Text("-", fontSize = 11.sp, color = Color(0xFFAAAAAA))
-                            Text(ExcelParser.getFlagEmoji(team), fontSize = 13.sp)
+                        if (teams.size == 1 && teams[0].startsWith("P")) {
+                            Text("partido ${teams[0].removePrefix("P")}", fontSize = 11.sp, color = Color(0xFFAAAAAA))
+                        } else {
+                            teams.forEachIndexed { index, team ->
+                                if (index > 0) Text(" vs ", fontSize = 10.sp, color = Color(0xFFAAAAAA))
+                                Text("${ExcelParser.getFlagEmoji(team)} $team", fontSize = 11.sp, color = Color.White, maxLines = 1)
+                            }
                         }
                     } else {
                         Text(match.awayFlag, fontSize = 13.sp); Spacer(Modifier.width(4.dp))

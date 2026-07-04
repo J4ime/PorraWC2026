@@ -33,7 +33,7 @@ object KnockoutCalculator {
                 val isLiveTied = hasResult && !isFinished && prevMatch.homeGoals == prevMatch.awayGoals
                 val isLiveLeading = hasResult && !isFinished && prevMatch.homeGoals != prevMatch.awayGoals
 
-                if (isFinished) {
+                if (isFinished && hasResult) {
                     val winner = if (prevMatch.homeGoals!! > prevMatch.awayGoals!!) prevMatch.homeTeam else prevMatch.awayTeam
                     if (!result[round].orEmpty().any { TeamNameNormalizer.matches(it, winner) }) {
                         result[round]?.add(winner)

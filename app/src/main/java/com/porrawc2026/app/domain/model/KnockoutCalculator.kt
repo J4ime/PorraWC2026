@@ -106,80 +106,29 @@ object KnockoutCalculator {
             val nextRound = roundToNextRound[round] ?: continue
             val pointsForNextRound = roundPoints[nextRound] ?: continue
             
-            // Buscar predicciones de la siguiente ronda
             val nextRoundPredictions = predictions.filter { it.round == nextRound }
             if (nextRoundPredictions.isEmpty()) continue
             
-            val hasResult = match.homeGoals != null && match.awayGoals != null
-            val isFinished = match.winnerTeam != null
+            var matchPts = 0
             
-            // Caso 1: Partido finalizado
-            if (isFinished) {
-                val winner = match.winnerTeam ?: continue
-                // Verificar si el usuario tiene al ganador en su predicción de la siguiente ronda
-                val predictionsWithWinner = nextRoundPredictions.filter { prediction ->
-                    val homeTeam = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
-                    val awayTeam = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
-                    TeamNameNormalizer.matches(homeTeam, winner) || TeamNameNormalizer.matches(awayTeam, winner)
+            for (team in listOfNotNull(match.homeTeam, match.awayTeam)) {
+                if (team.isBlank()) continue
+                val matchingPreds = nextRoundPredictions.filter { pred ->
+                    val h = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, predictions)
+                    val a = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, predictions)
+                    TeamNameNormalizer.matches(h, team) || TeamNameNormalizer.matches(a, team)
                 }
-                if (predictionsWithWinner.isNotEmpty()) {
-                    pointsByMatch[match.id] = pointsForNextRound
-                    // Asignar puntos a las predicciones que tienen al ganador
-                    predictionsWithWinner.forEach { prediction ->
-                        pointsByPrediction[prediction.matchNumber] = pointsForNextRound
+                if (matchingPreds.isNotEmpty()) {
+                    matchPts += pointsForNextRound
+                    matchingPreds.forEach { pred ->
+                        pointsByPrediction[pred.matchNumber] =
+                            (pointsByPrediction[pred.matchNumber] ?: 0) + pointsForNextRound
                     }
                 }
             }
-            // Caso 2: Partido en vivo
-            else if (hasResult) {
-                val homeGoals = match.homeGoals!!
-                val awayGoals = match.awayGoals!!
-                
-                // Caso 2a: Hay un equipo ganando provisionalmente
-                if (homeGoals != awayGoals) {
-                    val leadingTeam = if (homeGoals > awayGoals) match.homeTeam else match.awayTeam
-                    val predictionsWithLeader = nextRoundPredictions.filter { prediction ->
-                        val homeTeam = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
-                        val awayTeam = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
-                        TeamNameNormalizer.matches(homeTeam, leadingTeam) || TeamNameNormalizer.matches(awayTeam, leadingTeam)
-                    }
-                    if (predictionsWithLeader.isNotEmpty()) {
-                        pointsByMatch[match.id] = pointsForNextRound
-                        predictionsWithLeader.forEach { prediction ->
-                            pointsByPrediction[prediction.matchNumber] = pointsForNextRound
-                        }
-                    }
-                }
-                // Caso 2b: Partido empatado
-                else {
-                    val predictionsWithBoth = nextRoundPredictions.filter { prediction ->
-                        val homeTeam = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
-                        val awayTeam = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
-                        (TeamNameNormalizer.matches(homeTeam, match.homeTeam) || TeamNameNormalizer.matches(awayTeam, match.homeTeam)) &&
-                        (TeamNameNormalizer.matches(homeTeam, match.awayTeam) || TeamNameNormalizer.matches(awayTeam, match.awayTeam))
-                    }
-                    if (predictionsWithBoth.isNotEmpty()) {
-                        pointsByMatch[match.id] = pointsForNextRound
-                        predictionsWithBoth.forEach { prediction ->
-                            pointsByPrediction[prediction.matchNumber] = pointsForNextRound
-                        }
-                    }
-                }
-            }
-            // Caso 3: Partido no jugado aún
-            else {
-                val predictionsWithBoth = nextRoundPredictions.filter { prediction ->
-                    val homeTeam = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
-                    val awayTeam = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
-                    (TeamNameNormalizer.matches(homeTeam, match.homeTeam) || TeamNameNormalizer.matches(awayTeam, match.homeTeam)) &&
-                    (TeamNameNormalizer.matches(homeTeam, match.awayTeam) || TeamNameNormalizer.matches(awayTeam, match.awayTeam))
-                }
-                if (predictionsWithBoth.isNotEmpty()) {
-                    pointsByMatch[match.id] = pointsForNextRound
-                    predictionsWithBoth.forEach { prediction ->
-                        pointsByPrediction[prediction.matchNumber] = pointsForNextRound
-                    }
-                }
+            
+            if (matchPts > 0) {
+                pointsByMatch[match.id] = (pointsByMatch[match.id] ?: 0) + matchPts
             }
         }
         

@@ -17,8 +17,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.porrawc2026.app.data.local.entity.MatchEntity
-
+import com.porrawc2026.app.domain.model.KnockoutCalculator
 import com.porrawc2026.app.domain.model.PointsCalculator
+import com.porrawc2026.app.domain.model.TeamNameNormalizer
 import com.porrawc2026.app.ui.theme.*
 import com.porrawc2026.app.util.ExcelParser
 
@@ -27,6 +28,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
     val allMatches by viewModel.allMatches.collectAsStateWithLifecycle()
     val allTeams by viewModel.allTeams.collectAsStateWithLifecycle()
     val koPredictions by viewModel.allKnockoutPredictions.collectAsStateWithLifecycle()
+    val koPointsMap by viewModel.knockoutPointsMap.collectAsStateWithLifecycle()
     val sorted = remember(allMatches) { allMatches.sortedBy { it.dateTime } }
     val listState = rememberLazyListState()
 
@@ -39,19 +41,39 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
         "Final" to 500
     )
 
-    val teamsByRound = remember(koPredictions) {
-        koPredictions
-            .filter { it.winner != null }
-            .groupBy { it.round }
-            .mapValues { (_, preds) ->
-                preds.mapNotNull { p ->
-                    val ref = if (p.winner == 1) p.homeTeamRef else p.awayTeamRef
-                    val resolved = PointsCalculator.resolvePredictionTeamName(ref, koPredictions)
-                    val isRef = (resolved.startsWith("W") && resolved.drop(1).toIntOrNull() != null) ||
-                            (resolved.startsWith("L") && resolved.drop(1).toIntOrNull() != null)
-                    if (isRef) null else resolved
-                }.sorted()
+    val liveRoundLists = remember(allMatches) {
+        KnockoutCalculator.buildLiveRoundLists(allMatches)
+    }
+
+    data class KOItem(val team: String, val points: Int, val userPredicted: Boolean, val matchPlayed: Boolean, val correct: Boolean)
+
+    val roundItems = remember(liveRoundLists, koPredictions, allMatches, koPointsMap) {
+        val result = mutableMapOf<String, List<KOItem>>()
+        for ((round, teams) in liveRoundLists) {
+            result[round] = teams.map { team ->
+                val match = allMatches.firstOrNull { m ->
+                    m.isKnockout && m.knockoutRound == round &&
+                    TeamNameNormalizer.matches(m.homeTeam, team)
+                } ?: allMatches.firstOrNull { m ->
+                    m.isKnockout && m.knockoutRound == round &&
+                    TeamNameNormalizer.matches(m.awayTeam, team)
+                }
+                val matchPlayed = match?.let { it.homeGoals != null && it.awayGoals != null } ?: false
+                val pred = if (match != null) koPredictions.firstOrNull { it.matchNumber == match.id } else null
+                val userPredicted = if (pred != null) {
+                    val home = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
+                    val away = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
+                    TeamNameNormalizer.matches(home, team) || TeamNameNormalizer.matches(away, team)
+                } else false
+                val correct = matchPlayed && userPredicted && pred != null && match != null && (
+                    (pred.winner == 1 && TeamNameNormalizer.matches(team, match.homeTeam)) ||
+                    (pred.winner == 2 && TeamNameNormalizer.matches(team, match.awayTeam))
+                )
+                val points = if (matchPlayed && correct && match != null) (koPointsMap[match.id] ?: 0) else 0
+                KOItem(team, points, userPredicted, matchPlayed, correct)
             }
+        }
+        result
     }
 
     LaunchedEffect(scrollTrigger) {
@@ -88,8 +110,8 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
         }
 
         rounds.forEach { (round, pts) ->
-            val teams = teamsByRound[round].orEmpty()
-            if (teams.isNotEmpty()) {
+            val items = roundItems[round].orEmpty()
+            if (items.isNotEmpty()) {
                 item(key = "ko_header_$round") {
                     Text(
                         text = "${round.uppercase()} — $pts pts",
@@ -99,31 +121,55 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                         modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
                     )
                 }
-                items(teams.size, key = { "ko_team_${round}_${teams[it]}" }) { idx ->
-                    val team = teams[idx]
+                items(items.size, key = { "ko_team_${round}_${items[it].team}" }) { idx ->
+                    val item = items[idx]
+                    val bgColor = when {
+                        item.matchPlayed && item.correct -> AccentGreen.copy(alpha = 0.1f)
+                        item.matchPlayed -> AccentRed.copy(alpha = 0.1f)
+                        else -> SurfaceMedium.copy(alpha = 0.3f)
+                    }
+                    val teamColor = when {
+                        item.matchPlayed && item.correct -> AccentGreen
+                        item.matchPlayed -> AccentRed
+                        else -> TextPrimary
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(SurfaceMedium.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .background(bgColor, RoundedCornerShape(8.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = ExcelParser.getFlagEmoji(team),
+                            text = ExcelParser.getFlagEmoji(item.team),
                             fontSize = 16.sp
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = team,
+                            text = item.team,
                             fontSize = 14.sp,
-                            color = TextPrimary,
+                            color = teamColor,
                             modifier = Modifier.weight(1f)
                         )
+                        val statusText = when {
+                            item.matchPlayed && item.correct -> "✓"
+                            item.matchPlayed -> "✗"
+                            item.userPredicted -> "?"
+                            else -> "-"
+                        }
                         Text(
-                            text = "$pts",
+                            text = "$statusText",
                             fontSize = 14.sp,
-                            color = WCGold,
-                            fontWeight = FontWeight.Bold
+                            color = teamColor,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(18.dp)
+                        )
+                        Text(
+                            text = if (item.points > 0) "${item.points}" else "0",
+                            fontSize = 14.sp,
+                            color = if (item.points > 0) AccentGreen else TextMuted,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }

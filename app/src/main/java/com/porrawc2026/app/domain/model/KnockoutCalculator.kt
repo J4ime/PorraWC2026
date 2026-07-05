@@ -1,5 +1,6 @@
 package com.porrawc2026.app.domain.model
 
+import android.util.Log
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
 import com.porrawc2026.app.data.local.entity.MatchEntity
 
@@ -127,16 +128,23 @@ object KnockoutCalculator {
 
         for (round in KO_ROUNDS_IN_ORDER) {
             val roundMatches = matches.filter { it.isKnockout && it.knockoutRound == round }
+            Log.d("KO_DEBUG", "buildLiveRoundLists round=$round matches=${roundMatches.map { it.id }}")
             for (m in roundMatches) {
+                if (m.homeGoals == null || m.awayGoals == null) continue
+                Log.d("KO_DEBUG", "  match ${m.id}: homeTeam='${m.homeTeam}' isRef=${isRef(m.homeTeam)} awayTeam='${m.awayTeam}' isRef=${isRef(m.awayTeam)}")
                 val home = if (isRef(m.homeTeam)) null else resolveKnockoutTeam(m.homeTeam, matches)
                 val away = if (isRef(m.awayTeam)) null else resolveKnockoutTeam(m.awayTeam, matches)
+                Log.d("KO_DEBUG", "  resolve: home=$home away=$away")
                 if (home != null && result[round].orEmpty().none { TeamNameNormalizer.matches(it, home) }) {
                     result[round]?.add(home)
+                    Log.d("KO_DEBUG", "  added home=$home to $round, now size=${result[round]?.size}")
                 }
                 if (away != null && result[round].orEmpty().none { TeamNameNormalizer.matches(it, away) }) {
                     result[round]?.add(away)
+                    Log.d("KO_DEBUG", "  added away=$away to $round, now size=${result[round]?.size}")
                 }
             }
+            Log.d("KO_DEBUG", "final $round teams: ${result[round]}")
         }
 
         return result
@@ -161,14 +169,18 @@ object KnockoutCalculator {
 
         for ((round, ptsPerTeam) in roundPoints) {
             val actualTeams = liveRoundLists[round].orEmpty()
+            Log.d("KO_DEBUG", "computePointsFromLiveLists round=$round actualTeams=$actualTeams (empty=${actualTeams.isEmpty()})")
             if (actualTeams.isEmpty()) continue
 
             for (prediction in predictions.filter { it.round == round }) {
+                val match = matches.firstOrNull { it.id == prediction.matchNumber }
+                if (match == null || match.homeGoals == null || match.awayGoals == null) continue
                 val home = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
                 val away = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
                 var pts = 0
                 if (actualTeams.any { TeamNameNormalizer.matches(it, home) }) pts += ptsPerTeam
                 if (actualTeams.any { TeamNameNormalizer.matches(it, away) }) pts += ptsPerTeam
+                Log.d("KO_DEBUG", "  pred match=${prediction.matchNumber} home=$home away=$away pts=$pts")
                 if (pts > 0) {
                     pointsByMatch[prediction.matchNumber] = (pointsByMatch[prediction.matchNumber] ?: 0) + pts
                     pointsByPrediction[prediction.matchNumber] = (pointsByPrediction[prediction.matchNumber] ?: 0) + pts
@@ -176,6 +188,7 @@ object KnockoutCalculator {
             }
         }
 
+        Log.d("KO_DEBUG", "computePointsFromLiveLists result matchPts=$pointsByMatch predPts=$pointsByPrediction")
         return Pair(pointsByMatch, pointsByPrediction)
     }
 }

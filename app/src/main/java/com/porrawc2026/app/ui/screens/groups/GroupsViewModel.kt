@@ -1,5 +1,6 @@
 package com.porrawc2026.app.ui.screens.groups
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.porrawc2026.app.data.local.entity.KnockoutPredictionEntity
@@ -35,7 +36,9 @@ class GroupsViewModel @Inject constructor(
             combine(allMatches, allKnockoutPredictions) { matches, predictions ->
                 val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(matches)
                 val (matchPts, predPts) = KnockoutCalculator.computePointsFromLiveLists(predictions, liveRoundLists, matches)
-                matchPts + predPts
+                val combined = matchPts + predPts
+                Log.d("KO_DEBUG", "GroupsViewModel knockoutPointsMap=$combined")
+                combined
             }.collect { _knockoutPointsMap.value = it }
         }
     }

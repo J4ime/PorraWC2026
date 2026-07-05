@@ -102,7 +102,7 @@ fun PorraNavGraph() {
                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                     when (page) {
                         0 -> GoalscorersScreen()
-                        1 -> MatchesScreen(scrollTrigger = partidosScrollTrigger)
+                        1 -> MatchesScreen(scrollTrigger = partidosScrollTrigger, onRefreshRequest = { homeVM.refreshLiveScores() })
                         2 -> HomeScreen(refreshTrigger = homeRefreshTrigger)
                         3 -> QuestionsScreen()
                         4 -> AjustesScreen()

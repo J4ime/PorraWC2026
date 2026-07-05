@@ -355,13 +355,6 @@ class HomeViewModel @Inject constructor(
             if (hasLiveMatches()) {
                 fetchLiveMatchUpdates()
             } else {
-                val now = System.currentTimeMillis()
-                if (now - lastFetchTime < FETCH_COOLDOWN_MS) {
-                    LogManager.log(TAG, "refreshLiveScores skipped: ${now - lastFetchTime}ms since last fetch")
-                    _isBusy.value = false
-                    return@launch
-                }
-                lastFetchTime = now
                 refreshAll()
             }
             _isBusy.value = false

@@ -65,11 +65,8 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                     val away = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
                     TeamNameNormalizer.matches(home, team) || TeamNameNormalizer.matches(away, team)
                 } else false
-                val correct = matchPlayed && userPredicted && pred != null && match != null && (
-                    (pred.winner == 1 && TeamNameNormalizer.matches(team, match.homeTeam)) ||
-                    (pred.winner == 2 && TeamNameNormalizer.matches(team, match.awayTeam))
-                )
-                val points = if (matchPlayed && correct && match != null) (koPointsMap[match.id] ?: 0) else 0
+                val correct = matchPlayed && userPredicted
+                val points = if (correct) PointsCalculator.getKnockoutPoints(round) else 0
                 KOItem(team, points, userPredicted, matchPlayed, correct)
             }
         }

@@ -195,7 +195,9 @@ private fun TeamRow(team: String, points: Int) {
 private fun resolveTeamRef(ref: String, predictions: List<KnockoutPredictionEntity>): String? {
     val resolved = PointsCalculator.resolvePredictionTeamName(ref, predictions)
     val isRef = (resolved.startsWith("W") && resolved.drop(1).toIntOrNull() != null) ||
-            (resolved.startsWith("L") && resolved.drop(1).toIntOrNull() != null)
+            (resolved.startsWith("L") && resolved.drop(1).toIntOrNull() != null) ||
+            (resolved.startsWith("Ganador ") && resolved.removePrefix("Ganador ").toIntOrNull() != null) ||
+            (resolved.startsWith("Perdedor ") && resolved.removePrefix("Perdedor ").toIntOrNull() != null)
     return if (isRef) null else resolved
 }
 

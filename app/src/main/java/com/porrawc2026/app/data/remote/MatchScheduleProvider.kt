@@ -169,7 +169,7 @@ object MatchScheduleProvider {
                 id > 100 -> {
                     val round = when (id) {
                         101, 102 -> "Semifinales"
-                        103 -> "Tercer puesto"
+                        103 -> "3er puesto"
                         104 -> "Final"
                         else -> "Fase final"
                     }

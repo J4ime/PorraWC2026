@@ -179,18 +179,19 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                         val statusText = when {
                             item.matchPlayed && item.correct -> "✓"
                             item.matchPlayed -> "✗"
-                            item.userPredicted -> "?"
-                            else -> "-"
+                            else -> ""
                         }
+                        if (statusText.isNotBlank()) {
                         Text(
-                            text = "$statusText",
+                            text = statusText,
                             fontSize = 11.sp,
                             color = teamColor,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.width(14.dp)
                         )
+                        }
                         Text(
-                            text = if (item.points > 0) "${item.points}" else "0",
+                            text = if (item.points > 0) "${item.points}" else "",
                             fontSize = 11.sp,
                             color = if (item.points > 0) AccentGreen else TextMuted,
                             fontWeight = FontWeight.Bold,

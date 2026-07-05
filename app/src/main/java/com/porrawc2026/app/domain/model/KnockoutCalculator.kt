@@ -28,6 +28,11 @@ object KnockoutCalculator {
         val result = mutableMapOf<Int, Int>()
 
         for (match in matches.filter { it.isKnockout && it.id > 88 }) {
+            // Skip matches whose own teams haven't been resolved yet (still refs like "Ganador 97")
+            if (extractRefMatchId(match.homeTeam) != null || extractRefMatchId(match.awayTeam) != null) {
+                continue
+            }
+
             var totalPts = 0
 
             val refMatches = matches.filter { m ->

@@ -76,8 +76,19 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
             val actualTeams = liveRoundLists[round].orEmpty()
             val roundPreds = predsByRound[round].orEmpty()
             if (roundPreds.isEmpty()) continue
-            val roundComplete = actualTeams.size >= (expectedTeamsCount[round] ?: 0)
-            if (!roundComplete) continue
+            val allPrereqsMet = when (round) {
+                "Octavos" -> true
+                "Cuartos" -> allMatches.filter { it.knockoutRound == "Octavos" }
+                    .let { it.isNotEmpty() && it.all { m -> m.winnerTeam != null } }
+                "Semifinales" -> allMatches.filter { it.knockoutRound == "Cuartos" }
+                    .let { it.isNotEmpty() && it.all { m -> m.winnerTeam != null } }
+                "3er puesto", "Final" -> allMatches.filter { it.knockoutRound == "Semifinales" }
+                    .let { it.isNotEmpty() && it.all { m -> m.winnerTeam != null } }
+                else -> true
+            }
+            val enoughResolved = actualTeams.size >= (expectedTeamsCount[round] ?: 0)
+            if (!allPrereqsMet || !enoughResolved) continue
+            val roundComplete = true
             result[round] = roundPreds.flatMap { pred ->
                 val match = allMatches.firstOrNull { it.id == pred.matchNumber }
                 val homeRaw = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)

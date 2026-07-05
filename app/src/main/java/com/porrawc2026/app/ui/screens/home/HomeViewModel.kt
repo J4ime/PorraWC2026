@@ -208,6 +208,18 @@ class HomeViewModel @Inject constructor(
                     repository.insertMatches(staticSchedule)
                     prefsManager.setCacheTimestamp(System.currentTimeMillis())
                 }
+                // Apply hardcoded Octavos/Cuartos team names from static schedule if DB has blanks
+                cachedMatches = cachedMatches.map { m ->
+                    if (m.id in 89..100 && m.homeTeam.isBlank() && m.awayTeam.isBlank()) {
+                        val ss = staticSchedule.firstOrNull { it.id == m.id }
+                        if (ss != null && ss.homeTeam.isNotBlank())
+                            m.copy(homeTeam = ss.homeTeam, awayTeam = ss.awayTeam)
+                        else m
+                    } else m
+                }
+                // Persist the applied team names
+                val toUpdate = cachedMatches.filter { it.id in 89..100 && it.homeTeam.isNotBlank() }
+                repository.insertMatches(toUpdate)
                 // Migration: reset dieciseisavo placeholder names ("2º Grupo A") to empty,
                 // and force correct dates from schedule so findMatchByDate matches API times
                 fixDieciseisavoDatesAndNames()

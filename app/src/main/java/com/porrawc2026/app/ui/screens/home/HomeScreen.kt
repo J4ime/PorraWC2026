@@ -304,7 +304,7 @@ private fun MatchRow(match: MatchDisplay) {
 
             // Points + TV + round column
             Column(modifier = Modifier.width(38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val showKoPoints = match.isKnockout && (isLive || showScore) && match.pointsEarned > 0
+                val showKoPoints = match.isKnockout && match.pointsEarned > 0
                 val showGroupPoints = !match.isKnockout && hasPred && (isLive || showScore || match.pointsEarned > 0)
             if (showGroupPoints || showKoPoints) {
                     val pts = if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0"

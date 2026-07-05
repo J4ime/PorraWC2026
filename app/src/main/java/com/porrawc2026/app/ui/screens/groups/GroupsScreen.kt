@@ -1,11 +1,21 @@
 package com.porrawc2026.app.ui.screens.groups
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,31 +57,41 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
 
     data class KOItem(val team: String, val points: Int, val userPredicted: Boolean, val matchPlayed: Boolean, val correct: Boolean)
 
+    val isRef: (String) -> Boolean = { resolved ->
+        (resolved.startsWith("W") && resolved.drop(1).toIntOrNull() != null) ||
+        (resolved.startsWith("L") && resolved.drop(1).toIntOrNull() != null) ||
+        (resolved.startsWith("Ganador ") && resolved.removePrefix("Ganador ").toIntOrNull() != null) ||
+        (resolved.startsWith("Perdedor ") && resolved.removePrefix("Perdedor ").toIntOrNull() != null)
+    }
+
     val roundItems = remember(liveRoundLists, koPredictions, allMatches, koPointsMap) {
         val result = mutableMapOf<String, List<KOItem>>()
-        for ((round, teams) in liveRoundLists) {
-            result[round] = teams.map { team ->
-                val match = allMatches.firstOrNull { m ->
-                    m.isKnockout && m.knockoutRound == round &&
-                    TeamNameNormalizer.matches(m.homeTeam, team)
-                } ?: allMatches.firstOrNull { m ->
-                    m.isKnockout && m.knockoutRound == round &&
-                    TeamNameNormalizer.matches(m.awayTeam, team)
-                }
+        val predsByRound = koPredictions.groupBy { it.round }
+        for ((round, _) in rounds) {
+            val actualTeams = liveRoundLists[round].orEmpty()
+            val roundPreds = predsByRound[round].orEmpty()
+            if (roundPreds.isEmpty()) continue
+            result[round] = roundPreds.flatMap { pred ->
+                val match = allMatches.firstOrNull { it.id == pred.matchNumber }
+                val homeRaw = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
+                val awayRaw = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
+                val teams = listOfNotNull(
+                    if (isRef(homeRaw)) null else homeRaw,
+                    if (isRef(awayRaw)) null else awayRaw
+                )
                 val matchPlayed = match?.let { it.homeGoals != null && it.awayGoals != null } ?: false
-                val pred = if (match != null) koPredictions.firstOrNull { it.matchNumber == match.id } else null
-                val userPredicted = if (pred != null) {
-                    val home = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
-                    val away = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
-                    TeamNameNormalizer.matches(home, team) || TeamNameNormalizer.matches(away, team)
-                } else false
-                val correct = matchPlayed && userPredicted
-                val points = if (correct) PointsCalculator.getKnockoutPoints(round) else 0
-                KOItem(team, points, userPredicted, matchPlayed, correct)
+                teams.map { team ->
+                    val correct = matchPlayed && actualTeams.any { TeamNameNormalizer.matches(it, team) }
+                    val points = if (correct) PointsCalculator.getKnockoutPoints(round) else 0
+                    KOItem(team, points, userPredicted = true, matchPlayed, correct)
+                }
             }
+            if (result[round].orEmpty().isEmpty()) result.remove(round)
         }
         result
     }
+
+    val loading = sorted.isEmpty() || (koPredictions.isNotEmpty() && koPointsMap.isEmpty())
 
     LaunchedEffect(scrollTrigger) {
         if (sorted.isEmpty()) return@LaunchedEffect
@@ -91,7 +111,15 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
         }
     }
 
-    LazyColumn(Modifier.fillMaxSize().background(SurfaceDark).padding(horizontal = 12.dp), state = listState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Box(Modifier.fillMaxSize().background(SurfaceDark)) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = WCGold
+            )
+        }
+
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), state = listState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(top = 8.dp).background(GroupHeaderBg, RoundedCornerShape(8.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Fecha", Modifier.width(72.dp), style = MaterialTheme.typography.labelSmall, color = TextMuted)
@@ -174,6 +202,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
         }
 
         item { Spacer(Modifier.height(16.dp)) }
+    }
     }
 }
 

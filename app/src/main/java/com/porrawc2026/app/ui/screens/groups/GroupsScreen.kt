@@ -143,7 +143,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                         style = MaterialTheme.typography.titleSmall,
                         color = WCGold,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                     )
                 }
                 items(items.size, key = { "ko_team_${round}_${items[it].team}" }) { idx ->
@@ -162,17 +162,17 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(bgColor, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = ExcelParser.getFlagEmoji(item.team),
-                            fontSize = 16.sp
+                            fontSize = 12.sp
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = item.team,
-                            fontSize = 14.sp,
+                            fontSize = 11.sp,
                             color = teamColor,
                             modifier = Modifier.weight(1f)
                         )
@@ -184,14 +184,14 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                         }
                         Text(
                             text = "$statusText",
-                            fontSize = 14.sp,
+                            fontSize = 11.sp,
                             color = teamColor,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.width(18.dp)
+                            modifier = Modifier.width(14.dp)
                         )
                         Text(
                             text = if (item.points > 0) "${item.points}" else "0",
-                            fontSize = 14.sp,
+                            fontSize = 11.sp,
                             color = if (item.points > 0) AccentGreen else TextMuted,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center

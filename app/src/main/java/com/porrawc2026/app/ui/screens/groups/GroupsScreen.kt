@@ -55,7 +55,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
         KnockoutCalculator.buildLiveRoundLists(allMatches)
     }
 
-    data class KOItem(val team: String, val points: Int, val userPredicted: Boolean, val matchPlayed: Boolean, val correct: Boolean)
+    data class KOItem(val team: String, val points: Int, val userPredicted: Boolean, val teamsKnown: Boolean, val correct: Boolean)
 
     val isRef: (String) -> Boolean = { resolved ->
         (resolved.startsWith("W") && resolved.drop(1).toIntOrNull() != null) ||
@@ -79,11 +79,11 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                     if (isRef(homeRaw)) null else homeRaw,
                     if (isRef(awayRaw)) null else awayRaw
                 )
-                val matchPlayed = match?.let { it.homeGoals != null && it.awayGoals != null } ?: false
+                val teamsKnown = actualTeams.isNotEmpty()
                 teams.map { team ->
-                    val correct = matchPlayed && actualTeams.any { TeamNameNormalizer.matches(it, team) }
+                    val correct = teamsKnown && actualTeams.any { TeamNameNormalizer.matches(it, team) }
                     val points = if (correct) PointsCalculator.getKnockoutPoints(round) else 0
-                    KOItem(team, points, userPredicted = true, matchPlayed, correct)
+                    KOItem(team, points, userPredicted = true, teamsKnown, correct)
                 }
             }
             if (result[round].orEmpty().isEmpty()) result.remove(round)
@@ -149,13 +149,13 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                 items(items.size, key = { "ko_team_${round}_${items[it].team}" }) { idx ->
                     val item = items[idx]
                     val bgColor = when {
-                        item.matchPlayed && item.correct -> AccentGreen.copy(alpha = 0.1f)
-                        item.matchPlayed -> AccentRed.copy(alpha = 0.1f)
+                        item.teamsKnown && item.correct -> AccentGreen.copy(alpha = 0.1f)
+                        item.teamsKnown -> AccentRed.copy(alpha = 0.1f)
                         else -> SurfaceMedium.copy(alpha = 0.3f)
                     }
                     val teamColor = when {
-                        item.matchPlayed && item.correct -> AccentGreen
-                        item.matchPlayed -> AccentRed
+                        item.teamsKnown && item.correct -> AccentGreen
+                        item.teamsKnown -> AccentRed
                         else -> TextPrimary
                     }
                     Row(
@@ -177,8 +177,8 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                             modifier = Modifier.weight(1f)
                         )
                         val statusText = when {
-                            item.matchPlayed && item.correct -> "✓"
-                            item.matchPlayed -> "✗"
+                            item.teamsKnown && item.correct -> "✓"
+                            item.teamsKnown -> "✗"
                             else -> ""
                         }
                         if (statusText.isNotBlank()) {

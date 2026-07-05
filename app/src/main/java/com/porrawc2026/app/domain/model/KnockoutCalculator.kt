@@ -130,18 +130,13 @@ object KnockoutCalculator {
             val roundMatches = matches.filter { it.isKnockout && it.knockoutRound == round }
             Log.d("KO_DEBUG", "buildLiveRoundLists round=$round matches=${roundMatches.map { it.id }}")
             for (m in roundMatches) {
-                if (m.homeGoals == null || m.awayGoals == null) continue
-                Log.d("KO_DEBUG", "  match ${m.id}: homeTeam='${m.homeTeam}' isRef=${isRef(m.homeTeam)} awayTeam='${m.awayTeam}' isRef=${isRef(m.awayTeam)}")
-                val home = if (isRef(m.homeTeam)) null else resolveKnockoutTeam(m.homeTeam, matches)
-                val away = if (isRef(m.awayTeam)) null else resolveKnockoutTeam(m.awayTeam, matches)
-                Log.d("KO_DEBUG", "  resolve: home=$home away=$away")
-                if (home != null && result[round].orEmpty().none { TeamNameNormalizer.matches(it, home) }) {
-                    result[round]?.add(home)
-                    Log.d("KO_DEBUG", "  added home=$home to $round, now size=${result[round]?.size}")
+                resolveKnockoutTeam(m.homeTeam, matches)?.let { team ->
+                    if (result[round].orEmpty().none { TeamNameNormalizer.matches(it, team) })
+                        result[round]?.add(team)
                 }
-                if (away != null && result[round].orEmpty().none { TeamNameNormalizer.matches(it, away) }) {
-                    result[round]?.add(away)
-                    Log.d("KO_DEBUG", "  added away=$away to $round, now size=${result[round]?.size}")
+                resolveKnockoutTeam(m.awayTeam, matches)?.let { team ->
+                    if (result[round].orEmpty().none { TeamNameNormalizer.matches(it, team) })
+                        result[round]?.add(team)
                 }
             }
             Log.d("KO_DEBUG", "final $round teams: ${result[round]}")

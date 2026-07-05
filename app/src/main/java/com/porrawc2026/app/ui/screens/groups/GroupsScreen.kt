@@ -180,27 +180,14 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = item.team,
-                            fontSize = 14.sp,
+                            fontSize = 11.sp,
                             color = teamColor,
                             modifier = Modifier.weight(1f)
                         )
-                        val statusText = when {
-                            item.matchPlayed && item.correct -> "✓"
-                            item.matchPlayed -> "✗"
-                            item.userPredicted -> "?"
-                            else -> "-"
-                        }
                         Text(
-                            text = "$statusText",
-                            fontSize = 14.sp,
-                            color = teamColor,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.width(18.dp)
-                        )
-                        Text(
-                            text = if (item.points > 0) "${item.points}" else "0",
-                            fontSize = 14.sp,
-                            color = if (item.points > 0) AccentGreen else TextMuted,
+                            text = "0",
+                            fontSize = 11.sp,
+                            color = TextMuted,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )

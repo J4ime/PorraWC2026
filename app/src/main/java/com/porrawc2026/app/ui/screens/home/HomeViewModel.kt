@@ -468,11 +468,21 @@ class HomeViewModel @Inject constructor(
         val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
 
         // Compute knockout points per prediction using live round lists
-        val (matchPoints, predPoints) = KnockoutCalculator.computePointsFromLiveLists(
+        val (allMatchPoints, predPoints) = KnockoutCalculator.computePointsFromLiveLists(
             koPredictions, liveRoundLists, cachedMatches
         )
-        matchPointsMap = matchPoints
-        knockoutPointsMap = matchPoints + predPoints
+
+        // For Octavos+ matches (89-104), compute points based on next-round predictions (0/1/2 logic)
+        val nextRoundPoints = KnockoutCalculator.computeNextRoundMatchPoints(
+            koPredictions, cachedMatches
+        )
+
+        // Combine: Dieciseisavos (73-88) uses old logic, Octavos+ uses new 0/1/2 logic
+        matchPointsMap = mutableMapOf<Int, Int>().apply {
+            putAll(allMatchPoints.filterKeys { it in 73..88 })
+            putAll(nextRoundPoints)
+        }
+        knockoutPointsMap = matchPointsMap + predPoints
 
         // Save points to knockout_predictions table so total points calculation works
         for (prediction in koPredictions) {

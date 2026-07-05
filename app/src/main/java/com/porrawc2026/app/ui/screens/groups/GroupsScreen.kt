@@ -80,9 +80,20 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                     if (isRef(awayRaw)) null else awayRaw
                 )
                 teams.map { team ->
-                    val correct = actualTeams.any { TeamNameNormalizer.matches(it, team) }
-                    val points = if (correct) PointsCalculator.getKnockoutPoints(round) else 0
-                    KOItem(team, points, userPredicted = true, teamsKnown = true, correct)
+                    val teamFound = actualTeams.any { TeamNameNormalizer.matches(it, team) }
+                    val matchHasRealNames = match != null && !isRef(match.homeTeam) && !isRef(match.awayTeam)
+                    if (teamFound && matchHasRealNames) {
+                        val pts = PointsCalculator.getKnockoutPoints(round)
+                        KOItem(team, pts, userPredicted = true, teamsKnown = true, correct = true)
+                    } else {
+                        val roundComplete = when (round) {
+                            "Cuartos" -> actualTeams.size >= 8
+                            "Semifinales" -> actualTeams.size >= 4
+                            else -> true
+                        }
+                        val closed = matchHasRealNames && roundComplete
+                        KOItem(team, 0, userPredicted = true, teamsKnown = closed, correct = false)
+                    }
                 }
             }
             if (result[round].orEmpty().isEmpty()) result.remove(round)

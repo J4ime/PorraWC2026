@@ -251,21 +251,25 @@ class HomeViewModel @Inject constructor(
             var lastFullFetch = System.currentTimeMillis()
             var lastDay = LocalDate.now(madridZone)
             while (true) {
-                delay(60_000L)
-                val hasLive = hasLiveMatches()
-                if (hasLive) {
-                    fetchLiveMatchUpdates()
-                }
-                val now = System.currentTimeMillis()
-                if (now - lastFullFetch >= FETCH_COOLDOWN_MS) {
-                    lastFullFetch = now
-                    fetchLiveResults()
-                }
-                val today = LocalDate.now(madridZone)
-                if (today != lastDay) {
-                    lastDay = today
-                    LogManager.log(TAG, "Day changed to $today, refreshing matches")
-                    refreshUpcomingMatches()
+                try {
+                    delay(60_000L)
+                    val hasLive = hasLiveMatches()
+                    if (hasLive) {
+                        fetchLiveMatchUpdates()
+                    }
+                    val now = System.currentTimeMillis()
+                    if (now - lastFullFetch >= FETCH_COOLDOWN_MS) {
+                        lastFullFetch = now
+                        fetchLiveResults()
+                    }
+                    val today = LocalDate.now(madridZone)
+                    if (today != lastDay) {
+                        lastDay = today
+                        LogManager.log(TAG, "Day changed to $today, refreshing matches")
+                        refreshUpcomingMatches()
+                    }
+                } catch (e: Exception) {
+                    LogManager.log(TAG, "Polling error: ${e.message}")
                 }
             }
         }

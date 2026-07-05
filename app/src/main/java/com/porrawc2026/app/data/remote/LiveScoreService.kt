@@ -78,10 +78,8 @@ class LiveScoreService @Inject constructor(
     suspend fun fetchLiveScoreByEspnId(match: MatchEntity): LiveScoreUpdate? {
         val espnId = match.espnId ?: return null
         return try {
-            val response = espnService.getEvents(eventId = espnId)
-            val events = response.events ?: return null
-            val event = events.firstOrNull { it.id == espnId } ?: return null
-            parseSimpleEvent(event, match)
+            val event = espnService.getEvent(eventId = espnId)
+            parseEvent(event, listOf(match))
         } catch (e: Exception) {
             LogManager.log("LiveScoreService", "Error fetching live score for match ${match.id} (espnId=$espnId)", e)
             null

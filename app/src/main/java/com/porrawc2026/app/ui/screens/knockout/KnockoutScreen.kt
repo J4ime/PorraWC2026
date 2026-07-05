@@ -110,16 +110,14 @@ private fun KnockoutSelectedTeamsList(
 
     val teamsByRound = remember(predictions) {
         predictions
-            .filter { it.winner != null }
             .groupBy { it.round }
             .mapValues { (_, preds) ->
-                preds.mapNotNull { p ->
-                    val ref = if (p.winner == 1) p.homeTeamRef else p.awayTeamRef
-                    val resolved = PointsCalculator.resolvePredictionTeamName(ref, predictions)
-                    val isRef = (resolved.startsWith("W") && resolved.drop(1).toIntOrNull() != null) ||
-                            (resolved.startsWith("L") && resolved.drop(1).toIntOrNull() != null)
-                    if (isRef) null else resolved
-                }.sorted()
+                preds.flatMap { p ->
+                    listOfNotNull(
+                        resolveTeamRef(p.homeTeamRef, predictions),
+                        resolveTeamRef(p.awayTeamRef, predictions)
+                    )
+                }.distinct().sorted()
             }
     }
 
@@ -192,6 +190,13 @@ private fun TeamRow(team: String, points: Int) {
             fontWeight = FontWeight.Bold
         )
     }
+}
+
+private fun resolveTeamRef(ref: String, predictions: List<KnockoutPredictionEntity>): String? {
+    val resolved = PointsCalculator.resolvePredictionTeamName(ref, predictions)
+    val isRef = (resolved.startsWith("W") && resolved.drop(1).toIntOrNull() != null) ||
+            (resolved.startsWith("L") && resolved.drop(1).toIntOrNull() != null)
+    return if (isRef) null else resolved
 }
 
 private fun getCurrentKnockoutRound(): String {

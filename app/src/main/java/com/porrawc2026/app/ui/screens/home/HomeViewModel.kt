@@ -912,9 +912,7 @@ class HomeViewModel @Inject constructor(
             cachedMatches = cachedMatches.map {
                 if (it.id == update.matchId) it.copy(homeScorers = homeJson, awayScorers = awayJson) else it
             }
-            if (update.isFinished) {
-                repository.updateMatchScorers(update.matchId, homeJson, awayJson)
-            }
+            repository.updateMatchScorers(update.matchId, homeJson, awayJson)
         }
     }
 

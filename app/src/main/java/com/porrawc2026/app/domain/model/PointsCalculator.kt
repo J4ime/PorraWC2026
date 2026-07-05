@@ -65,24 +65,23 @@ object PointsCalculator {
     }
 
     fun resolvePredictionTeamName(ref: String, predictions: List<KnockoutPredictionEntity>): String {
-        if (ref.startsWith("W")) {
-            val matchId = ref.substring(1).toIntOrNull() ?: return ref
-            val pred = predictions.firstOrNull { it.matchNumber == matchId }
-            if (pred != null && pred.winner != null) {
-                val teamRef = if (pred.winner == 1) pred.homeTeamRef else pred.awayTeamRef
-                return resolvePredictionTeamName(teamRef, predictions)
-            }
-            return ref
+        val matchId = when {
+            ref.startsWith("W") -> ref.substring(1).toIntOrNull()
+            ref.startsWith("L") -> ref.substring(1).toIntOrNull()
+            ref.startsWith("Ganador ") -> ref.removePrefix("Ganador ").trim().toIntOrNull()
+            ref.startsWith("Perdedor ") -> ref.removePrefix("Perdedor ").trim().toIntOrNull()
+            else -> return ref
+        } ?: return ref
+
+        val pred = predictions.firstOrNull { it.matchNumber == matchId } ?: return ref
+        if (pred.winner == null) return ref
+
+        val isWinner = ref.startsWith("W") || ref.startsWith("Ganador ")
+        val teamRef = if (isWinner) {
+            if (pred.winner == 1) pred.homeTeamRef else pred.awayTeamRef
+        } else {
+            if (pred.winner == 1) pred.awayTeamRef else pred.homeTeamRef
         }
-        if (ref.startsWith("L")) {
-            val matchId = ref.substring(1).toIntOrNull() ?: return ref
-            val pred = predictions.firstOrNull { it.matchNumber == matchId }
-            if (pred != null && pred.winner != null) {
-                val loserRef = if (pred.winner == 1) pred.awayTeamRef else pred.homeTeamRef
-                return resolvePredictionTeamName(loserRef, predictions)
-            }
-            return ref
-        }
-        return ref
+        return resolvePredictionTeamName(teamRef, predictions)
     }
 }

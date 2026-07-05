@@ -79,7 +79,9 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                     if (isRef(homeRaw)) null else homeRaw,
                     if (isRef(awayRaw)) null else awayRaw
                 )
-                val teamsKnown = actualTeams.isNotEmpty()
+                val teamsKnown = match != null &&
+                    match.homeTeam.isNotBlank() && match.awayTeam.isNotBlank() &&
+                    !isRef(match.homeTeam) && !isRef(match.awayTeam)
                 teams.map { team ->
                     val correct = teamsKnown && actualTeams.any { TeamNameNormalizer.matches(it, team) }
                     val points = if (correct) PointsCalculator.getKnockoutPoints(round) else 0

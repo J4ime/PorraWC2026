@@ -57,13 +57,6 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
 
     data class KOItem(val team: String, val points: Int, val userPredicted: Boolean, val teamsKnown: Boolean, val correct: Boolean)
 
-    val isRef: (String) -> Boolean = { resolved ->
-        (resolved.startsWith("W") && resolved.drop(1).toIntOrNull() != null) ||
-        (resolved.startsWith("L") && resolved.drop(1).toIntOrNull() != null) ||
-        (resolved.startsWith("Ganador ") && resolved.removePrefix("Ganador ").toIntOrNull() != null) ||
-        (resolved.startsWith("Perdedor ") && resolved.removePrefix("Perdedor ").toIntOrNull() != null)
-    }
-
     val roundItems = remember(liveRoundLists, koPredictions, allMatches, koPointsMap) {
         val result = mutableMapOf<String, List<KOItem>>()
         val predsByRound = koPredictions.groupBy { it.round }
@@ -76,12 +69,12 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                 val homeRaw = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
                 val awayRaw = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
                 val teams = listOfNotNull(
-                    if (isRef(homeRaw)) null else homeRaw,
-                    if (isRef(awayRaw)) null else awayRaw
+                    if (KnockoutCalculator.isRef(homeRaw)) null else homeRaw,
+                    if (KnockoutCalculator.isRef(awayRaw)) null else awayRaw
                 )
                 teams.map { team ->
                     val teamFound = actualTeams.any { TeamNameNormalizer.matches(it, team) }
-                    val matchHasRealNames = match != null && !isRef(match.homeTeam) && !isRef(match.awayTeam)
+                    val matchHasRealNames = match != null && !KnockoutCalculator.isRef(match.homeTeam) && !KnockoutCalculator.isRef(match.awayTeam)
                     if (teamFound && matchHasRealNames) {
                         val pts = PointsCalculator.getKnockoutPoints(round)
                         KOItem(team, pts, userPredicted = true, teamsKnown = true, correct = true)

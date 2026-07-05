@@ -85,6 +85,12 @@ object KnockoutCalculator {
         }
     }
 
+    fun isRef(teamName: String): Boolean =
+        (teamName.startsWith("Ganador ") && teamName.removePrefix("Ganador ").toIntOrNull() != null) ||
+        (teamName.startsWith("Perdedor ") && teamName.removePrefix("Perdedor ").toIntOrNull() != null) ||
+        (teamName.startsWith("W") && teamName.drop(1).toIntOrNull() != null) ||
+        (teamName.startsWith("L") && teamName.drop(1).toIntOrNull() != null)
+
     fun roundLevel(round: String): Int = when (round) {
         "Dieciseisavos" -> 1; "Octavos" -> 2; "Cuartos" -> 3; "Semifinales" -> 4
         "3er puesto" -> 5; "Final" -> 6; "Campeón" -> 7; else -> 0
@@ -122,8 +128,8 @@ object KnockoutCalculator {
         for (round in KO_ROUNDS_IN_ORDER) {
             val roundMatches = matches.filter { it.isKnockout && it.knockoutRound == round }
             for (m in roundMatches) {
-                val home = resolveKnockoutTeam(m.homeTeam, matches)
-                val away = resolveKnockoutTeam(m.awayTeam, matches)
+                val home = if (isRef(m.homeTeam)) null else resolveKnockoutTeam(m.homeTeam, matches)
+                val away = if (isRef(m.awayTeam)) null else resolveKnockoutTeam(m.awayTeam, matches)
                 if (home != null && result[round].orEmpty().none { TeamNameNormalizer.matches(it, home) }) {
                     result[round]?.add(home)
                 }

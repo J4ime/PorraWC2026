@@ -64,6 +64,11 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
         (resolved.startsWith("Perdedor ") && resolved.removePrefix("Perdedor ").toIntOrNull() != null)
     }
 
+    val expectedTeamsCount = mapOf(
+        "Dieciseisavos" to 32, "Octavos" to 16, "Cuartos" to 8,
+        "Semifinales" to 4, "3er puesto" to 2, "Final" to 2
+    )
+
     val roundItems = remember(liveRoundLists, koPredictions, allMatches, koPointsMap) {
         val result = mutableMapOf<String, List<KOItem>>()
         val predsByRound = koPredictions.groupBy { it.round }
@@ -71,6 +76,8 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
             val actualTeams = liveRoundLists[round].orEmpty()
             val roundPreds = predsByRound[round].orEmpty()
             if (roundPreds.isEmpty()) continue
+            val roundComplete = actualTeams.size >= (expectedTeamsCount[round] ?: 0)
+            if (!roundComplete) continue
             result[round] = roundPreds.flatMap { pred ->
                 val match = allMatches.firstOrNull { it.id == pred.matchNumber }
                 val homeRaw = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
@@ -79,16 +86,10 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                     if (isRef(homeRaw)) null else homeRaw,
                     if (isRef(awayRaw)) null else awayRaw
                 )
-                val matchHasRealNames = match != null &&
-                    match.homeTeam.isNotBlank() && match.awayTeam.isNotBlank() &&
-                    !isRef(match.homeTeam) && !isRef(match.awayTeam)
-                val roundHasRealTeams = actualTeams.isNotEmpty()
-                if (!matchHasRealNames && !roundHasRealTeams) return@flatMap emptyList<KOItem>()
-                val effectiveKnown = matchHasRealNames || roundHasRealTeams
                 teams.map { team ->
-                    val correct = roundHasRealTeams && actualTeams.any { TeamNameNormalizer.matches(it, team) }
+                    val correct = actualTeams.any { TeamNameNormalizer.matches(it, team) }
                     val points = if (correct) PointsCalculator.getKnockoutPoints(round) else 0
-                    KOItem(team, points, userPredicted = true, effectiveKnown, correct)
+                    KOItem(team, points, userPredicted = true, roundComplete, correct)
                 }
             }
             if (result[round].orEmpty().isEmpty()) result.remove(round)
@@ -183,7 +184,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                         )
                         val statusText = when {
                             item.teamsKnown && item.correct -> "✓"
-                            item.teamsKnown -> "✗"
+                            item.teamsKnown -> "0"
                             else -> ""
                         }
                         if (statusText.isNotBlank()) {

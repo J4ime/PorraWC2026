@@ -79,14 +79,16 @@ fun MatchesScreen(scrollTrigger: Int = 0, viewModel: GroupsViewModel = hiltViewM
                     if (isRef(homeRaw)) null else homeRaw,
                     if (isRef(awayRaw)) null else awayRaw
                 )
-                val teamsKnown = match != null &&
+                val matchHasRealNames = match != null &&
                     match.homeTeam.isNotBlank() && match.awayTeam.isNotBlank() &&
                     !isRef(match.homeTeam) && !isRef(match.awayTeam)
-                if (!teamsKnown) return@flatMap emptyList<KOItem>()
+                val roundHasRealTeams = actualTeams.isNotEmpty()
+                if (!matchHasRealNames && !roundHasRealTeams) return@flatMap emptyList<KOItem>()
+                val effectiveKnown = matchHasRealNames || roundHasRealTeams
                 teams.map { team ->
-                    val correct = actualTeams.any { TeamNameNormalizer.matches(it, team) }
+                    val correct = roundHasRealTeams && actualTeams.any { TeamNameNormalizer.matches(it, team) }
                     val points = if (correct) PointsCalculator.getKnockoutPoints(round) else 0
-                    KOItem(team, points, userPredicted = true, teamsKnown, correct)
+                    KOItem(team, points, userPredicted = true, effectiveKnown, correct)
                 }
             }
             if (result[round].orEmpty().isEmpty()) result.remove(round)

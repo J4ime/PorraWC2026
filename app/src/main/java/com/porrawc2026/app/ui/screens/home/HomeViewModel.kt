@@ -468,7 +468,7 @@ class HomeViewModel @Inject constructor(
         val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
 
         // Compute knockout points per prediction using live round lists
-        val (allMatchPoints, predPoints) = KnockoutCalculator.computePointsFromLiveLists(
+        val (allMatchPoints, _) = KnockoutCalculator.computePointsFromLiveLists(
             koPredictions, liveRoundLists, cachedMatches
         )
 
@@ -482,7 +482,7 @@ class HomeViewModel @Inject constructor(
             putAll(allMatchPoints.filterKeys { it in 73..88 })
             putAll(nextRoundPoints)
         }
-        knockoutPointsMap = matchPointsMap + predPoints
+        knockoutPointsMap = matchPointsMap
 
         // Save points to knockout_predictions table so total points calculation works
         for (prediction in koPredictions) {

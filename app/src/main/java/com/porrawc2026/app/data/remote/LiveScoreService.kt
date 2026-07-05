@@ -326,8 +326,9 @@ class LiveScoreService @Inject constructor(
                 try {
                     val scorers: List<LiveScorer> = gson.fromJson(homeRaw, scorerListType) ?: emptyList()
                     scorers.forEach { s ->
+                        val cleanName = cleanPlayerName(s.playerName)
                         allScorers.getOrPut(match.homeTeam) { mutableMapOf() }
-                            .merge(s.playerName, 1) { a, b -> a + b }
+                            .merge(cleanName, 1) { a, b -> a + b }
                     }
                 } catch (e: Exception) {
                     LogManager.log("LiveScoreService", "Error parsing home scorers for match ${match.id}", e)
@@ -337,8 +338,9 @@ class LiveScoreService @Inject constructor(
                 try {
                     val scorers: List<LiveScorer> = gson.fromJson(awayRaw, scorerListType) ?: emptyList()
                     scorers.forEach { s ->
+                        val cleanName = cleanPlayerName(s.playerName)
                         allScorers.getOrPut(match.awayTeam) { mutableMapOf() }
-                            .merge(s.playerName, 1) { a, b -> a + b }
+                            .merge(cleanName, 1) { a, b -> a + b }
                     }
                 } catch (e: Exception) {
                     LogManager.log("LiveScoreService", "Error parsing away scorers for match ${match.id}", e)
@@ -351,6 +353,10 @@ class LiveScoreService @Inject constructor(
                 TopScorerData(player, team, goals)
             }
         }.sortedByDescending { it.goals }
+    }
+
+    private fun cleanPlayerName(name: String): String {
+        return name.replace(" (pen)", "").replace(" (OG)", "").replace(" (pen miss)", "")
     }
 
     private fun findMatchByDate(eventDate: String?, eventName: String?, matches: List<MatchEntity>): MatchEntity? {

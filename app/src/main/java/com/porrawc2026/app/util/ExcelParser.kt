@@ -344,8 +344,8 @@ object ExcelParser {
                 val rowIdx = startRow + offset
                 val row = sheet.getRow(rowIdx) ?: continue
                 val matchNumber = cellInt(row, COL_KNOCKOUT_MATCH_NUM) ?: continue
-                val homeTeam = cellText(row, COL_MATCH_HOME) ?: (cellText(row, COL_KNOCKOUT_HOME_REF) ?: "W$matchNumber")
-                val awayTeam = cellText(row, COL_MATCH_AWAY) ?: (cellText(row, COL_KNOCKOUT_AWAY_REF) ?: "W$matchNumber")
+                val homeTeam = cellText(row, COL_KNOCKOUT_HOME_REF) ?: "W$matchNumber"
+                val awayTeam = cellText(row, COL_KNOCKOUT_AWAY_REF) ?: "W$matchNumber"
 
                 val dateStr = readDateCell(row)
                 val predHome = cellInt(row, COL_GOAL_HOME)
@@ -374,8 +374,8 @@ object ExcelParser {
         val thirdPlaceRow = sheet.getRow(142)
         if (thirdPlaceRow != null) {
             matchId++
-            val h = cellText(thirdPlaceRow, COL_MATCH_HOME) ?: "L101"
-            val a = cellText(thirdPlaceRow, COL_MATCH_AWAY) ?: "L102"
+            val h = cellText(thirdPlaceRow, COL_KNOCKOUT_HOME_REF) ?: "L101"
+            val a = cellText(thirdPlaceRow, COL_KNOCKOUT_AWAY_REF) ?: "L102"
             matches.add(MatchEntity(id = 103, groupName = "3er puesto", matchday = "3er puesto",
                 dateTime = readDateCell(thirdPlaceRow),
                 homeTeam = cleanText(h), awayTeam = cleanText(a),
@@ -387,8 +387,8 @@ object ExcelParser {
         val finalRow = sheet.getRow(146)
         if (finalRow != null) {
             matchId++
-            val h = cellText(finalRow, COL_MATCH_HOME) ?: "W101"
-            val a = cellText(finalRow, COL_MATCH_AWAY) ?: "W102"
+            val h = cellText(finalRow, COL_KNOCKOUT_HOME_REF) ?: "W101"
+            val a = cellText(finalRow, COL_KNOCKOUT_AWAY_REF) ?: "W102"
             matches.add(MatchEntity(id = 104, groupName = "Final", matchday = "Final",
                 dateTime = readDateCell(finalRow),
                 homeTeam = cleanText(h), awayTeam = cleanText(a),

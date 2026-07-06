@@ -529,6 +529,7 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun fixDieciseisavoDatesAndNames() {
         val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
+        val allSched = MatchScheduleProvider.getHardcodedSchedule()
         val now = Instant.now()
         // For matches that already started, preserve team names (they come from API).
         // Only reset placeholder names for future matches or empty names.
@@ -563,24 +564,61 @@ class HomeViewModel @Inject constructor(
                     }
                 } else m
             } else if (m.id in 89..100) {
-                val hasRealNames = m.homeTeam.isNotBlank() && m.awayTeam.isNotBlank()
-                if (hasRealNames) m else m.copy(
-                    homeTeam = "", awayTeam = "",
-                    homeGoals = null, awayGoals = null,
-                    homeScorers = null, awayScorers = null,
-                    homeRedCards = null, awayRedCards = null,
-                    homeYellowCards = null, awayYellowCards = null,
-                    homeMissedPenalties = 0, awayMissedPenalties = 0,
-                    winnerTeam = null,
-                    homeHeadedGoals = 0, awayHeadedGoals = 0,
-                    hasSubGoal = false,
-                    homeShootoutScore = 0, awayShootoutScore = 0,
-                    pointsEarned = 0
-                )
+                val sched = allSched[m.id]
+                val hasBracketRef = m.homeTeam.startsWith("Ganador ") || m.homeTeam.startsWith("Perdedor ")
+                val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
+                val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
+                if (hasBracketRef && alreadyStarted && m.homeTeam == sched?.home && m.awayTeam == sched?.away) {
+                    // Already correct bracket ref, keep as-is
+                    m
+                } else if (alreadyStarted && m.homeGoals != null && m.awayGoals != null) {
+                    // API has set results, leave it alone
+                    m
+                } else if (sched != null) {
+                    // Reset to schedule bracket refs
+                    m.copy(
+                        homeTeam = sched.home,
+                        awayTeam = sched.away,
+                        homeGoals = null, awayGoals = null,
+                        homeScorers = null, awayScorers = null,
+                        homeRedCards = null, awayRedCards = null,
+                        homeYellowCards = null, awayYellowCards = null,
+                        homeMissedPenalties = 0, awayMissedPenalties = 0,
+                        winnerTeam = null,
+                        homeHeadedGoals = 0, awayHeadedGoals = 0,
+                        hasSubGoal = false,
+                        homeShootoutScore = 0, awayShootoutScore = 0,
+                        pointsEarned = 0
+                    )
+                } else m
+            } else if (m.id in 101..104) {
+                val sched = allSched[m.id]
+                val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
+                val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
+                if (alreadyStarted && m.homeGoals != null && m.awayGoals != null) {
+                    // API has set results, leave it alone
+                    m
+                } else if (sched != null) {
+                    // Reset to schedule bracket refs (Ganador/Perdedor X)
+                    m.copy(
+                        homeTeam = sched.home,
+                        awayTeam = sched.away,
+                        homeGoals = null, awayGoals = null,
+                        homeScorers = null, awayScorers = null,
+                        homeRedCards = null, awayRedCards = null,
+                        homeYellowCards = null, awayYellowCards = null,
+                        homeMissedPenalties = 0, awayMissedPenalties = 0,
+                        winnerTeam = null,
+                        homeHeadedGoals = 0, awayHeadedGoals = 0,
+                        hasSubGoal = false,
+                        homeShootoutScore = 0, awayShootoutScore = 0,
+                        pointsEarned = 0
+                    )
+                } else m
             } else m
         }
         // Only persist the cleared data; preserve API-set scores for already-started matches
-        val toPersist = cachedMatches.filter { it.id in 73..100 }
+        val toPersist = cachedMatches.filter { it.id in 73..104 }
         repository.insertMatches(toPersist)
     }
 

@@ -35,9 +35,16 @@ class GroupsViewModel @Inject constructor(
         viewModelScope.launch {
             combine(allMatches, allKnockoutPredictions) { matches, predictions ->
                 val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(matches)
+                // DEBUG: dump Octavos match data from DB
+                val octavosMatches = matches.filter { it.id in 89..96 }
+                for (m in octavosMatches) {
+                    Log.d("KO_DEBUG", "GroupsVM DB id=${m.id} koRound=${m.knockoutRound} isKo=${m.isKnockout} homeTeam='${m.homeTeam}' awayTeam='${m.awayTeam}' homeGoals=${m.homeGoals} awayGoals=${m.awayGoals}")
+                }
+                Log.d("KO_DEBUG", "GroupsVM DB liveRoundLists[Octavos]=${liveRoundLists["Octavos"]}")
+                Log.d("KO_DEBUG", "GroupsVM DB octavos predictions: ${predictions.filter { it.round == "Octavos" }.map { "${it.matchNumber}: refs ${it.homeTeamRef}/${it.awayTeamRef}" }}")
                 val (matchPts, predPts) = KnockoutCalculator.computePointsFromLiveLists(predictions, liveRoundLists, matches)
                 val combined = matchPts + predPts
-                Log.d("KO_DEBUG", "GroupsViewModel knockoutPointsMap=$combined")
+                Log.d("KO_DEBUG", "GroupsViewModel knockoutPointsMap=$combined matchPts=$matchPts predPts=$predPts")
                 combined
             }.collect { _knockoutPointsMap.value = it }
         }

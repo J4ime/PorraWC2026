@@ -454,6 +454,13 @@ class HomeViewModel @Inject constructor(
         val koPredictions = repository.getKnockoutPredictions().first()
         knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.homeTeamRef != null || it.awayTeamRef != null } }
 
+        // DEBUG: dump Octavos match data from cachedMatches
+        val octavosMatches = cachedMatches.filter { it.id in 89..96 }
+        for (m in octavosMatches) {
+            Log.d("KO_DEBUG", "HomeVM cachedMatches id=${m.id} koRound=${m.knockoutRound} isKo=${m.isKnockout} homeTeam='${m.homeTeam}' awayTeam='${m.awayTeam}' homeGoals=${m.homeGoals} awayGoals=${m.awayGoals}")
+        }
+        Log.d("KO_DEBUG", "HomeVM octavos predictions: ${koPredictions.filter { it.round == "Octavos" }.map { "${it.matchNumber}: refs ${it.homeTeamRef}/${it.awayTeamRef}" }}")
+
         // Group/match prediction points (10+10+30)
         cachedMatches = cachedMatches.map { m ->
             val pts = PointsCalculator.calculateMatchPoints(m)
@@ -463,6 +470,7 @@ class HomeViewModel @Inject constructor(
 
         // Compute KO points same as Partidos tab (buildLiveRoundLists + computePointsFromLiveLists)
         val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
+        Log.d("KO_DEBUG", "HomeVM liveRoundLists[Octavos]=${liveRoundLists["Octavos"]}")
         val (allMatchPoints, _) = KnockoutCalculator.computePointsFromLiveLists(
             koPredictions, liveRoundLists, cachedMatches
         )

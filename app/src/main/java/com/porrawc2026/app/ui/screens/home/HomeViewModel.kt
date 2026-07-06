@@ -254,6 +254,8 @@ class HomeViewModel @Inject constructor(
                 try {
                     delay(60_000L)
                     val hasLive = hasLiveMatches()
+                    val liveStatus = cachedMatches.map { "${it.id}:${liveMinutes[it.id] ?: "?"}/${it.homeGoals?:0}-${it.awayGoals?:0}" }.take(20)
+                    LogManager.log(TAG, "Poll: hasLive=$hasLive, lastFullFetch=$lastFullFetch, matchStatus samples=${liveStatus}")
                     if (hasLive) {
                         fetchLiveMatchUpdates()
                     }
@@ -352,10 +354,14 @@ class HomeViewModel @Inject constructor(
     fun refreshLiveScores() {
         viewModelScope.launch(Dispatchers.IO) {
             _isBusy.value = true
+            LogManager.log(TAG, "refreshLiveScores: hasLiveMatches=${hasLiveMatches()}")
+            LogManager.log(TAG, "refreshLiveScores: cachedMatches #${cachedMatches.size}, liveMinutes keys=${liveMinutes.keys.sorted()}")
             if (hasLiveMatches()) {
+                LogManager.log(TAG, "refreshLiveScores: calling fetchLiveMatchUpdates")
                 fetchLiveMatchUpdates()
             } else {
-                refreshAll()
+                LogManager.log(TAG, "refreshLiveScores: no live detection, forcing full fetchLiveResults(fullFetch=true)")
+                fetchLiveResults(fullFetch = true)
             }
             _isBusy.value = false
         }
@@ -642,10 +648,17 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveResults(fullFetch: Boolean = false) {
-        val wcMatches = filterMatchesForFetch(fullFetch) ?: return
-        val ids = wcMatches.map { it.id }.sorted()
-        val dates = wcMatches.mapNotNull { it.dateTime.take(10) }.distinct().sorted()
+        val filterResult = filterMatchesForFetch(fullFetch)
+        if (filterResult == null) {
+            LogManager.log(TAG, "fetchLiveResults: filterMatchesForFetch returned null (no matches to fetch), fullFetch=$fullFetch")
+            LogManager.log(TAG, "fetchLiveResults: today=${getTodayMatchesWithDates().map { it.id }}, stale=${getStaleMatches().map { it.id }}")
+            return
+        }
+        LogManager.log(TAG, "fetchLiveResults: filterMatchesForFetch returned ${filterResult.size} matches, fullFetch=$fullFetch")
+        val ids = filterResult.map { it.id }.sorted()
+        val dates = filterResult.mapNotNull { it.dateTime.take(10) }.distinct().sorted()
         LogManager.log("HomeVM", "Fetching match IDs=$ids dates=$dates")
+        val wcMatches = filterResult
         val scoreUpdates = fetchWithRetry { liveScoreService.fetchScoreUpdates(wcMatches) }.orEmpty()
         if (scoreUpdates.isNotEmpty()) {
             LogManager.log("HomeVM", "API returned ${scoreUpdates.size} updates: ${scoreUpdates.map { "${it.matchId}:${it.apiHomeTeam?:""} ${it.homeGoals}-${it.awayGoals} ${it.apiAwayTeam?:""}" }}")
@@ -691,7 +704,13 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun fetchLiveMatchUpdates() {
         val liveMatches = cachedMatches.filter { matchStatus(it) == MatchStatus.LIVE && it.espnId != null }
-        if (liveMatches.isEmpty()) return
+        val liveAll = cachedMatches.filter { matchStatus(it) == MatchStatus.LIVE }
+        val liveNoEspn = liveAll.filter { it.espnId == null }
+        LogManager.log(TAG, "fetchLiveMatchUpdates: total LIVE=${liveAll.size}, with espnId=${liveMatches.size}, without espnId=${liveNoEspn.map { it.id }}")
+        if (liveMatches.isEmpty()) {
+            LogManager.log(TAG, "fetchLiveMatchUpdates: no live matches with espnId, returning")
+            return
+        }
         LogManager.log("HomeVM", "Fetching live match updates by espnId: ${liveMatches.map { "${it.id}:${it.espnId}" }}")
         val updates = liveMatches.mapNotNull { liveScoreService.fetchLiveScoreByEspnId(it) }
         if (updates.isEmpty()) return
@@ -749,7 +768,10 @@ class HomeViewModel @Inject constructor(
         } else {
             (todayMatches + staleMatches + koToFetch).distinctBy { it.id }
         }
-        if (matchesForWc.isEmpty()) return null
+        if (matchesForWc.isEmpty()) {
+            LogManager.log(TAG, "filterMatchesForFetch matchesForWc=empty (today=${todayMatches.size} stale=${staleMatches.size} ko=${koToFetch.size})")
+            return null
+        }
 
         // Load cached scorers into memory for display
         loadCachedScorers()
@@ -765,9 +787,11 @@ class HomeViewModel @Inject constructor(
         else matchesForWc.filter { it.id !in finishedInDb }
 
         if (wcMatches.isEmpty()) {
+            LogManager.log(TAG, "filterMatchesForFetch: all ${matchesForWc.size} matches filtered as finishedInDb, skipping fetch")
             refreshUpcomingMatches()
             return null
         }
+        LogManager.log(TAG, "filterMatchesForFetch: ${matchesForWc.size} candidates, ${finishedInDb.size} finishedInDb, ${wcMatches.size} to fetch")
         return wcMatches
     }
 
@@ -1244,6 +1268,9 @@ class HomeViewModel @Inject constructor(
             val now = Instant.now()
             val end = start.plusSeconds(MATCH_WINDOW_SECONDS)
             if (now.isAfter(end)) return MatchStatus.FINISHED
+            // Si estamos dentro de la ventana del partido (empezo pero no termino)
+            // y no tenemos liveMinutes ni goles, igual está LIVE
+            if (now.isAfter(start)) return MatchStatus.LIVE
         }
         if (match.homeGoals != null || match.awayGoals != null) return MatchStatus.LIVE
         return MatchStatus.UPCOMING

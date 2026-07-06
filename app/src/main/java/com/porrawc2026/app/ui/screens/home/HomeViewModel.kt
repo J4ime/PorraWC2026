@@ -703,17 +703,20 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun fetchLiveMatchUpdates() {
-        val liveMatches = cachedMatches.filter { matchStatus(it) == MatchStatus.LIVE && it.espnId != null }
-        val liveAll = cachedMatches.filter { matchStatus(it) == MatchStatus.LIVE }
-        val liveNoEspn = liveAll.filter { it.espnId == null }
-        LogManager.log(TAG, "fetchLiveMatchUpdates: total LIVE=${liveAll.size}, with espnId=${liveMatches.size}, without espnId=${liveNoEspn.map { it.id }}")
+        val liveMatches = cachedMatches.filter { matchStatus(it) == MatchStatus.LIVE }
+        val liveWithEspn = liveMatches.filter { it.espnId != null }
+        val liveNoEspn = liveMatches.filter { it.espnId == null }
+        LogManager.log(TAG, "fetchLiveMatchUpdates: total LIVE=${liveMatches.size}, with espnId=${liveWithEspn.size}, without espnId=${liveNoEspn.map { it.id }}")
         if (liveMatches.isEmpty()) {
-            LogManager.log(TAG, "fetchLiveMatchUpdates: no live matches with espnId, returning")
+            LogManager.log(TAG, "fetchLiveMatchUpdates: no live matches, returning")
             return
         }
-        LogManager.log("HomeVM", "Fetching live match updates by espnId: ${liveMatches.map { "${it.id}:${it.espnId}" }}")
-        val updates = liveMatches.mapNotNull { liveScoreService.fetchLiveScoreByEspnId(it) }
-        if (updates.isEmpty()) return
+        LogManager.log("HomeVM", "Fetching live match updates by scoreboard: ${liveMatches.map { "${it.id}:${it.espnId}" }}")
+        val updates = liveScoreService.fetchScoreUpdates(liveMatches)
+        if (updates.isEmpty()) {
+            LogManager.log(TAG, "fetchLiveMatchUpdates: scoreboard returned 0 updates")
+            return
+        }
         processScoreUpdates(updates)
 
         // For live KO matches (73-104), fetch summary endpoint for shootout data during penalties

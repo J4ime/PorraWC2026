@@ -187,7 +187,7 @@ object KnockoutCalculator {
 
             for (prediction in predictions.filter { it.round == round }) {
                 val match = matches.firstOrNull { it.id == prediction.matchNumber }
-                if (match == null || match.homeGoals == null || match.awayGoals == null) continue
+                if (match == null) continue
                 val home = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
                 val away = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
                 var pts = 0

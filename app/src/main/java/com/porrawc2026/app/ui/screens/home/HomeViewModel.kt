@@ -228,7 +228,7 @@ class HomeViewModel @Inject constructor(
                 refreshPoints()
                 loadPlayers()
                 processedGoalKeys.addAll(prefsManager.getProcessedGoalKeys())
-                // Don't generate dieciseisavo names yet — wait for API data
+                loadCachedScorers()
                 lastWrittenScores.clear()
                 refreshUpcomingMatches()
                 _hasData.value = true
@@ -461,13 +461,14 @@ class HomeViewModel @Inject constructor(
             m.copy(pointsEarned = pts)
         }
 
-        // Compute cross-round KO points for ALL KO matches (Home screen)
-        val nextRoundPoints = KnockoutCalculator.computeNextRoundMatchPoints(
-            koPredictions, cachedMatches
+        // Compute per-round KO points (same logic as Partidos tab)
+        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
+        val (allMatchPoints, _) = KnockoutCalculator.computePointsFromLiveLists(
+            koPredictions, liveRoundLists, cachedMatches
         )
 
-        // Home screen display + DB persistence: cross-round for all KO
-        matchPointsMap = nextRoundPoints
+        // Home screen display + DB persistence: per-round points (same as Partidos)
+        matchPointsMap = allMatchPoints
         knockoutPointsMap = matchPointsMap
 
         // Save points to knockout_predictions table so total points calculation works
@@ -524,19 +525,15 @@ class HomeViewModel @Inject constructor(
             if (m.id in 73..88) {
                 val sched = schedule[m.id]
                 if (sched != null) {
-                    val isPlaceholder = m.homeTeam.contains("Grupo") || m.homeTeam.contains("/") ||
-                                        m.awayTeam.contains("Grupo") || m.awayTeam.contains("/")
-                    val hasRealNames = !isPlaceholder && m.homeTeam.isNotBlank() && m.awayTeam.isNotBlank()
                     val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
                     val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
-                    if (hasRealNames && alreadyStarted) {
-                        // Preserve API-set names and results, just ensure correct date
+                    if (alreadyStarted && m.homeGoals != null && m.awayGoals != null) {
+                        // API has set results, preserve everything
                         m.copy(dateTime = sched.date)
                     } else {
-                        // Keep team names from Excel import (col 12/13), only clear placeholders
+                        // Clear to empty — let API populate (fixes old-format import data)
                         m.copy(
-                            homeTeam = if (isPlaceholder) "" else m.homeTeam,
-                            awayTeam = if (isPlaceholder) "" else m.awayTeam,
+                            homeTeam = "", awayTeam = "",
                             dateTime = sched.date,
                             homeGoals = null, awayGoals = null,
                             homeScorers = null, awayScorers = null,

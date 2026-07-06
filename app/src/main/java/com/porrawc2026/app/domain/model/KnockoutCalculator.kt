@@ -33,6 +33,23 @@ object KnockoutCalculator {
         return null
     }
 
+    private fun resolvePredictionTeams(
+        ref: String, matches: List<MatchEntity>,
+        visited: MutableSet<Int> = mutableSetOf()
+    ): Set<String> {
+        if (ref.isBlank()) return emptySet()
+        if (ref.startsWith("Perdedor ") || ref.startsWith("L ")) return setOf(ref)
+        val matchId = extractRefMatchId(ref) ?: return setOf(ref)
+        if (matchId in visited) return setOf(ref)
+        visited.add(matchId)
+        val sourceMatch = matches.firstOrNull { it.id == matchId } ?: return setOf(ref)
+        val homeTeams = resolvePredictionTeams(sourceMatch.homeTeam, matches, visited)
+        val awayTeams = resolvePredictionTeams(sourceMatch.awayTeam, matches, visited)
+        val all = homeTeams + awayTeams
+        if (all.isEmpty()) return setOf(ref)
+        return all
+    }
+
     fun computeCrossRoundPoints(
         predictions: List<KnockoutPredictionEntity>,
         matches: List<MatchEntity>
@@ -73,12 +90,13 @@ object KnockoutCalculator {
                 val pts = ptsPerRound[round] ?: continue
 
                 val pred = predictions.firstOrNull { it.matchNumber == nextMatch.id } ?: continue
-                val predHome = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, predictions)
-                val predAway = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, predictions)
-                if (predHome.isBlank() && predAway.isBlank()) continue
+                val predHomeTeams = resolvePredictionTeams(pred.homeTeamRef, matches)
+                val predAwayTeams = resolvePredictionTeams(pred.awayTeamRef, matches)
+                val allPredTeams = predHomeTeams + predAwayTeams
+                if (allPredTeams.isEmpty() || allPredTeams.all { it.isBlank() || it.startsWith("W") || it.startsWith("L") }) continue
 
-                val homeInPred = TeamNameNormalizer.matches(home, predHome) || TeamNameNormalizer.matches(home, predAway)
-                val awayInPred = TeamNameNormalizer.matches(away, predHome) || TeamNameNormalizer.matches(away, predAway)
+                val homeInPred = allPredTeams.any { TeamNameNormalizer.matches(it, home) }
+                val awayInPred = allPredTeams.any { TeamNameNormalizer.matches(it, away) }
 
                 val count = (if (homeInPred) 1 else 0) + (if (awayInPred) 1 else 0)
                 when (count) {
@@ -89,12 +107,16 @@ object KnockoutCalculator {
                     1 -> {
                         val winner = getWinnerSimple(match)
                         if (winner != null) {
-                            val predictedTeam = if (homeInPred) home else away
-                            if (TeamNameNormalizer.matches(winner, predictedTeam)) {
+                            if (allPredTeams.any { TeamNameNormalizer.matches(winner, it) }) {
                                 displayMap[match.id] = (displayMap[match.id] ?: 0) + pts
                                 dbMap[nextMatch.id] = (dbMap[nextMatch.id] ?: 0) + pts
+                            } else {
+                                displayMap.putIfAbsent(match.id, 0)
                             }
                         }
+                    }
+                    0 -> {
+                        displayMap.putIfAbsent(match.id, 0)
                     }
                 }
             }

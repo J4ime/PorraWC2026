@@ -873,6 +873,15 @@ class HomeViewModel @Inject constructor(
             cachedMatches = cachedMatches.map {
                 if (it.id == update.matchId) it.copy(homeGoals = update.homeGoals, awayGoals = update.awayGoals) else it
             }
+            // Recalcular pointsEarned para partidos de grupo con los nuevos goles
+            val updatedMatch = cachedMatches.firstOrNull { it.id == update.matchId }
+            if (updatedMatch != null && !updatedMatch.isKnockout) {
+                val pts = PointsCalculator.calculateMatchPoints(updatedMatch)
+                cachedMatches = cachedMatches.map {
+                    if (it.id == update.matchId) it.copy(pointsEarned = pts) else it
+                }
+                repository.updateMatchPoints(update.matchId, pts)
+            }
             recalcAllPoints(); refreshPoints()
             if (update.isFinished) {
                 repository.updateMatchResults(update.matchId, update.homeGoals, update.awayGoals)
@@ -1201,7 +1210,11 @@ class HomeViewModel @Inject constructor(
             homeGoals = match.homeGoals, awayGoals = match.awayGoals,
             predictedHomeGoals = match.predictedHomeGoals,
             predictedAwayGoals = match.predictedAwayGoals,
-            pointsEarned = if (match.isKnockout) (matchPointsMap[match.id] ?: 0) else match.pointsEarned,
+            pointsEarned = when {
+                !match.isKnockout -> match.pointsEarned
+                match.id in matchPointsMap -> matchPointsMap[match.id]!!
+                else -> -1
+            },
             groupLabel = match.groupName, status = status, tvChannel = match.tvChannel,
             liveMinute = liveMin,
             homeScorers = homeScr,

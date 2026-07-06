@@ -71,15 +71,24 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
 
             for (pred in preds) {
                 val match = allMatches.firstOrNull { it.id == pred.matchNumber }
-                val matchPlayed = match?.let { it.homeGoals != null && it.awayGoals != null } ?: false
                 val home = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
                 val away = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
 
-                for (team in listOf(home, away)) {
-                    if (team.isBlank() || seenTeams.any { TeamNameNormalizer.matches(it, team) }) continue
-                    seenTeams.add(team)
-                    val correct = matchPlayed && actualTeams.any { TeamNameNormalizer.matches(it, team) }
-                    items.add(KOItem(team, if (correct) ptsPerTeam else 0, correct))
+                if (round == "3er puesto" || round == "Final") {
+                    val winnerTeam = if (pred.winner == 1) home else if (pred.winner == 2) away else null
+                    if (winnerTeam != null && winnerTeam.isNotBlank() && seenTeams.none { TeamNameNormalizer.matches(it, winnerTeam) }) {
+                        seenTeams.add(winnerTeam)
+                        val winnerEs = match?.winnerTeam?.let { TeamNameNormalizer.enToEs(it) }
+                        val correct = winnerEs != null && TeamNameNormalizer.matches(winnerEs, winnerTeam)
+                        items.add(KOItem(winnerTeam, if (correct) ptsPerTeam else 0, correct))
+                    }
+                } else {
+                    for (team in listOf(home, away)) {
+                        if (team.isBlank() || seenTeams.any { TeamNameNormalizer.matches(it, team) }) continue
+                        seenTeams.add(team)
+                        val correct = actualTeams.any { TeamNameNormalizer.matches(it, team) }
+                        items.add(KOItem(team, if (correct) ptsPerTeam else 0, correct))
+                    }
                 }
             }
             if (items.isNotEmpty()) result[round] = items

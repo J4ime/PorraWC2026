@@ -28,7 +28,7 @@ object KnockoutCalculator {
     ): Map<Int, Int> {
         val result = mutableMapOf<Int, Int>()
 
-        for (match in matches.filter { it.isKnockout && it.id > 88 }) {
+        for (match in matches.filter { it.isKnockout && it.id >= 73 }) {
             var totalPts = 0
 
             val refMatches = matches.filter { m ->

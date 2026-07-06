@@ -461,24 +461,13 @@ class HomeViewModel @Inject constructor(
             m.copy(pointsEarned = pts)
         }
 
-        // Build live round lists (with provisional teams during live matches)
-        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
-
-        // Compute knockout points per prediction using live round lists
-        val (allMatchPoints, _) = KnockoutCalculator.computePointsFromLiveLists(
-            koPredictions, liveRoundLists, cachedMatches
-        )
-
-        // For Octavos+ matches (89-104), compute points based on next-round predictions (0/1/2 logic)
+        // Compute cross-round KO points for ALL KO matches (Home screen)
         val nextRoundPoints = KnockoutCalculator.computeNextRoundMatchPoints(
             koPredictions, cachedMatches
         )
 
-        // Combine: Dieciseisavos (73-88) uses old logic, Octavos+ uses new 0/1/2 logic
-        matchPointsMap = mutableMapOf<Int, Int>().apply {
-            putAll(allMatchPoints.filterKeys { it in 73..88 })
-            putAll(nextRoundPoints)
-        }
+        // Home screen display + DB persistence: cross-round for all KO
+        matchPointsMap = nextRoundPoints
         knockoutPointsMap = matchPointsMap
 
         // Save points to knockout_predictions table so total points calculation works
@@ -531,8 +520,6 @@ class HomeViewModel @Inject constructor(
         val schedule = MatchScheduleProvider.getDieciseisavosSchedule()
         val allSched = MatchScheduleProvider.getHardcodedSchedule()
         val now = Instant.now()
-        // For matches that already started, preserve team names (they come from API).
-        // Only reset placeholder names for future matches or empty names.
         cachedMatches = cachedMatches.map { m ->
             if (m.id in 73..88) {
                 val sched = schedule[m.id]
@@ -546,9 +533,10 @@ class HomeViewModel @Inject constructor(
                         // Preserve API-set names and results, just ensure correct date
                         m.copy(dateTime = sched.date)
                     } else {
+                        // Keep team names from Excel import (col 12/13), only clear placeholders
                         m.copy(
-                            homeTeam = "",
-                            awayTeam = "",
+                            homeTeam = if (isPlaceholder) "" else m.homeTeam,
+                            awayTeam = if (isPlaceholder) "" else m.awayTeam,
                             dateTime = sched.date,
                             homeGoals = null, awayGoals = null,
                             homeScorers = null, awayScorers = null,
@@ -564,42 +552,29 @@ class HomeViewModel @Inject constructor(
                     }
                 } else m
             } else if (m.id in 89..100) {
-                val sched = allSched[m.id]
-                val hasBracketRef = m.homeTeam.startsWith("Ganador ") || m.homeTeam.startsWith("Perdedor ")
-                val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
-                val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
-                if (hasBracketRef && alreadyStarted && m.homeTeam == sched?.home && m.awayTeam == sched?.away) {
-                    // Already correct bracket ref, keep as-is
-                    m
-                } else if (alreadyStarted && m.homeGoals != null && m.awayGoals != null) {
-                    // API has set results, leave it alone
-                    m
-                } else if (sched != null) {
-                    // Reset to schedule bracket refs
-                    m.copy(
-                        homeTeam = sched.home,
-                        awayTeam = sched.away,
-                        homeGoals = null, awayGoals = null,
-                        homeScorers = null, awayScorers = null,
-                        homeRedCards = null, awayRedCards = null,
-                        homeYellowCards = null, awayYellowCards = null,
-                        homeMissedPenalties = 0, awayMissedPenalties = 0,
-                        winnerTeam = null,
-                        homeHeadedGoals = 0, awayHeadedGoals = 0,
-                        hasSubGoal = false,
-                        homeShootoutScore = 0, awayShootoutScore = 0,
-                        pointsEarned = 0
-                    )
-                } else m
-            } else if (m.id in 101..104) {
-                val sched = allSched[m.id]
+                val isPlaceholder = m.homeTeam.contains("Grupo") || m.homeTeam.contains("/") ||
+                                    m.awayTeam.contains("Grupo") || m.awayTeam.contains("/")
                 val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
                 val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
                 if (alreadyStarted && m.homeGoals != null && m.awayGoals != null) {
                     // API has set results, leave it alone
                     m
+                } else if (m.homeTeam.isBlank() && m.awayTeam.isBlank()) {
+                    // Keep blank — will be populated by API
+                    m
+                } else if (isPlaceholder) {
+                    m.copy(homeTeam = "", awayTeam = "")
+                } else {
+                    // Preserve bracket refs ("Ganador XX") or direct names from Excel import
+                    m
+                }
+            } else if (m.id in 101..104) {
+                val sched = allSched[m.id]
+                val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
+                val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
+                if (alreadyStarted && m.homeGoals != null && m.awayGoals != null) {
+                    m
                 } else if (sched != null) {
-                    // Reset to schedule bracket refs (Ganador/Perdedor X)
                     m.copy(
                         homeTeam = sched.home,
                         awayTeam = sched.away,
@@ -617,7 +592,6 @@ class HomeViewModel @Inject constructor(
                 } else m
             } else m
         }
-        // Only persist the cleared data; preserve API-set scores for already-started matches
         val toPersist = cachedMatches.filter { it.id in 73..104 }
         repository.insertMatches(toPersist)
     }

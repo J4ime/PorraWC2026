@@ -452,7 +452,7 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun recalcAllPoints() {
         val koPredictions = repository.getKnockoutPredictions().first()
-        knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.winner != null } }
+        knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.homeTeamRef != null || it.awayTeamRef != null } }
 
         // Group/match prediction points (10+10+30)
         cachedMatches = cachedMatches.map { m ->
@@ -525,27 +525,14 @@ class HomeViewModel @Inject constructor(
             if (m.id in 73..88) {
                 val sched = schedule[m.id]
                 if (sched != null) {
-                    val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
-                    val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
-                    if (alreadyStarted && m.homeGoals != null && m.awayGoals != null) {
-                        // API has set results, preserve everything
-                        m.copy(dateTime = sched.date)
+                    val isPlaceholder = m.homeTeam.contains("Grupo") || m.homeTeam.contains("/") ||
+                                        m.awayTeam.contains("Grupo") || m.awayTeam.contains("/")
+                    if (isPlaceholder) {
+                        // Only clear placeholder team names, preserve API data (winnerTeam, scores, etc.)
+                        m.copy(homeTeam = "", awayTeam = "", dateTime = sched.date)
                     } else {
-                        // Clear to empty — let API populate (fixes old-format import data)
-                        m.copy(
-                            homeTeam = "", awayTeam = "",
-                            dateTime = sched.date,
-                            homeGoals = null, awayGoals = null,
-                            homeScorers = null, awayScorers = null,
-                            homeRedCards = null, awayRedCards = null,
-                            homeYellowCards = null, awayYellowCards = null,
-                            homeMissedPenalties = 0, awayMissedPenalties = 0,
-                            winnerTeam = null,
-                            homeHeadedGoals = 0, awayHeadedGoals = 0,
-                            hasSubGoal = false,
-                            homeShootoutScore = 0, awayShootoutScore = 0,
-                            pointsEarned = 0
-                        )
+                        // Preserve everything, just fix date from schedule
+                        m.copy(dateTime = sched.date)
                     }
                 } else m
             } else if (m.id in 89..100) {

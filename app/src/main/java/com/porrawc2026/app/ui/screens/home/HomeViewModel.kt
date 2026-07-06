@@ -536,7 +536,9 @@ class HomeViewModel @Inject constructor(
             if (m.id in 73..88) {
                 val sched = schedule[m.id]
                 if (sched != null) {
-                    val hasRealNames = m.homeTeam.isNotBlank() && m.awayTeam.isNotBlank()
+                    val isPlaceholder = m.homeTeam.contains("Grupo") || m.homeTeam.contains("/") ||
+                                        m.awayTeam.contains("Grupo") || m.awayTeam.contains("/")
+                    val hasRealNames = !isPlaceholder && m.homeTeam.isNotBlank() && m.awayTeam.isNotBlank()
                     val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
                     val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
                     if (hasRealNames && alreadyStarted) {

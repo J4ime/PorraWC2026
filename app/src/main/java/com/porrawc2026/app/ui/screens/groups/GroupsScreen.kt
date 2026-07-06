@@ -55,56 +55,35 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
         "Final" to 500
     )
 
-    val liveRoundLists = remember(allMatches) {
-        KnockoutCalculator.buildLiveRoundLists(allMatches)
-    }
+    data class KOItem(val team: String, val points: Int, val correct: Boolean)
 
-    data class KOItem(val team: String, val points: Int, val userPredicted: Boolean, val matchPlayed: Boolean, val correct: Boolean)
-
-    val roundItems = remember(liveRoundLists, koPredictions, allMatches, koPointsMap) {
-        Log.d("KO_DEBUG", "=== Recomputing roundItems ===")
-        for ((r, t) in liveRoundLists) {
-            Log.d("KO_DEBUG", "liveRoundLists[$r] = $t (size=${t.size})")
-        }
+    val roundItems = remember(koPredictions, allMatches, koPointsMap) {
         val result = mutableMapOf<String, List<KOItem>>()
-        for ((round, teams) in liveRoundLists) {
-            result[round] = teams.map { team ->
-                Log.d("KO_DEBUG", "Processing: round=$round team=$team")
-                val match = allMatches.firstOrNull { m ->
-                    m.isKnockout && m.knockoutRound == round &&
-                    TeamNameNormalizer.matches(m.homeTeam, team)
-                } ?: allMatches.firstOrNull { m ->
-                    m.isKnockout && m.knockoutRound == round &&
-                    TeamNameNormalizer.matches(m.awayTeam, team)
-                }
-                Log.d("KO_DEBUG", "  match found: ${match?.id} homeTeam=${match?.homeTeam} awayTeam=${match?.awayTeam}")
+        val roundPts = mapOf("Dieciseisavos" to 20, "Octavos" to 40, "Cuartos" to 80,
+            "Semifinales" to 160, "3er puesto" to 200, "Final" to 500)
+
+        for ((round, ptsPerTeam) in roundPts) {
+            val preds = koPredictions.filter { it.round == round }.sortedBy { it.matchNumber }
+            if (preds.isEmpty()) continue
+            val actualTeams = KnockoutCalculator.buildLiveRoundLists(allMatches)[round].orEmpty()
+            val items = mutableListOf<KOItem>()
+            val seenTeams = mutableListOf<String>()
+
+            for (pred in preds) {
+                val match = allMatches.firstOrNull { it.id == pred.matchNumber }
                 val matchPlayed = match?.let { it.homeGoals != null && it.awayGoals != null } ?: false
-                Log.d("KO_DEBUG", "  matchPlayed=$matchPlayed goals=${match?.homeGoals}-${match?.awayGoals}")
-                val pred = if (match != null) koPredictions.firstOrNull { it.matchNumber == match.id } else null
-                Log.d("KO_DEBUG", "  pred found: ${pred?.matchNumber} winner=${pred?.winner}")
-                val userPredicted = if (pred != null) {
-                    val home = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
-                    val away = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
-                    val up = TeamNameNormalizer.matches(home, team) || TeamNameNormalizer.matches(away, team)
-                    Log.d("KO_DEBUG", "  userPredicted=$up home=$home away=$away")
-                    up
-                } else {
-                    Log.d("KO_DEBUG", "  userPredicted=false (no pred)")
-                    false
+                val home = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
+                val away = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
+
+                for (team in listOf(home, away)) {
+                    if (team.isBlank() || seenTeams.any { TeamNameNormalizer.matches(it, team) }) continue
+                    seenTeams.add(team)
+                    val correct = matchPlayed && actualTeams.any { TeamNameNormalizer.matches(it, team) }
+                    items.add(KOItem(team, if (correct) ptsPerTeam else 0, correct))
                 }
-                val correct = matchPlayed && userPredicted && pred != null && match != null && (
-                    (pred.winner == 1 && TeamNameNormalizer.matches(team, match.homeTeam)) ||
-                    (pred.winner == 2 && TeamNameNormalizer.matches(team, match.awayTeam))
-                )
-                Log.d("KO_DEBUG", "  correct=$correct (matchPlayed=$matchPlayed userPredicted=$userPredicted pred!=null=${pred != null} match!=null=${match != null})")
-                val koPts = koPointsMap[match?.id]
-                Log.d("KO_DEBUG", "  koPointsMap[${match?.id}] = $koPts")
-                val points = if (matchPlayed && correct && match != null) (koPointsMap[match.id] ?: 0) else 0
-                Log.d("KO_DEBUG", "  FINAL: points=$points team=$team")
-                KOItem(team, points, userPredicted, matchPlayed, correct)
             }
+            if (items.isNotEmpty()) result[round] = items
         }
-        Log.d("KO_DEBUG", "=== roundItems keys: ${result.keys} ===")
         result
     }
 
@@ -156,16 +135,8 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
                 }
                 items(items.size, key = { "ko_team_${round}_${items[it].team}" }) { idx ->
                     val item = items[idx]
-                    val bgColor = when {
-                        item.matchPlayed && item.correct -> AccentGreen.copy(alpha = 0.1f)
-                        item.matchPlayed -> AccentRed.copy(alpha = 0.1f)
-                        else -> SurfaceMedium.copy(alpha = 0.3f)
-                    }
-                    val teamColor = when {
-                        item.matchPlayed && item.correct -> AccentGreen
-                        item.matchPlayed -> AccentRed
-                        else -> TextPrimary
-                    }
+                    val bgColor = if (item.correct) AccentGreen.copy(alpha = 0.1f) else SurfaceMedium.copy(alpha = 0.3f)
+                    val teamColor = if (item.correct) AccentGreen else TextPrimary
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -185,9 +156,9 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            text = "0",
+                            text = "${item.points}",
                             fontSize = 11.sp,
-                            color = TextMuted,
+                            color = if (item.correct) AccentGreen else TextMuted,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )

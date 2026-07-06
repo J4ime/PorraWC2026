@@ -677,9 +677,12 @@ class HomeViewModel @Inject constructor(
         }
         processScoreUpdates(scoreUpdates)
 
-        // Backfill: KO matches that finished without shootout data — refetch via summary endpoint
+        // Backfill: KO matches that finished without shootout data — only recent ones
+        val twoDaysAgo = Instant.now().minusSeconds(2 * 24 * 60 * 60)
         val koNoShootout = cachedMatches.filter {
-            it.id in 73..104 && it.homeGoals != null && it.awayGoals != null &&
+            val d = parseMadridInstant(it.dateTime)
+            it.id in 73..104 && d != null && d.isAfter(twoDaysAgo) &&
+            it.homeGoals != null && it.awayGoals != null &&
             isFinishedByTime(it) && it.homeShootoutScore == 0 && it.awayShootoutScore == 0
         }
         if (koNoShootout.isNotEmpty()) {
@@ -744,7 +747,13 @@ class HomeViewModel @Inject constructor(
         val todayMatches = getTodayMatchesWithDates()
         val staleMatches = if (fullFetch) emptyList() else getStaleMatches()
         val koToFetch = if (fullFetch) emptyList() else {
-            cachedMatches.filter { it.id in 73..104 }
+            cachedMatches.filter {
+                it.id in 73..104 && (
+                    matchStatus(it) == MatchStatus.LIVE ||
+                    getTodayMatchesWithDates().any { m -> m.id == it.id } ||
+                    !isFinishedByTime(it)
+                )
+            }
         }
         val matchesForWc = if (fullFetch) {
             cachedMatches

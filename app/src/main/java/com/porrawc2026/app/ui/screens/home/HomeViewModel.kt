@@ -455,7 +455,7 @@ class HomeViewModel @Inject constructor(
         knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.homeTeamRef != null || it.awayTeamRef != null } }
 
         // Compute KO points (cross-round: check if winning team is in next round prediction)
-        val allMatchPoints = KnockoutCalculator.computeNextRoundMatchPoints(
+        val allMatchPoints = KnockoutCalculator.computeCrossRoundPoints(
             koPredictions, cachedMatches
         )
 

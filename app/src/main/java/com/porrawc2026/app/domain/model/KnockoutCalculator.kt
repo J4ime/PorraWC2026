@@ -22,86 +22,76 @@ object KnockoutCalculator {
         }
     }
 
-    fun computeNextRoundMatchPoints(
+    fun getWinnerSimple(match: MatchEntity): String? {
+        match.winnerTeam?.let { return TeamNameNormalizer.enToEs(it) }
+        val hg = match.homeGoals ?: return null
+        val ag = match.awayGoals ?: return null
+        if (hg > ag) return match.homeTeam.takeIf { it.isNotBlank() }
+        if (ag > hg) return match.awayTeam.takeIf { it.isNotBlank() }
+        if (match.homeShootoutScore > match.awayShootoutScore) return match.homeTeam.takeIf { it.isNotBlank() }
+        if (match.awayShootoutScore > match.homeShootoutScore) return match.awayTeam.takeIf { it.isNotBlank() }
+        return null
+    }
+
+    fun computeCrossRoundPoints(
         predictions: List<KnockoutPredictionEntity>,
         matches: List<MatchEntity>
     ): Map<Int, Int> {
         val result = mutableMapOf<Int, Int>()
+        val ptsPerRound = mapOf(
+            "Dieciseisavos" to 20, "Octavos" to 40, "Cuartos" to 80,
+            "Semifinales" to 160, "3er puesto" to 200, "Final" to 500
+        )
 
-        for (match in matches.filter { it.isKnockout && it.id >= 73 }) {
-            var totalPts = 0
+        for (match in matches.filter { it.isKnockout && it.id in 73..104 }) {
+            val home = match.homeTeam.takeIf { it.isNotBlank() } ?: continue
+            val away = match.awayTeam.takeIf { it.isNotBlank() } ?: continue
 
-            val refMatches = matches.filter { m ->
+            val nextMatches = matches.filter { m ->
                 m.isKnockout && (
                     extractRefMatchId(m.homeTeam) == match.id ||
-                    extractRefMatchId(m.awayTeam) == match.id
+                    extractRefMatchId(m.awayTeam) == match.id ||
+                    m.knockoutRound == when (match.knockoutRound) {
+                        "Dieciseisavos" -> "Octavos"
+                        "Octavos" -> "Cuartos"
+                        "Cuartos" -> "Semifinales"
+                        "Semifinales" -> "3er puesto"
+                        else -> null
+                    } && (TeamNameNormalizer.matches(m.homeTeam, home) || TeamNameNormalizer.matches(m.awayTeam, home) ||
+                          TeamNameNormalizer.matches(m.homeTeam, away) || TeamNameNormalizer.matches(m.awayTeam, away))
                 )
             }
+            if (nextMatches.isEmpty()) continue
 
-            // Resolve real teams from API/schedule (bracket refs → winnerTeam)
-            val actualHome = resolveKnockoutTeam(match.homeTeam, matches)
-            val actualAway = resolveKnockoutTeam(match.awayTeam, matches)
+            for (nextMatch in nextMatches) {
+                val round = nextMatch.knockoutRound ?: continue
+                val pts = ptsPerRound[round] ?: continue
 
-            // Fallback to user's own predictions for pre-match potential
-            val currentPred = predictions.firstOrNull { it.matchNumber == match.id }
-            val userHome = currentPred?.let { PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions) }
-            val userAway = currentPred?.let { PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions) }
+                val pred = predictions.firstOrNull { it.matchNumber == nextMatch.id } ?: continue
+                val predHome = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, predictions)
+                val predAway = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, predictions)
+                if (predHome.isBlank() && predAway.isBlank()) continue
 
-            val compareHome = actualHome ?: userHome ?: continue
-            val compareAway = actualAway ?: userAway ?: continue
-
-            for (refMatch in refMatches) {
-                val nextRound = refMatch.knockoutRound ?: continue
-                val ptsPerTeam = PointsCalculator.getKnockoutPoints(nextRound)
-
-                val nextPred = predictions.firstOrNull { it.matchNumber == refMatch.id } ?: continue
-                val predHome = PointsCalculator.resolvePredictionTeamName(nextPred.homeTeamRef, predictions)
-                val predAway = PointsCalculator.resolvePredictionTeamName(nextPred.awayTeamRef, predictions)
-
-                val homeInPred = TeamNameNormalizer.matches(predHome, compareHome) || TeamNameNormalizer.matches(predAway, compareHome)
-                val awayInPred = TeamNameNormalizer.matches(predHome, compareAway) || TeamNameNormalizer.matches(predAway, compareAway)
+                val homeInPred = TeamNameNormalizer.matches(home, predHome) || TeamNameNormalizer.matches(home, predAway)
+                val awayInPred = TeamNameNormalizer.matches(away, predHome) || TeamNameNormalizer.matches(away, predAway)
 
                 val count = (if (homeInPred) 1 else 0) + (if (awayInPred) 1 else 0)
-
-                val pts = when (count) {
-                    2 -> ptsPerTeam
+                when (count) {
+                    2 -> result[match.id] = (result[match.id] ?: 0) + pts
                     1 -> {
-                        val predictedTeam = if (homeInPred) compareHome else compareAway
-                        checkTeamMatchResult(match, predictedTeam, ptsPerTeam, compareHome, compareAway)
+                        val winner = getWinnerSimple(match)
+                        if (winner != null) {
+                            val predictedTeam = if (homeInPred) home else away
+                            if (TeamNameNormalizer.matches(winner, predictedTeam)) {
+                                result[match.id] = (result[match.id] ?: 0) + pts
+                            }
+                        }
                     }
-                    else -> 0
                 }
-
-                totalPts += pts
-            }
-
-            if (totalPts > 0) {
-                result[match.id] = totalPts
             }
         }
 
         return result
-    }
-
-    private fun checkTeamMatchResult(
-        match: MatchEntity,
-        predictedTeam: String,
-        ptsPerTeam: Int,
-        resolvedHome: String,
-        resolvedAway: String
-    ): Int {
-        return when {
-            match.winnerTeam != null && TeamNameNormalizer.matches(match.winnerTeam!!, predictedTeam) -> ptsPerTeam
-            match.winnerTeam != null -> 0
-            match.homeGoals != null && match.awayGoals != null -> {
-                val homeWinning = match.homeGoals!! > match.awayGoals!!
-                val awayWinning = match.awayGoals!! > match.homeGoals!!
-                if ((TeamNameNormalizer.matches(predictedTeam, resolvedHome) && homeWinning) ||
-                    (TeamNameNormalizer.matches(predictedTeam, resolvedAway) && awayWinning)) ptsPerTeam
-                else 0
-            }
-            else -> 0
-        }
     }
 
     fun isRef(teamName: String): Boolean =

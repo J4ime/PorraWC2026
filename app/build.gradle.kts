@@ -21,8 +21,8 @@ android {
         applicationId = "com.porrawc2026.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 346
-        versionName = "1.9.181"
+        versionCode = 347
+        versionName = "1.9.182"
         buildConfigField("String", "FOOTBALL_DATA_API_KEY", "\"${localProperties.getProperty("FOOTBALL_DATA_API_KEY", "")}\"")
     }
 

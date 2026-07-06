@@ -454,25 +454,18 @@ class HomeViewModel @Inject constructor(
         val koPredictions = repository.getKnockoutPredictions().first()
         knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.homeTeamRef != null || it.awayTeamRef != null } }
 
-        // DEBUG: dump Octavos match data from cachedMatches
-        val octavosMatches = cachedMatches.filter { it.id in 89..96 }
-        for (m in octavosMatches) {
-            Log.d("KO_DEBUG", "HomeVM cachedMatches id=${m.id} koRound=${m.knockoutRound} isKo=${m.isKnockout} homeTeam='${m.homeTeam}' awayTeam='${m.awayTeam}' homeGoals=${m.homeGoals} awayGoals=${m.awayGoals}")
-        }
-        Log.d("KO_DEBUG", "HomeVM octavos predictions: ${koPredictions.filter { it.round == "Octavos" }.map { "${it.matchNumber}: refs ${it.homeTeamRef}/${it.awayTeamRef}" }}")
-
-        // Group/match prediction points (10+10+30)
+        // Group/match prediction points (10+10+30) — don't overwrite correct points with 0
         cachedMatches = cachedMatches.map { m ->
             val pts = PointsCalculator.calculateMatchPoints(m)
-            if (pts != m.pointsEarned) repository.updateMatchPoints(m.id, pts)
+            if (pts != m.pointsEarned && !(pts == 0 && m.pointsEarned > 0)) repository.updateMatchPoints(m.id, pts)
             m.copy(pointsEarned = pts)
         }
 
-        // Compute KO points same as Partidos tab (buildLiveRoundLists + computePointsFromLiveLists)
-        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
-        Log.d("KO_DEBUG", "HomeVM liveRoundLists[Octavos]=${liveRoundLists["Octavos"]}")
+        // Compute KO points using DB data (same source as Partidos tab)
+        val dbMatches = repository.getAllMatches().first()
+        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(dbMatches)
         val (allMatchPoints, _) = KnockoutCalculator.computePointsFromLiveLists(
-            koPredictions, liveRoundLists, cachedMatches
+            koPredictions, liveRoundLists, dbMatches
         )
 
         // Home screen display + DB persistence

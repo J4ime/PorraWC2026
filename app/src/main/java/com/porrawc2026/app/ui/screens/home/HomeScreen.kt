@@ -35,15 +35,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
-    refreshTrigger: Int = 0,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
@@ -109,23 +105,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(refreshTrigger) {
-        if (refreshTrigger > 0) {
-            selectedDay = null
-            viewModel.refreshLiveScores()
-        }
-    }
 
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshLiveScores()
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
-    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color(0xFF0E0E0E))) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -304,7 +284,7 @@ private fun MatchRow(match: MatchDisplay) {
 
             // Points + TV + round column
             Column(modifier = Modifier.width(38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                val showKoPoints = match.isKnockout && match.pointsEarned > 0
+                val showKoPoints = match.isKnockout && match.hasKnockoutPred
                 val showGroupPoints = !match.isKnockout && hasPred && (isLive || showScore || match.pointsEarned > 0)
             if (showGroupPoints || showKoPoints) {
                     val pts = if (match.pointsEarned > 0) "+${match.pointsEarned}" else "0"

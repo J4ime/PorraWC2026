@@ -38,6 +38,18 @@ object KnockoutCalculator {
                 )
             }
 
+            // Resolve real teams from API/schedule (bracket refs → winnerTeam)
+            val actualHome = resolveKnockoutTeam(match.homeTeam, matches)
+            val actualAway = resolveKnockoutTeam(match.awayTeam, matches)
+
+            // Fallback to user's own predictions for pre-match potential
+            val currentPred = predictions.firstOrNull { it.matchNumber == match.id }
+            val userHome = currentPred?.let { PointsCalculator.resolvePredictionTeamName(it.homeTeamRef, predictions) }
+            val userAway = currentPred?.let { PointsCalculator.resolvePredictionTeamName(it.awayTeamRef, predictions) }
+
+            val compareHome = actualHome ?: userHome ?: continue
+            val compareAway = actualAway ?: userAway ?: continue
+
             for (refMatch in refMatches) {
                 val nextRound = refMatch.knockoutRound ?: continue
                 val ptsPerTeam = PointsCalculator.getKnockoutPoints(nextRound)
@@ -46,16 +58,16 @@ object KnockoutCalculator {
                 val predHome = PointsCalculator.resolvePredictionTeamName(nextPred.homeTeamRef, predictions)
                 val predAway = PointsCalculator.resolvePredictionTeamName(nextPred.awayTeamRef, predictions)
 
-                val homeInPred = TeamNameNormalizer.matches(predHome, match.homeTeam) || TeamNameNormalizer.matches(predAway, match.homeTeam)
-                val awayInPred = TeamNameNormalizer.matches(predHome, match.awayTeam) || TeamNameNormalizer.matches(predAway, match.awayTeam)
+                val homeInPred = TeamNameNormalizer.matches(predHome, compareHome) || TeamNameNormalizer.matches(predAway, compareHome)
+                val awayInPred = TeamNameNormalizer.matches(predHome, compareAway) || TeamNameNormalizer.matches(predAway, compareAway)
 
                 val count = (if (homeInPred) 1 else 0) + (if (awayInPred) 1 else 0)
 
                 val pts = when (count) {
                     2 -> ptsPerTeam
                     1 -> {
-                        val predictedTeam = if (homeInPred) match.homeTeam else match.awayTeam
-                        checkTeamMatchResult(match, predictedTeam, ptsPerTeam)
+                        val predictedTeam = if (homeInPred) compareHome else compareAway
+                        checkTeamMatchResult(match, predictedTeam, ptsPerTeam, compareHome, compareAway)
                     }
                     else -> 0
                 }
@@ -71,15 +83,21 @@ object KnockoutCalculator {
         return result
     }
 
-    private fun checkTeamMatchResult(match: MatchEntity, predictedTeam: String, ptsPerTeam: Int): Int {
+    private fun checkTeamMatchResult(
+        match: MatchEntity,
+        predictedTeam: String,
+        ptsPerTeam: Int,
+        resolvedHome: String,
+        resolvedAway: String
+    ): Int {
         return when {
             match.winnerTeam != null && TeamNameNormalizer.matches(match.winnerTeam!!, predictedTeam) -> ptsPerTeam
             match.winnerTeam != null -> 0
             match.homeGoals != null && match.awayGoals != null -> {
                 val homeWinning = match.homeGoals!! > match.awayGoals!!
                 val awayWinning = match.awayGoals!! > match.homeGoals!!
-                if ((TeamNameNormalizer.matches(predictedTeam, match.homeTeam) && homeWinning) ||
-                    (TeamNameNormalizer.matches(predictedTeam, match.awayTeam) && awayWinning)) ptsPerTeam
+                if ((TeamNameNormalizer.matches(predictedTeam, resolvedHome) && homeWinning) ||
+                    (TeamNameNormalizer.matches(predictedTeam, resolvedAway) && awayWinning)) ptsPerTeam
                 else 0
             }
             else -> 0

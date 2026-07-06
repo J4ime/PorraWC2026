@@ -123,7 +123,8 @@ object KnockoutCalculator {
         }
         if (ganadorId != null) {
             val prevMatch = matches.firstOrNull { it.id == ganadorId }
-            return prevMatch?.winnerTeam
+            // Fallback: if winnerTeam is null but scores exist, infer winner from goals/shootout
+            return prevMatch?.winnerTeam ?: inferWinnerFromScores(prevMatch)
         }
 
         val perdedorId = when {
@@ -187,7 +188,7 @@ object KnockoutCalculator {
 
             for (prediction in predictions.filter { it.round == round }) {
                 val match = matches.firstOrNull { it.id == prediction.matchNumber }
-                if (match == null) continue
+                if (match == null || match.homeGoals == null || match.awayGoals == null) continue
                 val home = PointsCalculator.resolvePredictionTeamName(prediction.homeTeamRef, predictions)
                 val away = PointsCalculator.resolvePredictionTeamName(prediction.awayTeamRef, predictions)
                 var pts = 0
@@ -203,5 +204,17 @@ object KnockoutCalculator {
 
         Log.d("KO_DEBUG", "computePointsFromLiveLists result matchPts=$pointsByMatch predPts=$pointsByPrediction")
         return Pair(pointsByMatch, pointsByPrediction)
+    }
+
+    private fun inferWinnerFromScores(match: MatchEntity?): String? {
+        if (match == null) return null
+        val hg = match.homeGoals ?: return null
+        val ag = match.awayGoals ?: return null
+        if (hg > ag) return match.homeTeam.takeIf { it.isNotBlank() }
+        if (ag > hg) return match.awayTeam.takeIf { it.isNotBlank() }
+        // Draw → shootout
+        if (match.homeShootoutScore > match.awayShootoutScore) return match.homeTeam.takeIf { it.isNotBlank() }
+        if (match.awayShootoutScore > match.homeShootoutScore) return match.awayTeam.takeIf { it.isNotBlank() }
+        return null
     }
 }

@@ -461,14 +461,13 @@ class HomeViewModel @Inject constructor(
             m.copy(pointsEarned = pts)
         }
 
-        // Compute per-round KO points (same logic as Partidos tab)
-        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
-        val (allMatchPoints, _) = KnockoutCalculator.computePointsFromLiveLists(
-            koPredictions, liveRoundLists, cachedMatches
+        // Compute cross-round KO points (only for matches that advanced to next round)
+        val crossRoundPoints = KnockoutCalculator.computeNextRoundMatchPoints(
+            koPredictions, cachedMatches
         )
 
-        // Home screen display + DB persistence: per-round points (same as Partidos)
-        matchPointsMap = allMatchPoints
+        // Home screen display + DB persistence: cross-round points
+        matchPointsMap = crossRoundPoints
         knockoutPointsMap = matchPointsMap
 
         // Save points to knockout_predictions table so total points calculation works
@@ -567,7 +566,7 @@ class HomeViewModel @Inject constructor(
                         homeRedCards = null, awayRedCards = null,
                         homeYellowCards = null, awayYellowCards = null,
                         homeMissedPenalties = 0, awayMissedPenalties = 0,
-                        winnerTeam = null,
+                        // Preserve winnerTeam from API even for unstarted matches
                         homeHeadedGoals = 0, awayHeadedGoals = 0,
                         hasSubGoal = false,
                         homeShootoutScore = 0, awayShootoutScore = 0,

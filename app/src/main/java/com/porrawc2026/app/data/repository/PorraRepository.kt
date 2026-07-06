@@ -51,8 +51,7 @@ class PorraRepository @Inject constructor(
         val matchPoints = matchDao.getTotalMatchPoints()
         val questionPoints = questionDao.getTotalQuestionPoints()
         val playerPoints = playerPredictionDao.getTotalPoints()
-        val knockoutPoints = knockoutPredictionDao.getTotalPoints()
-        return matchPoints + questionPoints + playerPoints + knockoutPoints + advancementPoints
+        return matchPoints + questionPoints + playerPoints + advancementPoints
     }
 
     @Transaction

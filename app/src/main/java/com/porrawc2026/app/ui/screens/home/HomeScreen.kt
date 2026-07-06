@@ -40,6 +40,7 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(
+    homeScrollTrigger: Int = 0,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val totalPoints by viewModel.totalPoints.collectAsStateWithLifecycle()
@@ -69,6 +70,10 @@ fun HomeScreen(
     val allDaysSorted = remember(dayKeys) { dayKeys.sortedBy { sortNum(it) } }
     val todayIdx = allDaysSorted.indexOf(todayDayKey)
     val listState = rememberLazyListState()
+
+    LaunchedEffect(homeScrollTrigger) {
+        selectedDay = null
+    }
 
     LaunchedEffect(selectedDay, todayIdx) {
         val rawIdx = if (selectedDay == null) todayIdx

@@ -36,8 +36,9 @@ object KnockoutCalculator {
     fun computeCrossRoundPoints(
         predictions: List<KnockoutPredictionEntity>,
         matches: List<MatchEntity>
-    ): Map<Int, Int> {
-        val result = mutableMapOf<Int, Int>()
+    ): Pair<Map<Int, Int>, Map<Int, Int>> {
+        val displayMap = mutableMapOf<Int, Int>()
+        val dbMap = mutableMapOf<Int, Int>()
         val ptsPerRound = mapOf(
             "Dieciseisavos" to 20, "Octavos" to 40, "Cuartos" to 80,
             "Semifinales" to 160, "3er puesto" to 200, "Final" to 500
@@ -47,18 +48,22 @@ object KnockoutCalculator {
             val home = match.homeTeam.takeIf { it.isNotBlank() } ?: continue
             val away = match.awayTeam.takeIf { it.isNotBlank() } ?: continue
 
+            val nextRound = when (match.knockoutRound) {
+                "Dieciseisavos" -> "Octavos"
+                "Octavos" -> "Cuartos"
+                "Cuartos" -> "Semifinales"
+                "Semifinales" -> "3er puesto"
+                else -> null
+            }
+
             val nextMatches = matches.filter { m ->
                 m.isKnockout && (
                     extractRefMatchId(m.homeTeam) == match.id ||
                     extractRefMatchId(m.awayTeam) == match.id ||
-                    m.knockoutRound == when (match.knockoutRound) {
-                        "Dieciseisavos" -> "Octavos"
-                        "Octavos" -> "Cuartos"
-                        "Cuartos" -> "Semifinales"
-                        "Semifinales" -> "3er puesto"
-                        else -> null
-                    } && (TeamNameNormalizer.matches(m.homeTeam, home) || TeamNameNormalizer.matches(m.awayTeam, home) ||
-                          TeamNameNormalizer.matches(m.homeTeam, away) || TeamNameNormalizer.matches(m.awayTeam, away))
+                    (m.knockoutRound != null && (m.knockoutRound == nextRound ||
+                     (match.knockoutRound == "Semifinales" && m.knockoutRound == "Final")) &&
+                     (TeamNameNormalizer.matches(m.homeTeam, home) || TeamNameNormalizer.matches(m.awayTeam, home) ||
+                      TeamNameNormalizer.matches(m.homeTeam, away) || TeamNameNormalizer.matches(m.awayTeam, away)))
                 )
             }
             if (nextMatches.isEmpty()) continue
@@ -77,13 +82,17 @@ object KnockoutCalculator {
 
                 val count = (if (homeInPred) 1 else 0) + (if (awayInPred) 1 else 0)
                 when (count) {
-                    2 -> result[match.id] = (result[match.id] ?: 0) + pts
+                    2 -> {
+                        displayMap[match.id] = (displayMap[match.id] ?: 0) + pts
+                        dbMap[nextMatch.id] = (dbMap[nextMatch.id] ?: 0) + pts
+                    }
                     1 -> {
                         val winner = getWinnerSimple(match)
                         if (winner != null) {
                             val predictedTeam = if (homeInPred) home else away
                             if (TeamNameNormalizer.matches(winner, predictedTeam)) {
-                                result[match.id] = (result[match.id] ?: 0) + pts
+                                displayMap[match.id] = (displayMap[match.id] ?: 0) + pts
+                                dbMap[nextMatch.id] = (dbMap[nextMatch.id] ?: 0) + pts
                             }
                         }
                     }
@@ -91,7 +100,7 @@ object KnockoutCalculator {
             }
         }
 
-        return result
+        return Pair(displayMap, dbMap)
     }
 
     fun isRef(teamName: String): Boolean =

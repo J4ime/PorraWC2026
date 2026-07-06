@@ -54,6 +54,7 @@ fun PorraNavGraph() {
 
     var detailScreen by remember { mutableStateOf<DetailScreen?>(null) }
     var partidosScrollTrigger by remember { mutableStateOf(0) }
+    var homeScrollTrigger by remember { mutableStateOf(0) }
 
     val navItems = listOf(
         NavItem("Goleadores", Icons.Filled.SportsSoccer),
@@ -102,7 +103,7 @@ fun PorraNavGraph() {
                     when (page) {
                         0 -> GoalscorersScreen()
                         1 -> MatchesScreen(scrollTrigger = partidosScrollTrigger, onRefreshRequest = { homeVM.refreshLiveScores() })
-                        2 -> HomeScreen()
+                        2 -> HomeScreen(homeScrollTrigger = homeScrollTrigger)
                         3 -> QuestionsScreen()
                         4 -> AjustesScreen()
                     }
@@ -121,6 +122,7 @@ fun PorraNavGraph() {
                     onClick = {
                         detailScreen = null
                         if (index == 1) partidosScrollTrigger++
+                        if (index == 2) homeScrollTrigger++
                         scope.launch { pagerState.animateScrollToPage(index) }
                     },
                     icon = {

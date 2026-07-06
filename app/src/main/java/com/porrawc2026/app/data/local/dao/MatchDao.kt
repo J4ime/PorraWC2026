@@ -27,7 +27,7 @@ interface MatchDao {
     @Query("DELETE FROM matches")
     suspend fun deleteAll()
 
-    @Query("SELECT SUM(pointsEarned) FROM matches")
+    @Query("SELECT SUM(pointsEarned) FROM matches WHERE isKnockout = 0")
     suspend fun getTotalMatchPoints(): Int
 
     @Query("UPDATE matches SET homeGoals = :homeGoals, awayGoals = :awayGoals WHERE id = :matchId")

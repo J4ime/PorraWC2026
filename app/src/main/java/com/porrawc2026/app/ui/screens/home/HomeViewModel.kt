@@ -454,17 +454,9 @@ class HomeViewModel @Inject constructor(
         val koPredictions = repository.getKnockoutPredictions().first()
         knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.homeTeamRef != null || it.awayTeamRef != null } }
 
-        // Group/match prediction points (10+10+30) — don't overwrite correct points with 0
-        cachedMatches = cachedMatches.map { m ->
-            val pts = PointsCalculator.calculateMatchPoints(m)
-            if (pts != m.pointsEarned && !(pts == 0 && m.pointsEarned > 0)) repository.updateMatchPoints(m.id, pts)
-            m.copy(pointsEarned = pts)
-        }
-
-        // Compute KO points using DB data (cross-round: check if winning team is in next round prediction)
-        val dbMatches = repository.getAllMatches().first()
+        // Compute KO points (cross-round: check if winning team is in next round prediction)
         val allMatchPoints = KnockoutCalculator.computeNextRoundMatchPoints(
-            koPredictions, dbMatches
+            koPredictions, cachedMatches
         )
 
         // Home screen display + DB persistence

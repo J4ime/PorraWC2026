@@ -461,11 +461,10 @@ class HomeViewModel @Inject constructor(
             m.copy(pointsEarned = pts)
         }
 
-        // Compute KO points using DB data (same source as Partidos tab)
+        // Compute KO points using DB data (cross-round: check if winning team is in next round prediction)
         val dbMatches = repository.getAllMatches().first()
-        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(dbMatches)
-        val (allMatchPoints, _) = KnockoutCalculator.computePointsFromLiveLists(
-            koPredictions, liveRoundLists, dbMatches
+        val allMatchPoints = KnockoutCalculator.computeNextRoundMatchPoints(
+            koPredictions, dbMatches
         )
 
         // Home screen display + DB persistence

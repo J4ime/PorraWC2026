@@ -238,4 +238,136 @@ object KnockoutCalculator {
         if (match.awayShootoutScore > match.homeShootoutScore) return match.awayTeam.takeIf { it.isNotBlank() }
         return null
     }
+
+    // ── Home screen display (cross-round + "certain only" for pending matches) ──
+
+    private fun expandPredictionTeams(
+        ref: String,
+        predictions: List<KnockoutPredictionEntity>,
+        visited: MutableSet<Int> = mutableSetOf()
+    ): Set<String> {
+        if (ref.isBlank()) return emptySet()
+        val matchId = extractRefMatchId(ref) ?: return setOf(ref)
+        if (matchId in visited) return setOf(ref)
+        visited.add(matchId)
+        val pred = predictions.firstOrNull { it.matchNumber == matchId } ?: return setOf(ref)
+        val teams = mutableSetOf<String>()
+        if (pred.homeTeamRef.isNotBlank()) teams += expandPredictionTeams(pred.homeTeamRef, predictions, visited)
+        if (pred.awayTeamRef.isNotBlank()) teams += expandPredictionTeams(pred.awayTeamRef, predictions, visited)
+        return if (teams.isEmpty()) setOf(ref) else teams
+    }
+
+    private fun getLoserSimple(match: MatchEntity): String? {
+        val winner = getWinnerSimple(match) ?: return null
+        return if (TeamNameNormalizer.matches(match.homeTeam, winner)) match.awayTeam
+        else if (TeamNameNormalizer.matches(match.awayTeam, winner)) match.homeTeam
+        else null
+    }
+
+    fun computeHomeScreenDisplayPoints(
+        predictions: List<KnockoutPredictionEntity>,
+        matches: List<MatchEntity>
+    ): Map<Int, Int> {
+        val displayMap = mutableMapOf<Int, Int>()
+
+        // Static bracket: which source match feeds into which next match
+        val bracketNext = mapOf(
+            73 to 89, 74 to 89, 75 to 90, 76 to 90,
+            77 to 91, 78 to 91, 79 to 92, 80 to 92,
+            81 to 93, 82 to 93, 83 to 94, 84 to 94,
+            85 to 95, 86 to 95, 87 to 96, 88 to 96,
+            89 to 97, 90 to 97, 91 to 99, 92 to 99,
+            93 to 98, 94 to 98, 95 to 100, 96 to 100,
+            97 to 101, 98 to 101, 99 to 102, 100 to 102,
+            101 to 104, 102 to 104
+        )
+
+        val nextPts = mapOf("Octavos" to 40, "Cuartos" to 80, "Semifinales" to 160, "Final" to 500, "3er puesto" to 200)
+
+        for (match in matches.filter { it.isKnockout && it.id in 73..104 }) {
+            val home = match.homeTeam.takeIf { it.isNotBlank() } ?: continue
+            val away = match.awayTeam.takeIf { it.isNotBlank() } ?: continue
+            val id = match.id
+            val isPlayed = match.homeGoals != null && match.awayGoals != null
+            val round = match.knockoutRound ?: continue
+
+            when (round) {
+                "Dieciseisavos", "Octavos", "Cuartos" -> {
+                    val nextId = bracketNext[id] ?: continue
+                    val nextMatch = matches.firstOrNull { it.id == nextId } ?: continue
+                    val pts = nextPts[nextMatch.knockoutRound] ?: continue
+                    val pred = predictions.firstOrNull { it.matchNumber == nextId } ?: continue
+
+                    val predTeams = expandPredictionTeams(pred.homeTeamRef, predictions) +
+                            expandPredictionTeams(pred.awayTeamRef, predictions)
+                    if (predTeams.isEmpty()) continue
+
+                    val homeInPred = predTeams.any { TeamNameNormalizer.matches(it, home) }
+                    val awayInPred = predTeams.any { TeamNameNormalizer.matches(it, away) }
+                    val count = (if (homeInPred) 1 else 0) + (if (awayInPred) 1 else 0)
+
+                    if (isPlayed) {
+                        when (count) {
+                            2 -> displayMap[id] = pts
+                            1 -> {
+                                val winner = getWinnerSimple(match)
+                                if (winner != null && predTeams.any { TeamNameNormalizer.matches(it, winner) })
+                                    displayMap[id] = pts
+                                else
+                                    displayMap.putIfAbsent(id, 0)
+                            }
+                            0 -> displayMap.putIfAbsent(id, 0)
+                        }
+                    } else {
+                        when (count) {
+                            2 -> displayMap[id] = pts
+                            0 -> displayMap[id] = 0
+                        }
+                    }
+                }
+                "Semifinales" -> {
+                    for ((nextRound, pts) in listOf("Final" to 500, "3er puesto" to 200)) {
+                        val nextPreds = predictions.filter { it.round == nextRound }
+                        if (nextPreds.isEmpty()) continue
+
+                        val homeInNext = nextPreds.any { pred ->
+                            val t = expandPredictionTeams(pred.homeTeamRef, predictions) +
+                                    expandPredictionTeams(pred.awayTeamRef, predictions)
+                            t.any { TeamNameNormalizer.matches(it, home) }
+                        }
+                        val awayInNext = nextPreds.any { pred ->
+                            val t = expandPredictionTeams(pred.homeTeamRef, predictions) +
+                                    expandPredictionTeams(pred.awayTeamRef, predictions)
+                            t.any { TeamNameNormalizer.matches(it, away) }
+                        }
+                        val count = (if (homeInNext) 1 else 0) + (if (awayInNext) 1 else 0)
+
+                        if (isPlayed) {
+                            val relevantTeam = if (nextRound == "Final") getWinnerSimple(match)
+                            else getLoserSimple(match)
+                            when {
+                                count == 2 -> displayMap[id] = (displayMap[id] ?: 0) + pts
+                                count == 1 && relevantTeam != null -> {
+                                    val hit = nextPreds.any { pred ->
+                                        val t = expandPredictionTeams(pred.homeTeamRef, predictions) +
+                                                expandPredictionTeams(pred.awayTeamRef, predictions)
+                                        t.any { TeamNameNormalizer.matches(it, relevantTeam) }
+                                    }
+                                    if (hit) displayMap[id] = (displayMap[id] ?: 0) + pts
+                                    else displayMap.putIfAbsent(id, 0)
+                                }
+                                count == 0 -> displayMap.putIfAbsent(id, 0)
+                            }
+                        } else {
+                            when (count) {
+                                2 -> displayMap[id] = (displayMap[id] ?: 0) + pts
+                                0 -> displayMap[id] = (displayMap[id] ?: 0)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return displayMap
+    }
 }

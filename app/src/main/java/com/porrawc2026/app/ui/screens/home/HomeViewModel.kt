@@ -456,17 +456,18 @@ class HomeViewModel @Inject constructor(
         val koPredictions = repository.getKnockoutPredictions().first()
         knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.homeTeamRef != null || it.awayTeamRef != null } }
 
-        // Compute KO points using per-round live team lists (same algorithm as GroupsViewModel)
+        // DB persistence — compute per-round points from live team lists (same as GroupsViewModel)
         val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
-        val (displayPoints, dbPoints) = KnockoutCalculator.computePointsFromLiveLists(
+        val (_, dbPoints) = KnockoutCalculator.computePointsFromLiveLists(
             koPredictions, liveRoundLists, cachedMatches
         )
-
-        // Home screen display — points shown on the source match card
-        matchPointsMap = displayPoints
-        // DB persistence — points stored on the next-round prediction
         knockoutPointsMap = dbPoints
-        Log.d("KO_DEBUG", "HomeViewModel recalcAllPoints dbPoints=$dbPoints sum=${dbPoints.values.sum()}")
+
+        // Home screen display — cross-round advancement points (certain-only for pending matches)
+        matchPointsMap = KnockoutCalculator.computeHomeScreenDisplayPoints(
+            koPredictions, cachedMatches
+        )
+        Log.d("KO_DEBUG", "HomeViewModel recalcAllPoints koPtsMap=${knockoutPointsMap} sum=${knockoutPointsMap.values.sum()} displayMap=${matchPointsMap}")
 
         // Save points to knockout_predictions table so total points calculation works
         // Only write when pts > 0 to avoid partial writes from concurrent recalcs overwriting with 0

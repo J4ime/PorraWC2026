@@ -473,6 +473,23 @@ class HomeViewModel @Inject constructor(
             val pts = knockoutPointsMap[prediction.matchNumber] ?: 0
             repository.updateKnockoutPredictionPoints(prediction.matchNumber, pts)
         }
+
+        // Recalcular todos los puntos de partidos de grupo (prediccion vs resultado real)
+        for (match in cachedMatches) {
+            if (match.isKnockout) continue
+            if (match.predictedHomeGoals == null || match.predictedAwayGoals == null) continue
+            if (match.homeGoals == null || match.awayGoals == null) continue
+            val pts = PointsCalculator.calculateMatchPoints(
+                match.predictedHomeGoals!!, match.predictedAwayGoals!!,
+                match.homeGoals!!, match.awayGoals!!
+            )
+            if (pts != match.pointsEarned) {
+                cachedMatches = cachedMatches.map {
+                    if (it.id == match.id) it.copy(pointsEarned = pts) else it
+                }
+                repository.updateMatchPoints(match.id, pts)
+            }
+        }
     }
 
     private suspend fun checkGoalNotifications() {

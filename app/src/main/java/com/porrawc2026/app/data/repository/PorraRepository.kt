@@ -47,11 +47,12 @@ class PorraRepository @Inject constructor(
     suspend fun updateKnockoutPrediction(prediction: KnockoutPredictionEntity) =
         knockoutPredictionDao.update(prediction)
 
-    suspend fun calculateTotalPoints(advancementPoints: Int = 0): Int {
+    suspend fun calculateTotalPoints(): Int {
         val matchPoints = matchDao.getTotalMatchPoints()
         val questionPoints = questionDao.getTotalQuestionPoints()
         val playerPoints = playerPredictionDao.getTotalPoints()
-        return matchPoints + questionPoints + playerPoints + advancementPoints
+        val knockoutPoints = knockoutPredictionDao.getTotalPoints()
+        return matchPoints + questionPoints + playerPoints + knockoutPoints
     }
 
     @Transaction

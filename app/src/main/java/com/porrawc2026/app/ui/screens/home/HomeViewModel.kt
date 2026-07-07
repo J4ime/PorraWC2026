@@ -114,8 +114,7 @@ class HomeViewModel @Inject constructor(
 
     private val _totalPoints = MutableStateFlow(0)
     val totalPoints: StateFlow<Int> = _totalPoints.asStateFlow()
-    private val _advancementPoints = MutableStateFlow(0)
-    val advancementPoints: StateFlow<Int> = _advancementPoints.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
     private val _validationResult = MutableStateFlow<ValidationResult?>(null)
@@ -425,8 +424,7 @@ class HomeViewModel @Inject constructor(
 
     fun refreshPoints() {
         viewModelScope.launch {
-            val adv = _advancementPoints.value
-            _totalPoints.value = repository.calculateTotalPoints(adv)
+        _totalPoints.value = repository.calculateTotalPoints()
         }
     }
 
@@ -475,8 +473,6 @@ class HomeViewModel @Inject constructor(
             val pts = knockoutPointsMap[prediction.matchNumber] ?: 0
             repository.updateKnockoutPredictionPoints(prediction.matchNumber, pts)
         }
-
-        _advancementPoints.value = 0
     }
 
     private suspend fun checkGoalNotifications() {

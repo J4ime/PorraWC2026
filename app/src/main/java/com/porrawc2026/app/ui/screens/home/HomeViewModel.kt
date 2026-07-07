@@ -238,9 +238,7 @@ class HomeViewModel @Inject constructor(
             } finally {
                 _isBusy.value = false
             }
-        }
-        // Slow operations (API calls, photos) en segundo plano, sin bloquear la UI
-        viewModelScope.launch(Dispatchers.IO) {
+            // Slow operations (API calls, photos) — se ejecutan DESPUÉS de que cachedMatches tenga predicciones
             fetchLiveResults()
             downloadPlayerPhotos()
             precachePhotosInBackground()
@@ -458,23 +456,28 @@ class HomeViewModel @Inject constructor(
         val koPredictions = repository.getKnockoutPredictions().first()
         knockoutPredictionMap = koPredictions.associate { it.matchNumber to when (it.matchNumber) { 103, 104 -> true; else -> it.homeTeamRef != null || it.awayTeamRef != null } }
 
-        // Compute KO points (cross-round: check if winning team is in next round prediction)
-        val (displayPoints, dbPoints) = KnockoutCalculator.computeCrossRoundPoints(
-            koPredictions, cachedMatches
+        // Compute KO points using per-round live team lists (same algorithm as GroupsViewModel)
+        val liveRoundLists = KnockoutCalculator.buildLiveRoundLists(cachedMatches)
+        val (displayPoints, dbPoints) = KnockoutCalculator.computePointsFromLiveLists(
+            koPredictions, liveRoundLists, cachedMatches
         )
 
         // Home screen display — points shown on the source match card
         matchPointsMap = displayPoints
         // DB persistence — points stored on the next-round prediction
         knockoutPointsMap = dbPoints
+        Log.d("KO_DEBUG", "HomeViewModel recalcAllPoints dbPoints=$dbPoints sum=${dbPoints.values.sum()}")
 
         // Save points to knockout_predictions table so total points calculation works
-        for (prediction in koPredictions) {
-            val pts = knockoutPointsMap[prediction.matchNumber] ?: 0
-            repository.updateKnockoutPredictionPoints(prediction.matchNumber, pts)
+        // Only write when pts > 0 to avoid partial writes from concurrent recalcs overwriting with 0
+        for ((matchNumber, pts) in knockoutPointsMap) {
+            if (pts > 0) {
+                repository.updateKnockoutPredictionPoints(matchNumber, pts)
+            }
         }
 
         // Recalcular todos los puntos de partidos de grupo (prediccion vs resultado real)
+        LogManager.log(TAG, "recalcAllPoints START: totalGroup=${cachedMatches.count { !it.isKnockout }} withPred=${cachedMatches.count { !it.isKnockout && it.predictedHomeGoals != null }} withGoals=${cachedMatches.count { !it.isKnockout && it.homeGoals != null }}")
         for (match in cachedMatches) {
             if (match.isKnockout) continue
             if (match.predictedHomeGoals == null || match.predictedAwayGoals == null) continue
@@ -779,13 +782,20 @@ class HomeViewModel @Inject constructor(
                 )
             }
         }
+        val backfillMatches = if (fullFetch) emptyList() else {
+            cachedMatches.filter {
+                it.id in 1..72 &&
+                it.predictedHomeGoals != null && it.predictedAwayGoals != null &&
+                it.homeGoals == null && it.awayGoals == null
+            }
+        }
         val matchesForWc = if (fullFetch) {
             cachedMatches
         } else {
-            (todayMatches + staleMatches + koToFetch).distinctBy { it.id }
+            (todayMatches + staleMatches + koToFetch + backfillMatches).distinctBy { it.id }
         }
         if (matchesForWc.isEmpty()) {
-            LogManager.log(TAG, "filterMatchesForFetch matchesForWc=empty (today=${todayMatches.size} stale=${staleMatches.size} ko=${koToFetch.size})")
+            LogManager.log(TAG, "filterMatchesForFetch matchesForWc=empty (today=${todayMatches.size} stale=${staleMatches.size} ko=${koToFetch.size} backfill=${backfillMatches.size})")
             return null
         }
 
@@ -967,6 +977,8 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+        // Recalcular todos los puntos tras aplicar todas las actualizaciones
+        recalcAllPoints()
     }
 
     private suspend fun updateGoalScorers(update: LiveScoreUpdate) {

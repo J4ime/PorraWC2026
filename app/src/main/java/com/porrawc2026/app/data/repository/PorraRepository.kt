@@ -1,5 +1,6 @@
 package com.porrawc2026.app.data.repository
 
+import android.util.Log
 import androidx.room.Transaction
 import com.porrawc2026.app.data.local.dao.*
 import com.porrawc2026.app.data.local.entity.*
@@ -52,7 +53,9 @@ class PorraRepository @Inject constructor(
         val questionPoints = questionDao.getTotalQuestionPoints()
         val playerPoints = playerPredictionDao.getTotalPoints()
         val knockoutPoints = knockoutPredictionDao.getTotalPoints()
-        return matchPoints + questionPoints + playerPoints + knockoutPoints
+        val total = matchPoints + questionPoints + playerPoints + knockoutPoints
+        Log.w("PorraRepo", "calculateTotalPoints: match=$matchPoints questions=$questionPoints players=$playerPoints ko=$knockoutPoints total=$total")
+        return total
     }
 
     @Transaction

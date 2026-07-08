@@ -21,8 +21,8 @@ android {
         applicationId = "com.porrawc2026.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 362
-        versionName = "1.9.197"
+        versionCode = 363
+        versionName = "1.9.198"
         buildConfigField("String", "FOOTBALL_DATA_API_KEY", "\"${localProperties.getProperty("FOOTBALL_DATA_API_KEY", "")}\"")
     }
 
@@ -39,9 +39,6 @@ android {
 
     buildTypes {
         debug {
-            if (file("../release.jks").exists()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
         }
         release {
             isMinifyEnabled = true

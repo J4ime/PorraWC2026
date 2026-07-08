@@ -902,14 +902,14 @@ class HomeViewModel @Inject constructor(
                 if (update.winnerTeam != null) {
                     repository.updateMatchWinner(update.matchId, update.winnerTeam)
                 }
-                if (update.homeShootoutScore > 0 || update.awayShootoutScore > 0) {
-                    repository.updateMatchShootout(update.matchId, update.homeShootoutScore, update.awayShootoutScore)
-                    cachedMatches = cachedMatches.map {
-                        if (it.id == update.matchId) it.copy(
-                            homeShootoutScore = update.homeShootoutScore,
-                            awayShootoutScore = update.awayShootoutScore
-                        ) else it
-                    }
+            }
+            if (update.homeShootoutScore > 0 || update.awayShootoutScore > 0) {
+                repository.updateMatchShootout(update.matchId, update.homeShootoutScore, update.awayShootoutScore)
+                cachedMatches = cachedMatches.map {
+                    if (it.id == update.matchId) it.copy(
+                        homeShootoutScore = update.homeShootoutScore,
+                        awayShootoutScore = update.awayShootoutScore
+                    ) else it
                 }
             }
             // Dieciseisavo team names come from ESPN API in updateMatchScores()

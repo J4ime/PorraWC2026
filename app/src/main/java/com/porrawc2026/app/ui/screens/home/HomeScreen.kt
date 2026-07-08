@@ -55,9 +55,10 @@ fun HomeScreen(
 
     LaunchedEffect(pullRefreshState.isRefreshing) {
         if (pullRefreshState.isRefreshing) {
+            val liveDay = allMatches.firstOrNull { it.status == MatchStatus.LIVE }?.dayKey
             viewModel.forceCheckUpdate()
             viewModel.refreshLiveScores()
-            selectedDay = null
+            selectedDay = liveDay
             pullRefreshState.endRefresh()
         }
     }
@@ -345,11 +346,6 @@ private fun MatchRow(match: MatchDisplay) {
             // Penalty shootout attempts
             if (match.shootoutAttempts.isNotEmpty()) {
                 Spacer(Modifier.height(6.dp))
-                Row(Modifier.fillMaxWidth().padding(start = 50.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("TANDA DE PENALTIS", fontSize = 8.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.width(8.dp))
-                    Text("${match.homeShootoutScore}-${match.awayShootoutScore}", fontSize = 9.sp, color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
-                }
                 Row(Modifier.fillMaxWidth().padding(start = 50.dp)) {
                     // Home team column
                     Column(Modifier.weight(1f)) {

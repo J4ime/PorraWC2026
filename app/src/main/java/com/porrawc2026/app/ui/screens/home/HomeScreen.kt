@@ -72,13 +72,23 @@ fun HomeScreen(
     val todayIdx = allDaysSorted.indexOf(todayDayKey)
     val listState = rememberLazyListState()
 
+    val todaySortKey = if (todayDayKey.isNotBlank()) sortNum(todayDayKey) else {
+        val now = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Madrid"))
+        now.monthValue * 100 + now.dayOfMonth
+    }
+
+    val defaultIdx = if (todayIdx >= 0) todayIdx else {
+        val nextDayKey = allMatches.firstOrNull { it.dateLabel != "AYER" }?.dayKey
+        if (nextDayKey != null) allDaysSorted.indexOf(nextDayKey).coerceAtLeast(0) else 0
+    }
+
     LaunchedEffect(homeScrollTrigger) {
         selectedDay = null
     }
 
     LaunchedEffect(selectedDay, todayIdx) {
-        val rawIdx = if (selectedDay == null) todayIdx
-        else allDaysSorted.indexOf(selectedDay).let { if (it < 0) todayIdx else it }
+        val rawIdx = if (selectedDay == null) defaultIdx
+        else allDaysSorted.indexOf(selectedDay).let { if (it < 0) defaultIdx else it }
         if (rawIdx < 0) return@LaunchedEffect
         val lazyIdx = rawIdx + 1
         delay(100)
@@ -93,7 +103,7 @@ fun HomeScreen(
     }
 
     val dayLabel = { day: String ->
-        val s = sortNum(day); val t = sortNum(todayDayKey)
+        val s = sortNum(day); val t = todaySortKey
         when { s == t - 1 -> "AYER"; s == t -> "HOY"; s == t + 1 -> "MAÑANA"; else -> day }
     }
 

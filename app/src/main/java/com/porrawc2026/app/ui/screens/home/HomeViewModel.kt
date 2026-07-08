@@ -712,6 +712,23 @@ class HomeViewModel @Inject constructor(
             }
         }
 
+        // Backfill: KO matches that finished with shootout scores but no individual attempts
+        val koMissingAttempts = cachedMatches.filter {
+            val d = parseMadridInstant(it.dateTime)
+            it.id in 73..104 && d != null && d.isAfter(twoDaysAgo) &&
+            it.homeGoals != null && it.awayGoals != null &&
+            isFinishedByTime(it) &&
+            (it.homeShootoutScore > 0 || it.awayShootoutScore > 0) &&
+            shootoutAttempts[it.id].isNullOrEmpty()
+        }
+        if (koMissingAttempts.isNotEmpty()) {
+            LogManager.log("HomeVM", "Backfilling shootout attempts for: ${koMissingAttempts.map { it.id }}")
+            val fullUpdates = koMissingAttempts.mapNotNull { liveScoreService.fetchFullScoreByEspnId(it) }
+            if (fullUpdates.isNotEmpty()) {
+                processScoreUpdates(fullUpdates)
+            }
+        }
+
         notifyGoalEvents()
         recalculateAllPlayerGoals()
         refreshPoints()

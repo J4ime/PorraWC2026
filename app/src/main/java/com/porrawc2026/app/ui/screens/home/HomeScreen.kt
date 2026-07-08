@@ -86,7 +86,7 @@ fun HomeScreen(
         selectedDay = null
     }
 
-    LaunchedEffect(selectedDay, todayIdx) {
+    LaunchedEffect(selectedDay, todayIdx, defaultIdx) {
         val rawIdx = if (selectedDay == null) defaultIdx
         else allDaysSorted.indexOf(selectedDay).let { if (it < 0) defaultIdx else it }
         if (rawIdx < 0) return@LaunchedEffect
@@ -364,7 +364,7 @@ private fun MatchRow(match: MatchDisplay) {
                                 val icon = if (attempt.isScored) "\u26BD" else "\u274C"
                                 Text(icon, fontSize = 10.sp)
                                 Spacer(Modifier.width(4.dp))
-                                Text(attempt.playerName.split(" ").last(), fontSize = 10.sp, color = if (attempt.isScored) Color(0xFF4CAF50) else Color(0xFFFF5252), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(attempt.playerName.split(" ").last(), fontSize = 10.sp, color = if (attempt.isScored) Color.White else Color(0xFFFF5252), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Spacer(Modifier.height(2.dp))
                         }
@@ -376,7 +376,7 @@ private fun MatchRow(match: MatchDisplay) {
                                 val icon = if (attempt.isScored) "\u26BD" else "\u274C"
                                 Text(icon, fontSize = 10.sp)
                                 Spacer(Modifier.width(4.dp))
-                                Text(attempt.playerName.split(" ").last(), fontSize = 10.sp, color = if (attempt.isScored) Color(0xFF4CAF50) else Color(0xFFFF5252), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(attempt.playerName.split(" ").last(), fontSize = 10.sp, color = if (attempt.isScored) Color.White else Color(0xFFFF5252), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Spacer(Modifier.height(2.dp))
                         }

@@ -431,7 +431,11 @@ class LiveScoreService @Inject constructor(
     }
 
     private fun parseShootoutAttempts(details: List<EspnDetail>?, homeTeamId: String?): List<ShootoutAttempt> {
-        if (details == null) return emptyList()
+        if (details == null) {
+            LogManager.log("SHOOTOUT_DEBUG", "parseShootoutAttempts: details is null")
+            return emptyList()
+        }
+        LogManager.log("SHOOTOUT_DEBUG", "parseShootoutAttempts: total details=${details.size}, shootout details=${details.count { it.penaltyKick == true && it.shootout == true }}")
         val attempts = mutableListOf<ShootoutAttempt>()
         details.forEachIndexed { index, detail ->
             if (detail.penaltyKick == true && detail.shootout == true) {

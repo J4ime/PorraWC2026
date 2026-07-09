@@ -143,7 +143,7 @@ object MatchScheduleProvider {
         data[96] = MatchSchedule(96, "2026-07-07T22:00:00", "DAZN", "Suiza",     "Colombia",    "760508")  // SUI vs COL
 
         // Cuartos (Quarter-finals) — IDs 97-100
-        data[97] = MatchSchedule(97, "2026-07-09T22:00:00", "RTVE", "Ganador 89", "Ganador 90", "760510")  // R16 W1 vs R16 W2 20:00Z
+        data[97] = MatchSchedule(97, "2026-07-09T22:00:00", "DAZN, RTVE", "Francia", "Marruecos", "760510")  // CF1
         data[98] = MatchSchedule(98, "2026-07-10T21:00:00", "DAZN", "Ganador 93", "Ganador 94", "760511")  // R16 W5 vs R16 W6 19:00Z
         data[99] = MatchSchedule(99, "2026-07-11T23:00:00", "DAZN", "Ganador 91", "Ganador 92", "760512")  // R16 W3 vs R16 W4 21:00Z
         data[100] = MatchSchedule(100, "2026-07-12T03:00:00", "DAZN", "Ganador 95", "Ganador 96", "760513")  // R16 W7 vs R16 W8 01:00Z

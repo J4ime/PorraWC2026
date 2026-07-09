@@ -300,10 +300,11 @@ object KnockoutCalculator {
 
                     val predTeams = expandPredictionTeams(pred.homeTeamRef, predictions) +
                             expandPredictionTeams(pred.awayTeamRef, predictions)
-                    if (predTeams.isEmpty()) continue
+                    val resolvedTeams = predTeams.filterNot { isRef(it) }.toSet()
+                    if (resolvedTeams.isEmpty()) continue
 
-                    val homeInPred = predTeams.any { TeamNameNormalizer.matches(it, home) }
-                    val awayInPred = predTeams.any { TeamNameNormalizer.matches(it, away) }
+                    val homeInPred = resolvedTeams.any { TeamNameNormalizer.matches(it, home) }
+                    val awayInPred = resolvedTeams.any { TeamNameNormalizer.matches(it, away) }
                     val count = (if (homeInPred) 1 else 0) + (if (awayInPred) 1 else 0)
 
                     if (isPlayed) {
@@ -330,15 +331,22 @@ object KnockoutCalculator {
                         val nextPreds = predictions.filter { it.round == nextRound }
                         if (nextPreds.isEmpty()) continue
 
-                        val homeInNext = nextPreds.any { pred ->
+                        val resolvedPreds = nextPreds.filter { pred ->
                             val t = expandPredictionTeams(pred.homeTeamRef, predictions) +
                                     expandPredictionTeams(pred.awayTeamRef, predictions)
-                            t.any { TeamNameNormalizer.matches(it, home) }
+                            t.any { !isRef(it) }
                         }
-                        val awayInNext = nextPreds.any { pred ->
+                        if (resolvedPreds.isEmpty()) continue
+
+                        val homeInNext = resolvedPreds.any { pred ->
                             val t = expandPredictionTeams(pred.homeTeamRef, predictions) +
                                     expandPredictionTeams(pred.awayTeamRef, predictions)
-                            t.any { TeamNameNormalizer.matches(it, away) }
+                            t.filterNot { isRef(it) }.any { TeamNameNormalizer.matches(it, home) }
+                        }
+                        val awayInNext = resolvedPreds.any { pred ->
+                            val t = expandPredictionTeams(pred.homeTeamRef, predictions) +
+                                    expandPredictionTeams(pred.awayTeamRef, predictions)
+                            t.filterNot { isRef(it) }.any { TeamNameNormalizer.matches(it, away) }
                         }
                         val count = (if (homeInNext) 1 else 0) + (if (awayInNext) 1 else 0)
 
@@ -348,10 +356,10 @@ object KnockoutCalculator {
                             when {
                                 count == 2 -> displayMap[id] = (displayMap[id] ?: 0) + pts
                                 count == 1 && relevantTeam != null -> {
-                                    val hit = nextPreds.any { pred ->
+                                    val hit = resolvedPreds.any { pred ->
                                         val t = expandPredictionTeams(pred.homeTeamRef, predictions) +
                                                 expandPredictionTeams(pred.awayTeamRef, predictions)
-                                        t.any { TeamNameNormalizer.matches(it, relevantTeam) }
+                                        t.filterNot { isRef(it) }.any { TeamNameNormalizer.matches(it, relevantTeam) }
                                     }
                                     if (hit) displayMap[id] = (displayMap[id] ?: 0) + pts
                                     else displayMap.putIfAbsent(id, 0)

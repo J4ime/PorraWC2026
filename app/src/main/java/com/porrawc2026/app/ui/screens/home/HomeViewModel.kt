@@ -664,7 +664,40 @@ class HomeViewModel @Inject constructor(
             Instant.now().isAfter(start.plusSeconds(MATCH_WINDOW_SECONDS))
     }
 
+    private suspend fun backfillShootoutData() {
+        val koNoShootout = cachedMatches.filter {
+            val d = parseMadridInstant(it.dateTime)
+            it.id in 73..104 && d != null &&
+            it.homeGoals != null && it.awayGoals != null &&
+            isFinishedByTime(it) && it.homeShootoutScore == 0 && it.awayShootoutScore == 0
+        }
+        if (koNoShootout.isNotEmpty()) {
+            LogManager.log("HomeVM", "Backfilling shootout for KO matches: ${koNoShootout.map { it.id }}")
+            val fullUpdates = koNoShootout.mapNotNull { liveScoreService.fetchFullScoreByEspnId(it) }
+            if (fullUpdates.isNotEmpty()) {
+                processScoreUpdates(fullUpdates)
+            }
+        }
+
+        val koMissingAttempts = cachedMatches.filter {
+            val d = parseMadridInstant(it.dateTime)
+            it.id in 73..104 && d != null &&
+            it.homeGoals != null && it.awayGoals != null &&
+            isFinishedByTime(it) &&
+            (it.homeShootoutScore > 0 || it.awayShootoutScore > 0) &&
+            shootoutAttempts[it.id].isNullOrEmpty()
+        }
+        if (koMissingAttempts.isNotEmpty()) {
+            LogManager.log("HomeVM", "Backfilling shootout attempts for: ${koMissingAttempts.map { it.id }}")
+            val fullUpdates = koMissingAttempts.mapNotNull { liveScoreService.fetchFullScoreByEspnId(it) }
+            if (fullUpdates.isNotEmpty()) {
+                processScoreUpdates(fullUpdates)
+            }
+        }
+    }
+
     private suspend fun fetchLiveResults(fullFetch: Boolean = false) {
+        backfillShootoutData()
         val filterResult = filterMatchesForFetch(fullFetch)
         if (filterResult == null) {
             LogManager.log(TAG, "fetchLiveResults: filterMatchesForFetch returned null (no matches to fetch), fullFetch=$fullFetch")
@@ -695,39 +728,6 @@ class HomeViewModel @Inject constructor(
             LogManager.log("HomeVM", "  #${m.id}: ${m.homeTeam} ${m.homeGoals}-${m.awayGoals} ${m.awayTeam}")
         }
         processScoreUpdates(scoreUpdates)
-
-        // Backfill: KO matches that finished without shootout data — only recent ones
-        val twoDaysAgo = Instant.now().minusSeconds(2 * 24 * 60 * 60)
-        val koNoShootout = cachedMatches.filter {
-            val d = parseMadridInstant(it.dateTime)
-            it.id in 73..104 && d != null && d.isAfter(twoDaysAgo) &&
-            it.homeGoals != null && it.awayGoals != null &&
-            isFinishedByTime(it) && it.homeShootoutScore == 0 && it.awayShootoutScore == 0
-        }
-        if (koNoShootout.isNotEmpty()) {
-            LogManager.log("HomeVM", "Backfilling shootout for KO matches: ${koNoShootout.map { it.id }}")
-            val fullUpdates = koNoShootout.mapNotNull { liveScoreService.fetchFullScoreByEspnId(it) }
-            if (fullUpdates.isNotEmpty()) {
-                processScoreUpdates(fullUpdates)
-            }
-        }
-
-        // Backfill: KO matches that finished with shootout scores but no individual attempts
-        val koMissingAttempts = cachedMatches.filter {
-            val d = parseMadridInstant(it.dateTime)
-            it.id in 73..104 && d != null &&
-            it.homeGoals != null && it.awayGoals != null &&
-            isFinishedByTime(it) &&
-            (it.homeShootoutScore > 0 || it.awayShootoutScore > 0) &&
-            shootoutAttempts[it.id].isNullOrEmpty()
-        }
-        if (koMissingAttempts.isNotEmpty()) {
-            LogManager.log("HomeVM", "Backfilling shootout attempts for: ${koMissingAttempts.map { it.id }}")
-            val fullUpdates = koMissingAttempts.mapNotNull { liveScoreService.fetchFullScoreByEspnId(it) }
-            if (fullUpdates.isNotEmpty()) {
-                processScoreUpdates(fullUpdates)
-            }
-        }
 
         notifyGoalEvents()
         recalculateAllPlayerGoals()

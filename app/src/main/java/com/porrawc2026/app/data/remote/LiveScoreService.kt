@@ -89,9 +89,7 @@ class LiveScoreService @Inject constructor(
     suspend fun fetchFullScoreByEspnId(match: MatchEntity): LiveScoreUpdate? {
         val espnId = match.espnId ?: return null
         return try {
-            val dateStr = match.dateTime.take(10).replace("-", "")
-            val scoreboard = espnService.getScoreboard(dates = "$dateStr-$dateStr")
-            val event = scoreboard.events?.firstOrNull { it.id == espnId } ?: return null
+            val event = espnService.getScoreboardEvent(espnId)
             val summary = espnService.getSummary(espnId)
             parseEvent(event, listOf(match), summaryShootout = summary.shootout)
         } catch (e: Exception) {
@@ -191,7 +189,11 @@ class LiveScoreService @Inject constructor(
         val (homeShootout, awayShootout) = if (summaryShootout != null) {
             parseShootoutFromSummary(summaryShootout, homeTeam.id, awayTeam.id)
         } else {
-            parseShootout(competition.shootout, homeTeam.id, awayTeam.id)
+            val h = homeTeam.shootoutScore?.toIntOrNull()
+                ?: parseShootout(competition.shootout, homeTeam.id, awayTeam.id).first
+            val a = awayTeam.shootoutScore?.toIntOrNull()
+                ?: parseShootout(competition.shootout, homeTeam.id, awayTeam.id).second
+            Pair(h, a)
         }
         val shootoutAttempts = if (summaryShootout != null) {
             parseShootoutAttemptsFromSummary(summaryShootout, homeTeam.id)

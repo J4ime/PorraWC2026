@@ -89,6 +89,7 @@ data class EspnCompetitor(
     val id: String?,
     val homeAway: String?,
     val score: String?,
+    val shootoutScore: String? = null,
     val team: EspnTeam?,
     val winner: Boolean?
 )
@@ -170,6 +171,11 @@ interface EspnService {
 
     @GET("site/v2/sports/soccer/fifa.world/events/{eventId}")
     suspend fun getEvent(
+        @Path("eventId") eventId: String
+    ): EspnEvent
+
+    @GET("site/v2/sports/soccer/fifa.world/scoreboard/{eventId}")
+    suspend fun getScoreboardEvent(
         @Path("eventId") eventId: String
     ): EspnEvent
 

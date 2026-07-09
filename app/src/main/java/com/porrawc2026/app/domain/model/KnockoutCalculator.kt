@@ -312,7 +312,7 @@ object KnockoutCalculator {
                             2 -> displayMap[id] = pts
                             1 -> {
                                 val winner = getWinnerSimple(match)
-                                if (winner != null && predTeams.any { TeamNameNormalizer.matches(it, winner) })
+                                if (winner != null && resolvedTeams.any { TeamNameNormalizer.matches(it, winner) })
                                     displayMap[id] = pts
                                 else
                                     displayMap.putIfAbsent(id, 0)

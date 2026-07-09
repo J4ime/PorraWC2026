@@ -155,6 +155,10 @@ data class EspnSummaryShootout(
 )
 
 data class EspnShootoutShot(
+    val id: String?,
+    val playerId: String?,
+    val player: String?,
+    val shotNumber: Int?,
     val didScore: Boolean?
 )
 

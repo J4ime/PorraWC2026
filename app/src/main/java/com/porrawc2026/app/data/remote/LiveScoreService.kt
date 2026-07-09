@@ -193,7 +193,11 @@ class LiveScoreService @Inject constructor(
         } else {
             parseShootout(competition.shootout, homeTeam.id, awayTeam.id)
         }
-        val shootoutAttempts = parseShootoutAttempts(competition.details, homeTeam.id)
+        val shootoutAttempts = if (summaryShootout != null) {
+            parseShootoutAttemptsFromSummary(summaryShootout, homeTeam.id)
+        } else {
+            parseShootoutAttempts(competition.details, homeTeam.id)
+        }
 
         return LiveScoreUpdate(
             matchId = entity.id, homeGoals = hScore, awayGoals = aScore,
@@ -428,6 +432,21 @@ class LiveScoreService @Inject constructor(
         val awayMade = shootout.firstOrNull { it.id == awayId }
             ?.shots?.count { it.didScore == true } ?: 0
         return homeMade to awayMade
+    }
+
+    private fun parseShootoutAttemptsFromSummary(shootout: List<EspnSummaryShootout>?, homeTeamId: String?): List<ShootoutAttempt> {
+        if (shootout == null) return emptyList()
+        LogManager.log("SHOOTOUT_DEBUG", "parseShootoutAttemptsFromSummary: teams=${shootout.size}, shots=${shootout.sumOf { it.shots?.size ?: 0 }}")
+        val attempts = mutableListOf<ShootoutAttempt>()
+        shootout.forEach { teamShootout ->
+            val isHome = teamShootout.id == homeTeamId
+            teamShootout.shots?.forEachIndexed { index, shot ->
+                val playerName = shot.player ?: "?"
+                val isScored = shot.didScore == true
+                attempts.add(ShootoutAttempt(playerName, isHome, isScored, index))
+            }
+        }
+        return attempts
     }
 
     private fun parseShootoutAttempts(details: List<EspnDetail>?, homeTeamId: String?): List<ShootoutAttempt> {

@@ -51,8 +51,9 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
         "Octavos" to 40,
         "Cuartos" to 80,
         "Semifinales" to 160,
+        "Final" to 500,
         "3er puesto" to 200,
-        "Final" to 500
+        "Campeón" to 500
     )
 
     data class KOItem(val team: String, val points: Int, val correct: Boolean)
@@ -60,7 +61,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
     val roundItems = remember(koPredictions, allMatches, koPointsMap) {
         val result = mutableMapOf<String, List<KOItem>>()
         val roundPts = mapOf("Dieciseisavos" to 20, "Octavos" to 40, "Cuartos" to 80,
-            "Semifinales" to 160, "3er puesto" to 200, "Final" to 500)
+            "Semifinales" to 160, "Final" to 500, "3er puesto" to 200)
 
         for ((round, ptsPerTeam) in roundPts) {
             val preds = koPredictions.filter { it.round == round }.sortedBy { it.matchNumber }
@@ -94,6 +95,24 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
             }
             if (items.isNotEmpty()) result[round] = items
         }
+
+        val finalPred = koPredictions.firstOrNull { it.round == "Final" }
+        if (finalPred != null && "Campeón" !in result) {
+            val match = allMatches.firstOrNull { it.id == finalPred.matchNumber }
+            val home = PointsCalculator.resolvePredictionTeamName(finalPred.homeTeamRef, koPredictions)
+            val away = PointsCalculator.resolvePredictionTeamName(finalPred.awayTeamRef, koPredictions)
+            val predictedChampion = when (finalPred.winner) {
+                1 -> home; 2 -> away; else -> null
+            }
+            if (predictedChampion != null && predictedChampion.isNotBlank()) {
+                val actualWinner = match?.winnerTeam?.let { TeamNameNormalizer.enToEs(it) }
+                    ?: if (match != null && match.homeGoals != null && match.awayGoals != null)
+                        KnockoutCalculator.getWinnerSimple(match) else null
+                val correct = actualWinner != null && TeamNameNormalizer.matches(actualWinner, predictedChampion)
+                result["Campeón"] = listOf(KOItem(predictedChampion, if (correct) 500 else 0, correct))
+            }
+        }
+
         result
     }
 

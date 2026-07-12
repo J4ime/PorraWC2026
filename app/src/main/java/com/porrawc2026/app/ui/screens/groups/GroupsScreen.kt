@@ -74,7 +74,7 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
                 val home = PointsCalculator.resolvePredictionTeamName(pred.homeTeamRef, koPredictions)
                 val away = PointsCalculator.resolvePredictionTeamName(pred.awayTeamRef, koPredictions)
 
-                if (round == "3er puesto" || round == "Final") {
+                if (round == "3er puesto") {
                     val winnerTeam = if (pred.winner == 1) home else if (pred.winner == 2) away else null
                     if (winnerTeam != null && winnerTeam.isNotBlank() && seenTeams.none { TeamNameNormalizer.matches(it, winnerTeam) }) {
                         seenTeams.add(winnerTeam)
@@ -87,7 +87,8 @@ fun MatchesScreen(scrollTrigger: Int = 0, onRefreshRequest: () -> Unit = {}, vie
                         if (team.isBlank() || seenTeams.any { TeamNameNormalizer.matches(it, team) }) continue
                         seenTeams.add(team)
                         val correct = actualTeams.any { TeamNameNormalizer.matches(it, team) }
-                        items.add(KOItem(team, if (correct) ptsPerTeam else 0, correct))
+                        val pts = if (round == "Final") 250 else ptsPerTeam
+                        items.add(KOItem(team, if (correct) pts else 0, correct))
                     }
                 }
             }

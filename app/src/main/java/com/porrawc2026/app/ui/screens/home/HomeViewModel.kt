@@ -1181,9 +1181,13 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun resolveTeamNameIfPossible(teamName: String): String {
+        val isLoserRef = teamName.startsWith("Perdedor ") || teamName.startsWith("L")
         val refMatchId = extractRefMatchId(teamName) ?: return teamName
         val refMatch = cachedMatches.firstOrNull { it.id == refMatchId } ?: return teamName
-        return getWinnerName(refMatch) ?: teamName
+        val winner = getWinnerName(refMatch) ?: return teamName
+        if (!isLoserRef) return winner
+        return if (TeamNameNormalizer.matches(refMatch.homeTeam, winner)) refMatch.awayTeam
+        else refMatch.homeTeam
     }
 
     private fun getWinnerName(refMatch: MatchEntity): String? {

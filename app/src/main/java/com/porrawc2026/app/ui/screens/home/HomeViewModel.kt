@@ -573,17 +573,34 @@ class HomeViewModel @Inject constructor(
                 val matchStart = try { parseMadridInstant(m.dateTime) } catch (e: Exception) { null }
                 val alreadyStarted = matchStart != null && !matchStart.isAfter(now)
                 if (alreadyStarted && m.homeGoals != null && m.awayGoals != null) {
-                    m
+                    val resolvedHome = resolveTeamNameIfPossible(m.homeTeam)
+                    val resolvedAway = resolveTeamNameIfPossible(m.awayTeam)
+                    if (resolvedHome != m.homeTeam || resolvedAway != m.awayTeam) {
+                        repository.updateMatchTeams(m.id, resolvedHome, resolvedAway)
+                        m.copy(homeTeam = resolvedHome, awayTeam = resolvedAway)
+                    } else {
+                        m
+                    }
                 } else if (sched != null) {
+                    val resolvedHome = resolveTeamNameIfPossible(sched.home)
+                    val resolvedAway = resolveTeamNameIfPossible(sched.away)
+                    val newHome = if (resolvedHome != sched.home) resolvedHome
+                        else if (m.homeTeam.isNotBlank() && !m.homeTeam.startsWith("Ganador ")) m.homeTeam
+                        else sched.home
+                    val newAway = if (resolvedAway != sched.away) resolvedAway
+                        else if (m.awayTeam.isNotBlank() && !m.awayTeam.startsWith("Ganador ")) m.awayTeam
+                        else sched.away
+                    if (m.homeTeam != newHome || m.awayTeam != newAway) {
+                        repository.updateMatchTeams(m.id, newHome, newAway)
+                    }
                     m.copy(
-                        homeTeam = sched.home,
-                        awayTeam = sched.away,
+                        homeTeam = newHome,
+                        awayTeam = newAway,
                         homeGoals = null, awayGoals = null,
                         homeScorers = null, awayScorers = null,
                         homeRedCards = null, awayRedCards = null,
                         homeYellowCards = null, awayYellowCards = null,
                         homeMissedPenalties = 0, awayMissedPenalties = 0,
-                        // Preserve winnerTeam from API even for unstarted matches
                         homeHeadedGoals = 0, awayHeadedGoals = 0,
                         hasSubGoal = false,
                         homeShootoutScore = 0, awayShootoutScore = 0,
@@ -864,7 +881,7 @@ class HomeViewModel @Inject constructor(
                 val start = parseMadridInstant(match.dateTime)
                 if (start != null && start.isAfter(Instant.now())) {
                     // Future match: update team names only (scores can't exist yet)
-        if (update.matchId in 73..100 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+        if (update.matchId in 73..104 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
                         val esHome = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiHomeTeam))
                         val esAway = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiAwayTeam))
                         if (match.homeTeam != esHome || match.awayTeam != esAway) {
@@ -956,7 +973,7 @@ class HomeViewModel @Inject constructor(
             }
         }
         // For knockout matches, always use API team names (authoritative source), converted to Spanish
-        if (update.matchId in 73..100 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
+        if (update.matchId in 73..104 && update.apiHomeTeam != null && update.apiAwayTeam != null) {
             val esHome = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiHomeTeam))
             val esAway = convertEspnRefToGanador(TeamNameNormalizer.enToEs(update.apiAwayTeam))
             val match = cachedMatches.firstOrNull { it.id == update.matchId }

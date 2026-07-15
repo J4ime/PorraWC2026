@@ -338,7 +338,7 @@ object KnockoutCalculator {
                     }
                 }
                 "Semifinales" -> {
-                    for ((nextRound, pts) in listOf("Final" to 500, "3er puesto" to 200)) {
+                    for ((nextRound, pts) in listOf("Final" to 250, "3er puesto" to 200)) {
                         val nextPreds = predictions.filter { it.round == nextRound }
                         if (nextPreds.isEmpty()) continue
 

@@ -14,7 +14,7 @@ import java.net.URL
 
 object UpdateManager {
 
-    private const val GITHUB_API = "https://api.github.com/repos/J4ime/PorraWC2026/releases?per_page=1&sort=created&direction=desc"
+    private const val GITHUB_API = "https://api.github.com/repos/J4ime/Porra/releases?per_page=1&sort=created&direction=desc"
 
     data class UpdateInfo(val version: String, val downloadUrl: String, val isNewer: Boolean)
 

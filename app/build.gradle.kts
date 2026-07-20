@@ -72,7 +72,7 @@ android {
             .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
             .forEach { output ->
                 val versionName = variant.versionName
-                output.outputFileName = "PorraWC2026-v${versionName}.apk"
+                output.outputFileName = "Porra-v${versionName}.apk"
             }
     }
 

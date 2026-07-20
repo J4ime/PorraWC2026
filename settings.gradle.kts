@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PorraWC2026"
+rootProject.name = "Porra"
 include(":app")

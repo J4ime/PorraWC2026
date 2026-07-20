@@ -19,7 +19,7 @@ object PlayerPhotoDownloader {
     private val client = OkHttpClient.Builder()
         .addInterceptor { chain ->
             val req = chain.request().newBuilder()
-                .header("User-Agent", "Mozilla/5.0 (compatible; PorraWC2026/1.0)")
+                .header("User-Agent", "Mozilla/5.0 (compatible; Porra/1.0)")
                 .build()
             chain.proceed(req)
         }
